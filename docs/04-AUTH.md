@@ -116,11 +116,11 @@ POST /auth/2fa/enroll          POST /auth/2fa/activate     DELETE /auth/2fa
 
 ## 6. Security Requirements Checklist (tested in 12 §4)
 
-- [ ] Timing-uniform login for unknown vs wrong-password (dummy hash)
-- [ ] No user enumeration on register (generic "check your email" if taken), forgot-password, invite
-- [ ] All single-use tokens stored hashed; consumed transactionally (`UPDATE … WHERE used_at IS NULL RETURNING`)
-- [ ] Password change/reset revokes sessions per FR-AUTH-010/012
-- [ ] Refresh reuse revokes family + security audit entry
-- [ ] Cookie flags: HttpOnly, Secure, SameSite=Strict, scoped Path
-- [ ] `WWW-Authenticate: Bearer` on 401; no token material ever logged
-- [ ] Argon2id params asserted by a unit test (regression guard against silent downgrade)
+- [x] Timing-uniform login for unknown vs wrong-password (dummy hash)
+- [x] No user enumeration on register (generic "check your email" if taken), forgot-password, invite
+- [x] All single-use tokens stored hashed; consumed transactionally (`UPDATE … WHERE used_at IS NULL RETURNING`)
+- [x] Password change/reset revokes sessions per FR-AUTH-010/012
+- [x] Refresh reuse revokes family + security audit entry
+- [x] Cookie flags: HttpOnly, Secure, SameSite=Strict, scoped Path
+- [x] `WWW-Authenticate: Bearer` on 401; no token material ever logged
+- [x] Argon2id params asserted by a unit test (regression guard against silent downgrade)
