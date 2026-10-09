@@ -1,15 +1,12 @@
 import type { Metadata } from 'next';
 
+import { PageIntro } from '@/components/marketing/page-intro';
+import { ChangelogTimeline, type ChangelogEntry } from '@/components/marketing/changelog-timeline';
+
 export const metadata: Metadata = { title: 'Changelog' };
 
-interface Entry {
-  date: string;
-  version: string;
-  changes: string[];
-}
-
 // Simple content array (no MDX toolchain needed for a flat changelog).
-const entries: Entry[] = [
+const entries: ChangelogEntry[] = [
   {
     date: '2026-07-08',
     version: 'Admin & observability',
@@ -42,24 +39,9 @@ const entries: Entry[] = [
 
 export default function ChangelogPage() {
   return (
-    <div className="container max-w-2xl py-16">
-      <h1 className="text-4xl font-bold tracking-tight">Changelog</h1>
-      <p className="mt-3 text-muted-foreground">Product updates, newest first.</p>
-      <div className="mt-10 space-y-10">
-        {entries.map((e) => (
-          <article key={e.date} className="border-l-2 border-border pl-6">
-            <div className="flex items-baseline gap-3">
-              <h2 className="text-lg font-semibold">{e.version}</h2>
-              <time className="text-sm text-muted-foreground">{e.date}</time>
-            </div>
-            <ul className="mt-3 list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-              {e.changes.map((c) => (
-                <li key={c}>{c}</li>
-              ))}
-            </ul>
-          </article>
-        ))}
-      </div>
-    </div>
+    <>
+      <PageIntro kicker="Changelog" title="What shipped, and when." lede="Product updates, newest first." />
+      <ChangelogTimeline entries={entries} />
+    </>
   );
 }

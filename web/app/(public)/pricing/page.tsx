@@ -1,6 +1,9 @@
 import type { Metadata } from 'next';
 
 import { PricingTable } from '@/components/marketing/pricing-table';
+import { PageIntro } from '@/components/marketing/page-intro';
+import { Faq } from '@/components/marketing/faq';
+import { Reveal } from '@/components/motion/reveal';
 
 export const metadata: Metadata = { title: 'Pricing' };
 
@@ -23,40 +26,58 @@ const faqs = [
   },
 ];
 
+const flow = [
+  { n: '01', t: 'Allowance', b: 'Every plan bundles seats, storage and API calls.' },
+  { n: '02', t: 'Metering', b: 'Usage is measured continuously and reported to Stripe.' },
+  { n: '03', t: 'Invoice', b: 'The flat plan fee plus any overage, itemised line by line.' },
+  { n: '04', t: 'Dashboard', b: 'Live meters versus limits and an estimated invoice.' },
+];
+
 export default function PricingPage() {
   return (
-    <div className="container py-16">
-      <div className="mx-auto mb-12 max-w-2xl text-center">
-        <h1 className="text-4xl font-bold tracking-tight">Pricing</h1>
-        <p className="mt-3 text-muted-foreground">
-          Transparent plans with usage-based metering. No surprises — you only pay for the seats,
-          storage, and API calls beyond your plan&apos;s included allowance.
-        </p>
-      </div>
+    <>
+      <PageIntro
+        kicker="Pricing"
+        title="Plans that grow with the team."
+        lede="Transparent plans with usage-based metering. You only pay for the seats, storage and API calls beyond your plan's included allowance."
+      />
 
-      <PricingTable />
+      <section className="container">
+        <PricingTable />
+      </section>
 
-      <div className="mx-auto mt-16 max-w-3xl rounded-lg border bg-muted/30 p-6">
-        <h2 className="text-lg font-semibold">How metered billing works</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Every plan bundles an allowance of seats, storage, and API calls. We meter usage
-          continuously and report it to Stripe. At the end of each cycle your invoice combines the
-          flat plan fee with any metered overage, itemized so you can see exactly where costs came
-          from. A usage dashboard shows live meters versus limits and an estimated invoice.
-        </p>
-      </div>
-
-      <div className="mx-auto mt-16 max-w-3xl">
-        <h2 className="text-2xl font-bold tracking-tight">Frequently asked questions</h2>
-        <dl className="mt-6 space-y-6">
-          {faqs.map((f) => (
-            <div key={f.q}>
-              <dt className="font-medium">{f.q}</dt>
-              <dd className="mt-1 text-sm text-muted-foreground">{f.a}</dd>
-            </div>
+      <section className="container py-24 md:py-32">
+        <Reveal variant="fade" className="kicker">
+          How metered billing works
+        </Reveal>
+        <ol className="mt-8 grid gap-px overflow-hidden rounded-lg border border-border bg-border md:grid-cols-4">
+          {flow.map((f, i) => (
+            <Reveal as="li" key={f.n} index={i} className="group relative bg-background p-6">
+              <span className="font-mono text-xs text-muted-foreground">{f.n}</span>
+              <p className="mt-8 font-display text-xl font-semibold tracking-[-0.02em]">{f.t}</p>
+              <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{f.b}</p>
+              {i < flow.length - 1 ? (
+                <span
+                  aria-hidden
+                  className="absolute right-4 top-6 hidden font-mono text-muted-foreground transition-transform duration-500 ease-spring group-hover:translate-x-1 group-hover:text-signal md:block"
+                >
+                  →
+                </span>
+              ) : null}
+            </Reveal>
           ))}
-        </dl>
-      </div>
-    </div>
+        </ol>
+      </section>
+
+      <section className="container grid gap-10 pb-28 md:grid-cols-[0.8fr_1.2fr]">
+        <div>
+          <Reveal variant="fade" className="kicker">
+            FAQ
+          </Reveal>
+          <h2 className="mt-4 text-4xl font-semibold tracking-[-0.04em] md:text-5xl">Questions, answered.</h2>
+        </div>
+        <Faq items={faqs} />
+      </section>
+    </>
   );
 }
