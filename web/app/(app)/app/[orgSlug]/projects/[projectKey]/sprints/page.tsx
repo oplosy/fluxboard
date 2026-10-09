@@ -145,7 +145,7 @@ export default function ProjectSprintsPage({ params }: { params: { projectKey: s
                   value={name}
                   onChange={(e) => setName(e.target.value)}
                   placeholder="e.g. Sprint 12"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </Field>
               <Field id="sprint-goal" label="Goal (optional)">
@@ -154,7 +154,7 @@ export default function ProjectSprintsPage({ params }: { params: { projectKey: s
                   value={goal}
                   onChange={(e) => setGoal(e.target.value)}
                   placeholder="e.g. Ship onboarding"
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </Field>
               <Field id="sprint-start" label="Start (optional)">
@@ -163,7 +163,7 @@ export default function ProjectSprintsPage({ params }: { params: { projectKey: s
                   type="date"
                   value={start}
                   onChange={(e) => setStart(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </Field>
               <Field id="sprint-end" label="End (optional)">
@@ -172,7 +172,7 @@ export default function ProjectSprintsPage({ params }: { params: { projectKey: s
                   type="date"
                   value={end}
                   onChange={(e) => setEnd(e.target.value)}
-                  className="w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none"
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </Field>
             </div>
@@ -284,7 +284,7 @@ export default function ProjectSprintsPage({ params }: { params: { projectKey: s
                     }
                   }}
                   aria-label={`Add ${t.title} to sprint`}
-                  className="rounded-lg border border-input bg-background px-2 py-1 text-xs outline-none"
+                  className="rounded-lg border border-input bg-card px-2 py-1 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 >
                   <option value="">Add to sprint…</option>
                   {sprints

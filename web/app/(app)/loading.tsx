@@ -1,14 +1,10 @@
-import { Skeleton, SkeletonCard } from '@/components/ui/skeleton';
+import { Spinner } from '@/components/ui/spinner';
 
 export default function AppLoading() {
   return (
-    <div className="mx-auto max-w-5xl animate-fade-in px-6 py-8">
-      <Skeleton className="mb-6 h-8 w-48" />
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SkeletonCard />
-        <SkeletonCard />
-        <SkeletonCard />
-      </div>
+    <div className="flex min-h-[50vh] animate-fade-in flex-col items-center justify-center gap-4 text-muted-foreground">
+      <Spinner size="lg" className="text-foreground" />
+      <span className="font-mono text-[10px] uppercase tracking-[0.2em]">Loading</span>
     </div>
   );
 }

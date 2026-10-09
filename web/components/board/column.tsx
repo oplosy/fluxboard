@@ -39,6 +39,8 @@ export function Column({
   labels,
   onMutated,
   composeSignal,
+  flash = false,
+  isDone = false,
 }: {
   column: BoardColumn;
   tasks: TaskCard[];
@@ -53,6 +55,10 @@ export function Column({
   labels: Label[];
   onMutated: () => void;
   composeSignal?: number;
+  /** Briefly pulses the column (e.g. a card was just shipped into it). */
+  flash?: boolean;
+  /** Treat as the board's "done" lane (signal accent). */
+  isDone?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const [composing, setComposing] = useState(false);
@@ -91,32 +97,50 @@ export function Column({
     resetComposer();
   }
 
+  const fill = column.wip_limit ? Math.min(1, tasks.length / column.wip_limit) : 0;
+
   return (
-    <div className="flex w-80 shrink-0 flex-col rounded-3xl bg-secondary/45 p-2">
-      <div className="flex items-center gap-2 px-3 py-3">
-        <h3 className="font-display text-sm font-semibold">{column.name}</h3>
-        <span
-          className={cn(
-            'font-mono text-[10px]',
-            overLimit ? 'bg-amber-500/20 text-amber-700 dark:text-amber-400' : 'text-muted-foreground',
-          )}
-        >
-          {tasks.length}
-          {column.wip_limit != null ? ` / ${column.wip_limit}` : ''}
-        </span>
+    <div
+      className={cn(
+        'flex w-[300px] shrink-0 flex-col rounded-lg border bg-secondary/50 p-1.5 transition-[border-color,background-color,box-shadow] duration-300',
+        isOver ? 'border-dashed border-signal/70 bg-signal/[0.04]' : 'border-transparent',
+        flash && 'animate-[column-flash_0.9s_var(--ease-out-expo)]',
+      )}
+    >
+      <div className="px-2.5 pb-2.5 pt-2">
+        <div className="flex items-center gap-2">
+          <span className={cn('h-2 w-2 rounded-full', isDone ? 'bg-signal' : 'bg-foreground/30')} />
+          <h3 className="truncate font-display text-[14px] font-semibold tracking-[-0.01em]">{column.name}</h3>
+          <span
+            key={tasks.length}
+            className={cn(
+              'ml-auto animate-scale-in rounded-sm px-1.5 py-0.5 font-mono text-[10px] tabular-nums',
+              overLimit ? 'bg-warning/25 text-foreground' : 'bg-background text-muted-foreground',
+            )}
+          >
+            {tasks.length}
+            {column.wip_limit != null ? ` / ${column.wip_limit}` : ''}
+          </span>
+        </div>
+        {column.wip_limit != null ? (
+          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>
+            <div
+              className={cn('h-full origin-left rounded-full transition-[transform,background-color] duration-700 ease-out-expo', overLimit ? 'bg-warning' : 'bg-foreground/50')}
+              style={{ transform: `scaleX(${fill})` }}
+            />
+          </div>
+        ) : null}
       </div>
 
       <div
         ref={setNodeRef}
-        className={cn(
-          'flex min-h-[3rem] flex-1 flex-col gap-3 px-1 pb-2 transition-colors',
-          isOver && 'rounded-2xl bg-primary/8',
-        )}
+        className="flex min-h-[3rem] flex-1 flex-col gap-2 px-0.5 pb-1"
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t) => (
+          {tasks.map((t, i) => (
             <Card
               key={t.id}
+              index={i}
               task={t}
               href={cardHref(t)}
               selectMode={selectMode}
@@ -132,7 +156,7 @@ export function Column({
         </SortableContext>
 
         {composing ? (
-          <div className="rounded-2xl bg-card p-3 shadow-sm">
+          <div className="origin-top animate-scale-in rounded-md border border-foreground/30 bg-card p-3 shadow-[0_12px_28px_-16px_hsl(var(--ink)/0.4)]">
             <textarea
               autoFocus
               value={title}
@@ -153,7 +177,7 @@ export function Column({
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as Priority)}
                 aria-label="Priority"
-                className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               >
                 {PRIORITIES.map((p) => (
                   <option key={p} value={p}>
@@ -165,7 +189,7 @@ export function Column({
                 value={assigneeId}
                 onChange={(e) => setAssigneeId(e.target.value)}
                 aria-label="Assignee"
-                className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               >
                 <option value="">Unassigned</option>
                 {members.map((m) => (
@@ -179,21 +203,21 @@ export function Column({
                 value={startDate}
                 onChange={(e) => setStartDate(e.target.value)}
                 aria-label="Start date"
-                className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               />
               <input
                 type="date"
                 value={dueDate}
                 onChange={(e) => setDueDate(e.target.value)}
                 aria-label="Due date"
-                className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               />
             </div>
             <div className="mt-2 flex items-center gap-2">
               <button
                 onClick={submit}
                 disabled={addPending || !title.trim()}
-                className="rounded-xl bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground disabled:opacity-50"
+                className="rounded-sm bg-foreground px-3 py-1.5 text-xs font-medium text-background transition-[background-color,transform] hover:bg-signal hover:text-signal-foreground active:scale-95 disabled:opacity-50"
               >
                 {addPending ? 'Adding…' : 'Add'}
               </button>
@@ -203,14 +227,15 @@ export function Column({
               >
                 Cancel
               </button>
+              <span className="ml-auto font-mono text-[10px] text-muted-foreground">↵ add · esc</span>
             </div>
           </div>
         ) : (
           <button
             onClick={() => setComposing(true)}
-            className="flex items-center gap-1.5 rounded-xl px-3 py-2.5 text-left text-xs text-muted-foreground hover:bg-background hover:text-foreground"
+            className="group/add flex items-center gap-1.5 rounded-md border border-dashed border-transparent px-2.5 py-2 text-left text-xs text-muted-foreground transition-[border-color,background-color,color] hover:border-foreground/25 hover:bg-background hover:text-foreground"
           >
-            <Plus className="h-3.5 w-3.5" /> Add task
+            <Plus className="h-3.5 w-3.5 transition-transform duration-500 ease-spring group-hover/add:rotate-90" /> Add task
           </button>
         )}
       </div>

@@ -99,7 +99,7 @@ function Breakdown({
                 </span>
               </div>
               <div className="h-1.5 overflow-hidden rounded-full bg-neutral-800">
-                <div className="h-full rounded-full bg-amber-400" style={{ width: `${pct}%` }} />
+                <div className="h-full rounded-full bg-signal transition-[width] duration-700 ease-out-expo" style={{ width: `${pct}%` }} />
               </div>
             </li>
           );

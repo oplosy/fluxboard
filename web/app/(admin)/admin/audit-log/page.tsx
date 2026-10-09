@@ -11,7 +11,7 @@ const SEVERITIES = ['', 'info', 'notice', 'warning', 'critical'];
 const SEVERITY_STYLE: Record<string, string> = {
   info: 'bg-neutral-800 text-neutral-300',
   notice: 'bg-sky-500/20 text-sky-400',
-  warning: 'bg-amber-500/20 text-amber-400',
+  warning: 'bg-signal/20 text-signal',
   critical: 'bg-red-500/20 text-red-400',
 };
 
@@ -76,7 +76,7 @@ export default function AdminAuditLogPage() {
         <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={inputCls} />
         <button
           type="submit"
-          className="h-9 rounded-md bg-amber-500 px-4 text-sm font-medium text-neutral-950 hover:bg-amber-400"
+          className="h-9 rounded-md bg-signal px-4 text-sm font-medium text-neutral-950 hover:bg-signal/90"
         >
           Filter
         </button>
@@ -118,7 +118,7 @@ export default function AdminAuditLogPage() {
                   <td className="px-4 py-2 font-mono text-xs text-neutral-400">
                     {e.actor_user_id ? e.actor_user_id.slice(0, 8) : '—'}
                     {e.impersonator_user_id ? (
-                      <span className="ml-1 text-amber-400" title={`impersonated by ${e.impersonator_user_id}`}>
+                      <span className="ml-1 text-signal" title={`impersonated by ${e.impersonator_user_id}`}>
                         (imp)
                       </span>
                     ) : null}

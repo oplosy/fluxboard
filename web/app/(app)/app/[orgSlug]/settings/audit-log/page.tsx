@@ -105,7 +105,7 @@ export default function AuditLogSettingsPage() {
           <select
             value={severity}
             onChange={(e) => setSeverity(e.target.value)}
-            className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+            className="h-9 rounded-md border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           >
             {SEVERITIES.map((s) => (
               <option key={s} value={s}>

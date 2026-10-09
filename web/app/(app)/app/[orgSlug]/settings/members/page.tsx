@@ -129,7 +129,7 @@ function MemberRow({
           value={member.role}
           disabled={locked || busy}
           onChange={(e) => onRole(e.target.value as Role)}
-          className="h-9 rounded-md border border-input bg-background px-2 text-sm disabled:opacity-50"
+          className="h-9 rounded-md border border-input bg-card px-2 text-sm disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           aria-label="Member role"
         >
           {ASSIGNABLE_ROLES.map((r) => (

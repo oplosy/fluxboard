@@ -163,7 +163,7 @@ export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: bool
                   type="datetime-local"
                   value={mStart}
                   onChange={(e) => setMStart(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none"
+                  className="mt-1 w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </label>
               <label className="text-xs text-muted-foreground">
@@ -172,7 +172,7 @@ export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: bool
                   type="datetime-local"
                   value={mEnd}
                   onChange={(e) => setMEnd(e.target.value)}
-                  className="mt-1 w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none"
+                  className="mt-1 w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </label>
             </div>
@@ -181,7 +181,7 @@ export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: bool
               onChange={(e) => setMNote(e.target.value)}
               placeholder="Note (optional)"
               maxLength={500}
-              className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none"
+              className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
             />
             <div className="flex gap-2">
               <Button

@@ -112,7 +112,7 @@ export default function InviteMembersPage() {
             onChange={(e) => setRaw(e.target.value)}
             rows={4}
             placeholder="alice@acme.com, bob@acme.com"
-            className="flex w-full rounded-md border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
           <p className="text-xs text-muted-foreground">
             Separate multiple addresses with commas, spaces or new lines.
@@ -125,7 +125,7 @@ export default function InviteMembersPage() {
             id="invite-role"
             value={role}
             onChange={(e) => setRole(e.target.value as Role)}
-            className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+            className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           >
             {INVITE_ROLES.map((r) => (
               <option key={r} value={r}>

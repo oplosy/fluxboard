@@ -23,7 +23,7 @@ export function PastDueBanner() {
   if (!isAdmin || dismissed || !data?.past_due_warning) return null;
 
   return (
-    <div className="flex items-center gap-3 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm">
+    <div className="flex animate-slide-down items-center gap-3 border-b border-destructive/40 bg-destructive/10 px-4 py-2 text-sm">
       <AlertTriangle className="h-4 w-4 shrink-0 text-destructive" />
       <p className="flex-1">
         Payment is past due. Update your billing details to keep your subscription active.

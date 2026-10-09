@@ -2,10 +2,13 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import type { ReactNode } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { useRef, type ReactNode } from 'react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 
-import { cn } from '@/lib/utils';
+import { SectionShell } from '@/components/org/section-shell';
+import { Logo } from '@/components/brand/logo';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+import { useRouteEnter } from '@/components/motion/route-transition';
 
 const nav = [
   { href: '/account/profile', label: 'Profile' },
@@ -17,57 +20,41 @@ const nav = [
 
 export default function AccountLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
-
-  // Derive current section label for breadcrumb
+  const body = useRef<HTMLDivElement>(null);
+  useRouteEnter(body);
   const currentLabel = nav.find((n) => pathname === n.href)?.label ?? 'Account';
 
   return (
-    <div className="mx-auto max-w-5xl px-6 py-12 lg:px-10 lg:py-16 animate-fade-in">
-      {/* Header with breadcrumb */}
-      <div className="mb-10 flex items-end justify-between">
-        <div>
-          <div className="mb-3 flex items-center gap-1 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
-            <Link href="/app" className="hover:text-foreground transition-colors">
-              Organizations
-            </Link>
-            <ChevronRight className="h-3 w-3" />
-            <span className="text-foreground font-medium">Account</span>
-          </div>
-          <h1 className="text-4xl font-semibold tracking-[-0.06em]">{currentLabel}</h1>
+    <div className="min-h-screen">
+      <header className="sticky top-0 z-20 flex h-14 items-center justify-between border-b border-border bg-background/85 px-5 backdrop-blur-md lg:px-10">
+        <div className="flex items-center gap-5">
+          <Logo href="/app" />
+          <Link
+            href="/app"
+            className="group hidden items-center gap-1.5 text-sm text-muted-foreground transition-colors hover:text-foreground sm:flex"
+          >
+            <ArrowLeft className="h-3.5 w-3.5 transition-transform duration-500 ease-spring group-hover:-translate-x-1" />
+            Organizations
+          </Link>
         </div>
-        <Link
-          href="/logout"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
+        <div className="flex items-center gap-1">
+          <ThemeToggle compact />
+          <Link
+            href="/logout"
+            className="flex h-9 items-center gap-2 rounded-md px-3 text-sm text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <LogOut className="h-3.5 w-3.5" /> Sign out
+          </Link>
+        </div>
+      </header>
+      <div ref={body}>
+        <SectionShell
+          kicker="Account"
+          title={currentLabel}
+          tabs={nav.map((n) => ({ href: n.href, label: n.label, active: pathname === n.href }))}
         >
-          Sign out
-        </Link>
-      </div>
-
-      <div className="grid gap-8 md:grid-cols-[180px_1fr]">
-        <nav className="flex flex-row gap-1 overflow-x-auto md:flex-col md:pr-8">
-          {nav.map((n) => {
-            const active = pathname === n.href;
-            return (
-              <Link
-                key={n.href}
-                href={n.href}
-                className={cn(
-                  'relative whitespace-nowrap rounded-xl px-3 py-2.5 text-sm transition-all duration-200',
-                  active
-                    ? 'bg-secondary font-medium text-foreground'
-                    : 'text-muted-foreground hover:bg-secondary/60 hover:text-foreground',
-                )}
-              >
-                {/* Active indicator */}
-                {active ? (
-                  <span className="absolute left-0 top-1/2 hidden h-5 w-[3px] -translate-y-1/2 rounded-r-full bg-primary md:block" />
-                ) : null}
-                {n.label}
-              </Link>
-            );
-          })}
-        </nav>
-        <div className="animate-fade-in">{children}</div>
+          {children}
+        </SectionShell>
       </div>
     </div>
   );

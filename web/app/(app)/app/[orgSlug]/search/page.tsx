@@ -72,7 +72,7 @@ function SearchInner() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Search tasks…"
-            className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="w-full rounded-md border border-input bg-card py-2 pl-9 pr-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
         </div>
         <button type="submit" className="rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground">

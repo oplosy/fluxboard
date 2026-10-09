@@ -4,11 +4,12 @@ import { useRouter } from 'next/navigation';
 import { useEffect, type ReactNode } from 'react';
 
 import { useAuth } from './context';
+import { Spinner } from '@/components/ui/spinner';
 
 function Loading() {
   return (
-    <div className="flex min-h-[40vh] items-center justify-center text-sm text-muted-foreground">
-      Loading…
+    <div className="flex min-h-[40vh] items-center justify-center text-foreground">
+      <Spinner size="lg" />
     </div>
   );
 }
