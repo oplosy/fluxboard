@@ -2,275 +2,504 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ════════════════════════════════════════════════════════════════════
+   Fluxboard design tokens — "ink & paper" + one signal colour.
+   primary   = ink (light) / paper (dark): the default for solid UI.
+   signal    = vermilion: state, focus, progress and motion only.
+   ════════════════════════════════════════════════════════════════════ */
 @layer base {
   :root {
-    /* ── Core ─────────────────────────────────────────── */
-    --background: 210 24% 97%;
-    --foreground: 218 24% 18%;
-    --card: 0 0% 100%;
-    --card-foreground: 218 24% 18%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 218 24% 18%;
+    --paper: 42 23% 95%;
+    --ink: 60 5% 8%;
 
-    /* ── Brand ────────────────────────────────────────── */
-    --primary: 164 48% 30%;
-    --primary-foreground: 0 0% 100%;
-    --accent: 164 48% 30%;
-    --accent-foreground: 0 0% 100%;
+    --background: 42 23% 95%;
+    --foreground: 60 5% 8%;
+    --card: 40 33% 99%;
+    --card-foreground: 60 5% 8%;
+    --popover: 40 33% 99%;
+    --popover-foreground: 60 5% 8%;
 
-    /* ── Semantic ─────────────────────────────────────── */
-    --secondary: 210 20% 93%;
-    --secondary-foreground: 218 24% 18%;
-    --muted: 210 20% 93%;
-    --muted-foreground: 218 10% 46%;
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 45%;
+    --primary: 60 5% 8%;
+    --primary-foreground: 42 23% 95%;
+
+    --signal: 14 88% 51%;
+    --signal-foreground: 60 5% 8%;
+    --signal-ink: 13 80% 39%;
+    --cobalt: 226 76% 52%;
+
+    --secondary: 40 15% 89.5%;
+    --secondary-foreground: 60 5% 8%;
+    --muted: 40 15% 89.5%;
+    --muted-foreground: 40 4% 38%;
+    --accent: 40 15% 89.5%;
+    --accent-foreground: 60 5% 8%;
+
+    --destructive: 2 72% 46%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 52% 32%;
     --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
+    --warning: 38 92% 48%;
+    --warning-foreground: 60 5% 8%;
 
-    /* ── Surfaces ─────────────────────────────────────── */
-    --border: 210 18% 89%;
-    --input: 210 18% 86%;
-    --ring: 164 48% 30%;
-    --radius: 0.9rem;
+    --border: 40 10% 83%;
+    --input: 40 10% 78%;
+    --ring: 14 88% 51%;
+    --radius: 0.5rem;
 
-    /* ── Sidebar ──────────────────────────────────────── */
-    --sidebar: 210 24% 94%;
-    --sidebar-foreground: 218 24% 18%;
-    --sidebar-border: 210 18% 94%;
-    --sidebar-active: 164 48% 30%;
+    --sidebar: 40 18% 92%;
+    --sidebar-foreground: 60 5% 8%;
+    --sidebar-border: 40 10% 84%;
+    --sidebar-active: 14 88% 51%;
 
-    /* ── Topbar ───────────────────────────────────────── */
-    --topbar: 210 24% 97%;
-    --topbar-foreground: 218 24% 18%;
+    --topbar: 42 23% 95%;
+    --topbar-foreground: 60 5% 8%;
+
+    --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+    --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+    --ease-in-out-quart: cubic-bezier(0.76, 0, 0.24, 1);
   }
 
   .dark {
-    /* ── Core ─────────────────────────────────────────── */
-    --background: 218 22% 11%;
-    --foreground: 210 24% 96%;
-    --card: 218 20% 14%;
-    --card-foreground: 210 24% 96%;
-    --popover: 218 20% 14%;
-    --popover-foreground: 210 24% 96%;
+    --paper: 40 18% 92%;
+    --ink: 60 4% 6%;
 
-    /* ── Brand ────────────────────────────────────────── */
-    --primary: 164 52% 52%;
-    --primary-foreground: 218 24% 10%;
-    --accent: 164 52% 52%;
-    --accent-foreground: 218 24% 10%;
+    --background: 60 3% 6.5%;
+    --foreground: 40 18% 92%;
+    --card: 60 3% 9%;
+    --card-foreground: 40 18% 92%;
+    --popover: 60 3% 10%;
+    --popover-foreground: 40 18% 92%;
 
-    /* ── Semantic ─────────────────────────────────────── */
-    --secondary: 218 18% 18%;
-    --secondary-foreground: 210 24% 96%;
-    --muted: 218 18% 18%;
-    --muted-foreground: 210 10% 68%;
-    --destructive: 0 63% 45%;
-    --destructive-foreground: 210 40% 98%;
-    --success: 142 71% 40%;
-    --success-foreground: 0 0% 100%;
-    --warning: 38 92% 50%;
-    --warning-foreground: 0 0% 0%;
+    --primary: 40 18% 92%;
+    --primary-foreground: 60 4% 7%;
 
-    /* ── Surfaces ─────────────────────────────────────── */
-    --border: 218 14% 23%;
-    --input: 218 14% 25%;
-    --ring: 164 52% 52%;
+    --signal: 16 100% 56%;
+    --signal-foreground: 60 4% 6%;
+    --signal-ink: 18 100% 64%;
+    --cobalt: 224 90% 68%;
 
-    /* ── Sidebar ──────────────────────────────────────── */
-    --sidebar: 218 20% 13%;
-    --sidebar-foreground: 210 24% 96%;
-    --sidebar-border: 218 14% 15%;
-    --sidebar-active: 164 52% 52%;
+    --secondary: 60 3% 13%;
+    --secondary-foreground: 40 18% 92%;
+    --muted: 60 3% 13%;
+    --muted-foreground: 40 6% 62%;
+    --accent: 60 3% 13%;
+    --accent-foreground: 40 18% 92%;
 
-    /* ── Topbar ───────────────────────────────────────── */
-    --topbar: 218 22% 11%;
-    --topbar-foreground: 210 24% 96%;
+    --destructive: 2 78% 56%;
+    --destructive-foreground: 0 0% 100%;
+    --success: 152 48% 48%;
+    --success-foreground: 60 4% 6%;
+    --warning: 38 92% 55%;
+    --warning-foreground: 60 4% 6%;
+
+    --border: 60 3% 17%;
+    --input: 60 3% 23%;
+    --ring: 16 100% 56%;
+
+    --sidebar: 60 3% 8%;
+    --sidebar-foreground: 40 18% 92%;
+    --sidebar-border: 60 3% 15%;
+    --sidebar-active: 16 100% 56%;
+
+    --topbar: 60 3% 6.5%;
+    --topbar-foreground: 40 18% 92%;
   }
 
-  /* ── Resets ───────────────────────────────────────── */
   * {
     @apply border-border;
   }
 
   html {
-    scroll-behavior: smooth;
+    -webkit-tap-highlight-color: transparent;
   }
 
   body {
     @apply bg-background text-foreground;
-    font-feature-settings: 'rlig' 1, 'calt' 1;
+    font-feature-settings: 'cv11', 'ss01', 'calt' 1;
+    text-rendering: optimizeLegibility;
   }
 
-  /* Display type for headings (Sora); body stays Inter, code stays mono */
-  h1, h2, h3 {
+  h1,
+  h2,
+  h3 {
     @apply font-display;
+    font-optical-sizing: auto;
+    text-wrap: balance;
   }
 
   ::selection {
-    background: hsl(var(--primary) / 0.2);
+    background: hsl(var(--signal));
+    color: hsl(var(--signal-foreground));
   }
 
-  /* Improved focus ring for keyboard navigation */
   :focus-visible {
-    @apply outline-none ring-2 ring-ring ring-offset-2 ring-offset-background;
+    outline: 2px solid hsl(var(--signal));
+    outline-offset: 2px;
   }
 
-  /* macOS-style overlay scrollbars: transparent track, floating rounded
-     thumb, no arrow buttons. Applies project-wide (board strip, sidebar,
-     tables, dialogs). */
+  /* Overlay-style scrollbars: transparent track, floating thumb. */
   * {
     scrollbar-width: thin;
-    scrollbar-color: hsl(var(--muted-foreground) / 0.35) transparent;
+    scrollbar-color: hsl(var(--muted-foreground) / 0.3) transparent;
   }
   *::-webkit-scrollbar {
     width: 10px;
     height: 10px;
   }
-  *::-webkit-scrollbar-track {
+  *::-webkit-scrollbar-track,
+  *::-webkit-scrollbar-corner {
     background: transparent;
   }
   *::-webkit-scrollbar-button {
     display: none;
-    width: 0;
-    height: 0;
   }
   *::-webkit-scrollbar-thumb {
-    background: hsl(var(--muted-foreground) / 0.35);
+    background: hsl(var(--muted-foreground) / 0.3);
     border-radius: 999px;
     border: 3px solid transparent;
     background-clip: padding-box;
   }
   *::-webkit-scrollbar-thumb:hover {
-    background: hsl(var(--muted-foreground) / 0.55);
+    background: hsl(var(--muted-foreground) / 0.5);
     border: 3px solid transparent;
     background-clip: padding-box;
   }
-  *::-webkit-scrollbar-corner {
-    background: transparent;
+
+  input[type='checkbox'] {
+    accent-color: hsl(var(--signal));
   }
 }
 
-/* ── Animation Keyframes ─────────────────────────────── */
-@keyframes fade-in {
-  from { opacity: 0; }
-  to { opacity: 1; }
+/* ── Components ─────────────────────────────────────────────────────── */
+@layer components {
+  /* Mono eyebrow label used for section numbering and metadata. */
+  .kicker {
+    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground;
+  }
+
+  /* Animated underline: grows from the left on hover/focus. */
+  .link-underline {
+    background-image: linear-gradient(currentColor, currentColor);
+    background-size: 0% 1px;
+    background-position: 0 100%;
+    background-repeat: no-repeat;
+    transition: background-size 0.45s var(--ease-out-expo);
+  }
+  .link-underline:hover,
+  .link-underline:focus-visible {
+    background-size: 100% 1px;
+  }
+
+  /* Blueprint grid backdrop. */
+  .blueprint {
+    background-image:
+      linear-gradient(hsl(var(--foreground) / 0.06) 1px, transparent 1px),
+      linear-gradient(90deg, hsl(var(--foreground) / 0.06) 1px, transparent 1px);
+    background-size: 48px 48px;
+  }
+
+  /* Corner tick marks for framed panels (engineering-drawing feel). */
+  .ticks {
+    position: relative;
+  }
+  .ticks::before,
+  .ticks::after {
+    content: '';
+    position: absolute;
+    width: 9px;
+    height: 9px;
+    pointer-events: none;
+    border-color: hsl(var(--foreground) / 0.45);
+  }
+  .ticks::before {
+    top: -1px;
+    left: -1px;
+    border-top-width: 1px;
+    border-left-width: 1px;
+  }
+  .ticks::after {
+    bottom: -1px;
+    right: -1px;
+    border-bottom-width: 1px;
+    border-right-width: 1px;
+  }
+
+  /* Film-grain overlay for large marketing surfaces. */
+  .grain::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.05;
+    mix-blend-mode: multiply;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  }
+  .dark .grain::after {
+    mix-blend-mode: screen;
+    opacity: 0.04;
+  }
 }
+
+/* ── Motion primitives ──────────────────────────────────────────────── */
+
+/* Scroll reveal: elements start hidden and animate in when `.is-in` lands. */
+[data-reveal] {
+  --reveal-delay: calc(var(--i, 0) * 70ms);
+  transition:
+    opacity 0.8s var(--ease-out-expo) var(--reveal-delay),
+    transform 0.9s var(--ease-out-expo) var(--reveal-delay),
+    filter 0.8s var(--ease-out-expo) var(--reveal-delay),
+    clip-path 1s var(--ease-in-out-quart) var(--reveal-delay);
+}
+[data-reveal='up'] {
+  opacity: 0;
+  transform: translateY(28px);
+}
+[data-reveal='fade'] {
+  opacity: 0;
+}
+[data-reveal='blur'] {
+  opacity: 0;
+  filter: blur(10px);
+  transform: translateY(10px);
+}
+[data-reveal='scale'] {
+  opacity: 0;
+  transform: scale(0.94);
+}
+[data-reveal='clip'] {
+  clip-path: inset(0 100% 0 0);
+}
+[data-reveal='clip-up'] {
+  clip-path: inset(100% 0 0 0);
+  transform: translateY(20px);
+}
+[data-reveal].is-in {
+  opacity: 1;
+  transform: none;
+  filter: none;
+  clip-path: inset(0 0 0 0);
+}
+
+/* Split-text: each word/char rises out of a mask. */
+.split-word {
+  display: inline-block;
+  overflow: hidden;
+  vertical-align: top;
+  padding-bottom: 0.08em;
+  margin-bottom: -0.08em;
+}
+.split-inner {
+  display: inline-block;
+  transform: translateY(105%);
+  transition: transform 1s var(--ease-out-expo);
+  transition-delay: calc(var(--i, 0) * 45ms + var(--split-delay, 0ms));
+}
+.is-in .split-inner,
+.split-inner.is-in {
+  transform: none;
+}
+
+/* Legacy stagger used across older pages. */
+.stagger-children > * {
+  animation: slide-up 0.6s var(--ease-out-expo) backwards;
+}
+.stagger-children > *:nth-child(1) { animation-delay: 0ms; }
+.stagger-children > *:nth-child(2) { animation-delay: 60ms; }
+.stagger-children > *:nth-child(3) { animation-delay: 120ms; }
+.stagger-children > *:nth-child(4) { animation-delay: 180ms; }
+.stagger-children > *:nth-child(5) { animation-delay: 240ms; }
+.stagger-children > *:nth-child(6) { animation-delay: 300ms; }
+.stagger-children > *:nth-child(n + 7) { animation-delay: 340ms; }
 
 @keyframes slide-up {
-  from { opacity: 0; transform: translateY(8px); }
+  from { opacity: 0; transform: translateY(14px); }
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes slide-in-left {
-  from { opacity: 0; transform: translateX(-12px); }
-  to { opacity: 1; transform: translateX(0); }
+/* Button ripple. */
+@keyframes ripple {
+  from { transform: translate(-50%, -50%) scale(0); opacity: 0.35; }
+  to { transform: translate(-50%, -50%) scale(1); opacity: 0; }
+}
+.ripple {
+  position: absolute;
+  border-radius: 999px;
+  pointer-events: none;
+  background: currentColor;
+  animation: ripple 0.65s var(--ease-out-expo) forwards;
 }
 
-@keyframes slide-in-right {
-  from { opacity: 0; transform: translateX(12px); }
-  to { opacity: 1; transform: translateX(0); }
+/* Text roll: label slides up and is replaced by its copy on hover. */
+.roll {
+  display: inline-grid;
+  overflow: hidden;
+  line-height: 1.25;
+}
+.roll > span {
+  grid-area: 1 / 1;
+  transition: transform 0.5s var(--ease-out-expo);
+}
+.roll > span:last-child {
+  transform: translateY(110%);
+}
+.group:hover .roll > span:first-child,
+.group:focus-visible .roll > span:first-child {
+  transform: translateY(-110%);
+}
+.group:hover .roll > span:last-child,
+.group:focus-visible .roll > span:last-child {
+  transform: none;
 }
 
-@keyframes scale-in {
-  from { opacity: 0; transform: scale(0.95); }
-  to { opacity: 1; transform: scale(1); }
+/* Theme switch: circular reveal via the View Transitions API. */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation: none;
+  mix-blend-mode: normal;
 }
 
-@keyframes shimmer {
-  0% { background-position: -200% 0; }
-  100% { background-position: 200% 0; }
-}
-
-@keyframes spin-slow {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes pulse-dot {
-  0%, 100% { opacity: 0.4; }
-  50% { opacity: 1; }
-}
-
-@keyframes slide-down {
-  from { opacity: 0; transform: translateY(-4px); }
-  to { opacity: 1; transform: translateY(0); }
-}
-
-/* ── Animation Utilities ─────────────────────────────── */
 @layer utilities {
-  .animate-fade-in {
-    animation: fade-in 0.3s ease-out both;
-  }
-  .animate-slide-up {
-    animation: slide-up 0.35s ease-out both;
-  }
-  .animate-slide-in-left {
-    animation: slide-in-left 0.3s ease-out both;
-  }
-  .animate-slide-in-right {
-    animation: slide-in-right 0.3s ease-out both;
-  }
-  .animate-scale-in {
-    animation: scale-in 0.2s ease-out both;
-  }
-  .animate-slide-down {
-    animation: slide-down 0.2s ease-out both;
-  }
-  .animate-shimmer {
-    animation: shimmer 2s ease-in-out infinite;
-    background-size: 200% 100%;
-  }
-  .animate-spin-slow {
-    animation: spin-slow 1.2s linear infinite;
-  }
-
-  /* Staggered children animation */
-  .stagger-children > * {
-    animation: slide-up 0.4s ease-out both;
-  }
-  .stagger-children > *:nth-child(1) { animation-delay: 0ms; }
-  .stagger-children > *:nth-child(2) { animation-delay: 60ms; }
-  .stagger-children > *:nth-child(3) { animation-delay: 120ms; }
-  .stagger-children > *:nth-child(4) { animation-delay: 180ms; }
-  .stagger-children > *:nth-child(5) { animation-delay: 240ms; }
-  .stagger-children > *:nth-child(6) { animation-delay: 300ms; }
-
-  /* Reserved for transient overlays; application surfaces stay opaque. */
-  .glass {
-    @apply bg-background;
-    border: 0;
-    box-shadow: 0 18px 50px hsl(var(--foreground) / 0.06);
-  }
-  .dark .glass { @apply bg-background; }
-
-  /* Gradient text */
-  .gradient-text {
-    @apply bg-clip-text text-transparent;
-    background-image: none;
-  }
-
-  /* Slim inline scrollbar for horizontal strips (kanban, tables) */
   .scrollbar-thin {
     scrollbar-width: thin;
   }
   .scrollbar-thin::-webkit-scrollbar {
     height: 8px;
   }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
 
-  /* Subtle glow effect */
-  .glow-primary { box-shadow: none; }
-  .dark .glow-primary { box-shadow: none; }
+  /* Overlay surface (menus, toasts). */
+  .glass {
+    @apply border border-border bg-popover text-popover-foreground;
+    box-shadow:
+      0 1px 0 hsl(var(--foreground) / 0.04),
+      0 18px 50px -12px hsl(var(--ink) / 0.25);
+  }
+
+  /* Kept as no-ops for older markup. */
+  .gradient-text {
+    color: inherit;
+  }
+  .glow-primary {
+    box-shadow: none;
+  }
+
+  .text-outline {
+    color: transparent;
+    -webkit-text-stroke: 1px hsl(var(--foreground) / 0.5);
+  }
+
+  .mask-fade-x {
+    mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent);
+  }
+  .mask-fade-b {
+    mask-image: linear-gradient(180deg, #000 70%, transparent);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
 }
 
-/* ── Reduced motion ──────────────────────────────────── */
+/* ── Reduced motion ─────────────────────────────────────────────────── */
 @media (prefers-reduced-motion: reduce) {
-  *, *::before, *::after {
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
     scroll-behavior: auto !important;
   }
+  [data-reveal],
+  .split-inner {
+    opacity: 1 !important;
+    transform: none !important;
+    filter: none !important;
+    clip-path: none !important;
+  }
+}
+
+@keyframes toast-in {
+  from { opacity: 0; transform: translateX(60%) scale(0.96); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes toast-life {
+  from { transform: scaleX(1); }
+  to { transform: scaleX(0); }
+}
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  20% { transform: translateX(-6px); }
+  40% { transform: translateX(5px); }
+  60% { transform: translateX(-3px); }
+  80% { transform: translateX(2px); }
+}
+@keyframes card-hop {
+  0% { transform: translateY(0) rotate(0) scale(1); box-shadow: 0 6px 18px -10px hsl(var(--ink) / 0.4); }
+  35% { transform: translateY(-6px) rotate(-2deg) scale(1.05); box-shadow: 0 22px 40px -14px hsl(var(--ink) / 0.45); }
+  100% { transform: none; }
+}
+
+/* Auth pages render plain <Card>s; inside the auth shell they become an open,
+   borderless form with an editorial title. */
+.auth-form > div {
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+.auth-form > div > div {
+  padding-left: 0;
+  padding-right: 0;
+}
+.auth-form > div > div:first-child {
+  padding-top: 0;
+  margin-bottom: 0.75rem;
+}
+.auth-form > div > div:first-child h3 {
+  font-size: 2.5rem;
+  line-height: 1;
+  letter-spacing: -0.045em;
+}
+.auth-form a.text-primary {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  text-decoration-color: hsl(var(--foreground) / 0.3);
+  transition: text-decoration-color 0.3s;
+}
+.auth-form a.text-primary:hover {
+  text-decoration-color: hsl(var(--signal));
+}
+@keyframes bell-swing {
+  0%, 100% { transform: rotate(0); }
+  15% { transform: rotate(16deg); }
+  30% { transform: rotate(-12deg); }
+  45% { transform: rotate(8deg); }
+  60% { transform: rotate(-5deg); }
+  75% { transform: rotate(2deg); }
+}
+@keyframes card-in {
+  from { opacity: 0; transform: translateY(8px) scale(0.98); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes column-flash {
+  0% { box-shadow: 0 0 0 0 hsl(var(--signal) / 0.6); }
+  100% { box-shadow: 0 0 0 14px hsl(var(--signal) / 0); }
+}
+@keyframes card-lift {
+  to { transform: rotate(-2.5deg) scale(1.03); }
+}
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(28px) scale(0.97); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes topple {
+  from { transform: rotate(0); }
+  to { transform: rotate(78deg); }
 }

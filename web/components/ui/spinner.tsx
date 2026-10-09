@@ -6,24 +6,23 @@ interface SpinnerProps {
 }
 
 const sizes = {
-  sm: 'h-4 w-4 border-[1.5px]',
-  md: 'h-5 w-5 border-2',
-  lg: 'h-8 w-8 border-2',
+  sm: 'h-3 gap-[2px] [&>span]:w-[2px]',
+  md: 'h-4 gap-[3px] [&>span]:w-[3px]',
+  lg: 'h-7 gap-1 [&>span]:w-1',
 };
 
-/** Circular spinner for inline or overlay loading indication. */
+/** Loading indicator: four bouncing columns echoing the logo mark. */
 export function Spinner({ size = 'md', className }: SpinnerProps) {
   return (
-    <div
-      className={cn(
-        'animate-spin-slow rounded-full border-muted-foreground/30 border-t-primary',
-        sizes[size],
-        className,
-      )}
-      role="status"
-      aria-label="Loading"
-    >
+    <span className={cn('inline-flex items-end', sizes[size], className)} role="status" aria-label="Loading">
+      {[0, 1, 2, 3].map((i) => (
+        <span
+          key={i}
+          className={cn('h-full origin-bottom animate-bar-bounce rounded-[1px] bg-current', i === 3 && 'text-signal')}
+          style={{ animationDelay: `${i * 120}ms` }}
+        />
+      ))}
       <span className="sr-only">Loading…</span>
-    </div>
+    </span>
   );
 }
