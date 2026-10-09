@@ -86,7 +86,7 @@ export default function LabelsSettingsPage() {
           type="color"
           value={newColor}
           onChange={(e) => setNewColor(e.target.value)}
-          className="h-9 w-12 rounded border border-input bg-background"
+          className="h-9 w-12 rounded border border-input bg-card transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           aria-label="New label color"
         />
         <Input
@@ -135,7 +135,7 @@ function LabelRow({
         value={color}
         onChange={(e) => setColor(e.target.value)}
         onBlur={commit}
-        className="h-8 w-10 rounded border border-input bg-background"
+        className="h-8 w-10 rounded border border-input bg-card transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
         aria-label="Label color"
       />
       <Input value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} className="max-w-xs" />

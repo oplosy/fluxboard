@@ -65,7 +65,7 @@ export default function AdminTenantsPage() {
         </select>
         <button
           type="submit"
-          className="h-9 rounded-md bg-amber-500 px-4 text-sm font-medium text-neutral-950 hover:bg-amber-400"
+          className="h-9 rounded-md bg-signal px-4 text-sm font-medium text-neutral-950 hover:bg-signal/90"
         >
           Filter
         </button>
@@ -98,7 +98,7 @@ export default function AdminTenantsPage() {
                   <td className="px-4 py-3">
                     <Link
                       href={`/admin/tenants/${t.org_id}`}
-                      className="font-medium text-neutral-100 hover:text-amber-400"
+                      className="font-medium text-neutral-100 hover:text-signal"
                     >
                       {t.name}
                     </Link>

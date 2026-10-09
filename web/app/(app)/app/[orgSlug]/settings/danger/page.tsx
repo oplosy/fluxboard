@@ -79,7 +79,7 @@ function TransferSection() {
                 setTarget(e.target.value);
                 setConfirm('');
               }}
-              className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+              className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
             >
               <option value="">Select a member…</option>
               {candidates.map((m) => (

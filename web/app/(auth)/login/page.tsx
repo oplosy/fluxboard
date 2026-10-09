@@ -22,6 +22,7 @@ import { isTwoFactorRequired } from '@/lib/api/types';
 import { useAuth } from '@/lib/auth/context';
 import { PENDING_2FA_KEY } from '@/lib/auth/pending';
 import { sanitizeNext } from '@/lib/nav/safe-next';
+import { useTransitionNav } from '@/components/motion/route-transition';
 
 function GoogleIcon() {
   return (
@@ -48,6 +49,7 @@ function GoogleIcon() {
 
 function LoginForm() {
   const router = useRouter();
+  const { go } = useTransitionNav();
   const params = useSearchParams();
   const next = sanitizeNext(params.get('next'));
   const { adopt } = useAuth();
@@ -64,7 +66,7 @@ function LoginForm() {
         return;
       }
       adopt(res);
-      router.replace(next);
+      go(next, { replace: true });
     },
   });
 

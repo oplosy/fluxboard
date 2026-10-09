@@ -7,6 +7,8 @@ import { ThemeProvider } from '@/components/ui/theme-provider';
 import { AuthProvider } from '@/lib/auth/context';
 import { ToastProvider } from '@/components/ui/toast';
 import { UpgradeModalProvider } from '@/components/upgrade-modal';
+import { RouteTransition } from '@/components/motion/route-transition';
+import { BurstLayer } from '@/components/canvas/burst-layer';
 import { ApiError } from '@/lib/api/client';
 
 export function Providers({ children }: { children: ReactNode }) {
@@ -33,10 +35,13 @@ export function Providers({ children }: { children: ReactNode }) {
       <QueryClientProvider client={queryClient}>
         <AuthProvider>
           <ToastProvider>
-            <UpgradeModalProvider>{children}</UpgradeModalProvider>
+            <UpgradeModalProvider>
+              <RouteTransition>{children}</RouteTransition>
+            </UpgradeModalProvider>
           </ToastProvider>
         </AuthProvider>
       </QueryClientProvider>
+      <BurstLayer />
     </ThemeProvider>
   );
 }
