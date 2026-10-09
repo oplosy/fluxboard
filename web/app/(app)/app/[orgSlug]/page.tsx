@@ -2,63 +2,226 @@
 
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
-import { CircleCheck, FolderKanban, Bell } from 'lucide-react';
+import { ArrowUpRight } from 'lucide-react';
+import type { ReactNode } from 'react';
 
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
+import { DueStrip } from '@/components/canvas/due-strip';
+import { CountUp } from '@/components/motion/effects';
+import { PriorityBars } from '@/components/board/priority-bars';
 import { useAuth } from '@/lib/auth/context';
 import { useOrg } from '@/lib/org/context';
 import { searchTasks } from '@/lib/api/tasks';
 import { listProjects } from '@/lib/api/projects';
-import { listNotifications } from '@/lib/api/notifications';
+import { listNotifications, getUnreadCount } from '@/lib/api/notifications';
+import { getMe } from '@/lib/api/user';
+import type { Priority } from '@/lib/api/types';
+import { cn } from '@/lib/utils';
+
+function greeting(d = new Date()) {
+  const h = d.getHours();
+  if (h < 5) return 'Working late';
+  if (h < 12) return 'Good morning';
+  if (h < 18) return 'Good afternoon';
+  return 'Good evening';
+}
 
 export default function OrgHomePage() {
-  const { org } = useOrg();
+  const { org, orgId, slug } = useOrg();
+  const { userId } = useAuth();
+  const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
+
+  const assigned = useQuery({
+    queryKey: ['home-assigned', orgId, userId],
+    queryFn: () => searchTasks(orgId, { assignee_id: userId ?? '', limit: 50 }),
+    enabled: Boolean(userId),
+  });
+  const projects = useQuery({ queryKey: ['home-projects', orgId], queryFn: () => listProjects(orgId, {}) });
+  const unread = useQuery({ queryKey: ['unread-count', orgId], queryFn: () => getUnreadCount(orgId) });
+
+  const firstName = me?.name?.split(' ')[0];
+  const dueItems =
+    assigned.data?.tasks
+      .filter((t) => t.due_date)
+      .map((t) => ({ id: t.id, title: t.title, due: t.due_date as string, priority: t.priority })) ?? [];
 
   return (
-    <div className="mx-auto max-w-[1320px] px-6 py-10 animate-fade-in lg:px-10">
-      <div className="mb-10 flex items-end justify-between gap-6 border-b border-border pb-6">
+    <div className="mx-auto max-w-[1320px] px-5 py-8 lg:px-10 lg:py-10">
+      <header className="mb-10 flex flex-wrap items-end justify-between gap-6">
         <div>
-          <p className="mb-3 font-mono text-[10px] font-medium uppercase tracking-[0.2em] text-primary">Workspace / overview</p>
-          <h1 className="text-3xl font-semibold tracking-[-0.04em] sm:text-4xl">{org.name}</h1>
-          <p className="mt-2 text-sm text-muted-foreground">A clear view of the work moving through your team.</p>
+          <p className="kicker animate-fade-in">
+            {org.name} / overview
+          </p>
+          <h1 className="mt-3 animate-[slide-up_0.7s_var(--ease-out-expo)_backwards] text-4xl font-semibold tracking-[-0.05em] sm:text-5xl">
+            {greeting()}
+            {firstName ? <span className="text-muted-foreground">, {firstName}</span> : null}
+            <span className="text-signal">.</span>
+          </h1>
         </div>
-        <span className="hidden font-mono text-[11px] text-muted-foreground sm:block">LIVE / {new Date().toLocaleDateString('en-GB')}</span>
+        <Link
+          href={`/app/${slug}/projects/new`}
+          className="group inline-flex h-10 items-center gap-2 rounded-md bg-foreground px-4 text-sm font-medium text-background transition-[background-color,color,transform] duration-300 hover:bg-signal hover:text-signal-foreground active:scale-[0.97]"
+        >
+          New project
+          <ArrowUpRight className="h-4 w-4 transition-transform duration-500 ease-spring group-hover:rotate-45" />
+        </Link>
+      </header>
+
+      {/* Stat strip */}
+      <div className="mb-8 grid grid-cols-1 gap-px overflow-hidden rounded-lg border border-border bg-border sm:grid-cols-3">
+        <Stat label="Assigned to you" value={assigned.data?.total} loading={assigned.isLoading} index={0} />
+        <Stat label="Projects" value={projects.data?.length} loading={projects.isLoading} index={1} />
+        <Stat label="Unread" value={unread.data} loading={unread.isLoading} index={2} accent={(unread.data ?? 0) > 0} />
       </div>
-      <div className="stagger-children grid gap-x-12 gap-y-10 lg:grid-cols-[1.35fr_0.9fr]">
-        <AssignedToMe />
+
+      {/* Due strip (canvas) */}
+      <section className="mb-10 animate-[slide-up_0.7s_var(--ease-out-expo)_backwards] rounded-lg border border-border bg-card [animation-delay:200ms]">
+        <div className="flex items-center justify-between border-b border-border px-5 py-3">
+          <p className="kicker">Your next two weeks</p>
+          <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 bg-signal" /> high
+            </span>
+            <span className="flex items-center gap-1.5">
+              <span className="h-2 w-2 bg-destructive" /> overdue
+            </span>
+          </div>
+        </div>
+        {assigned.isLoading ? (
+          <Skeleton className="m-5 h-[150px]" />
+        ) : dueItems.length === 0 ? (
+          <p className="px-5 py-12 text-center text-sm text-muted-foreground">Nothing with a due date on your plate.</p>
+        ) : (
+          <>
+            <DueStrip items={dueItems} className="h-[190px]" />
+            <ul className="sr-only">
+              {dueItems.map((d) => (
+                <li key={d.id}>
+                  {d.title}, due {new Date(d.due).toLocaleDateString()}
+                </li>
+              ))}
+            </ul>
+          </>
+        )}
+      </section>
+
+      <div className="grid gap-x-10 gap-y-10 lg:grid-cols-[1.3fr_0.9fr]">
+        <Panel title="Assigned to me" index={0}>
+          {assigned.isLoading ? (
+            <LoadingRows />
+          ) : assigned.isError ? (
+            <Failed />
+          ) : !assigned.data || assigned.data.tasks.length === 0 ? (
+            <Empty text="Nothing assigned to you right now." />
+          ) : (
+            <ul>
+              {assigned.data.tasks.slice(0, 8).map((t, i) => (
+                <li
+                  key={t.id}
+                  className="group flex animate-[slide-up_0.5s_var(--ease-out-expo)_backwards] items-center gap-3 border-b border-border py-3 text-sm"
+                  style={{ animationDelay: `${300 + i * 40}ms` }}
+                >
+                  <span className="font-mono text-[11px] text-muted-foreground">#{t.number}</span>
+                  <span className="truncate transition-transform duration-300 ease-out-expo group-hover:translate-x-1">{t.title}</span>
+                  <span className="ml-auto shrink-0">
+                    <PriorityBars priority={t.priority as Priority} />
+                  </span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {assigned.data && assigned.data.total > 8 ? (
+            <p className="mt-3 font-mono text-[11px] text-muted-foreground">
+              Showing 8 of {assigned.data.total}
+            </p>
+          ) : null}
+        </Panel>
+
         <RecentActivity />
-        <Projects />
+
+        <div className="lg:col-span-2">
+          <Panel
+            title="Projects"
+            index={2}
+            action={
+              <Link href={`/app/${slug}/projects`} className="link-underline font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
+                All projects →
+              </Link>
+            }
+          >
+            {projects.isLoading ? (
+              <LoadingRows />
+            ) : projects.isError ? (
+              <Failed />
+            ) : !projects.data || projects.data.length === 0 ? (
+              <Empty text="No projects yet." />
+            ) : (
+              <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {projects.data.slice(0, 6).map((p, i) => (
+                  <Link
+                    key={p.id}
+                    href={`/app/${slug}/projects/${p.key}`}
+                    className="group relative flex animate-[slide-up_0.6s_var(--ease-out-expo)_backwards] flex-col overflow-hidden rounded-lg border border-border bg-card p-4 transition-[border-color,transform,box-shadow] duration-300 ease-out-expo hover:-translate-y-1 hover:border-foreground/30 hover:shadow-[0_18px_40px_-24px_hsl(var(--ink)/0.5)]"
+                    style={{ animationDelay: `${350 + i * 60}ms` }}
+                  >
+                    <span
+                      className="absolute inset-x-0 top-0 h-[3px] origin-left scale-x-[0.18] transition-transform duration-500 ease-out-expo group-hover:scale-x-100"
+                      style={{ backgroundColor: p.color || 'hsl(var(--muted-foreground))' }}
+                    />
+                    <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{p.key}</span>
+                    <span className="mt-6 flex items-end justify-between gap-2">
+                      <span className="truncate font-display text-lg font-semibold tracking-[-0.02em]">{p.name}</span>
+                      <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-[transform,color] duration-500 ease-spring group-hover:rotate-45 group-hover:text-foreground" />
+                    </span>
+                  </Link>
+                ))}
+              </div>
+            )}
+          </Panel>
+        </div>
       </div>
     </div>
   );
 }
 
-function Panel({
-  title,
-  icon,
-  children,
+function Stat({
+  label,
+  value,
+  loading,
+  index,
+  accent = false,
 }: {
-  title: string;
-  icon: React.ReactNode;
-  children: React.ReactNode;
+  label: string;
+  value: number | undefined;
+  loading: boolean;
+  index: number;
+  accent?: boolean;
 }) {
   return (
-    <Card className="group rounded-none border-0 border-t border-border bg-transparent shadow-none hover:shadow-none">
-      <CardHeader className="flex-row items-center gap-3 px-0 py-4">
-        <div className="flex h-6 w-6 items-center justify-center rounded-sm bg-primary/10 text-primary">
-          {icon}
-        </div>
-        <CardTitle className="font-mono text-[11px] font-medium uppercase tracking-[0.16em]">{title}</CardTitle>
-      </CardHeader>
-      <CardContent className="px-0 pb-0">{children}</CardContent>
-    </Card>
+    <div className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards] bg-card p-5" style={{ animationDelay: `${index * 70}ms` }}>
+      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <div className={cn('mt-3 font-display text-4xl font-semibold tracking-[-0.04em]', accent && 'text-signal')}>
+        {loading ? <Skeleton className="h-9 w-16" /> : <CountUp value={value ?? 0} duration={1100} />}
+      </div>
+    </div>
   );
 }
 
-function LoadingSkeleton() {
+function Panel({ title, index, action, children }: { title: string; index: number; action?: ReactNode; children: ReactNode }) {
   return (
-    <div className="space-y-2">
+    <section className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards]" style={{ animationDelay: `${250 + index * 80}ms` }}>
+      <div className="mb-2 flex items-center justify-between border-b border-foreground pb-2">
+        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em]">{title}</h2>
+        {action}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+function LoadingRows() {
+  return (
+    <div className="space-y-3 pt-2">
       <Skeleton className="h-4 w-full" />
       <Skeleton className="h-4 w-3/4" />
       <Skeleton className="h-4 w-5/6" />
@@ -66,126 +229,45 @@ function LoadingSkeleton() {
   );
 }
 function Failed() {
-  return <p className="text-sm text-destructive">Couldn&apos;t load.</p>;
+  return <p className="py-3 text-sm text-destructive">Couldn&apos;t load.</p>;
 }
 function Empty({ text }: { text: string }) {
-  return <p className="text-sm text-muted-foreground">{text}</p>;
-}
-
-function AssignedToMe() {
-  const { orgId, slug } = useOrg();
-  const { userId } = useAuth();
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['home-assigned', orgId, userId],
-    queryFn: () => searchTasks(orgId, { assignee_id: userId ?? '', limit: 8 }),
-    enabled: Boolean(userId),
-  });
-
-  return (
-    <Panel title="Assigned to me" icon={<CircleCheck className="h-4 w-4" />}>
-      {isLoading ? (
-        <LoadingSkeleton />
-      ) : isError ? (
-        <Failed />
-      ) : !data || data.tasks.length === 0 ? (
-        <Empty text="Nothing assigned to you right now." />
-      ) : (
-        <ul className="space-y-1">
-          {data.tasks.map((t) => (
-            <li
-              key={t.id}
-              className="flex items-center justify-between border-b border-border/70 px-0 py-3 text-sm transition-colors hover:text-primary"
-            >
-              <span className="truncate">{t.title}</span>
-              <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                {t.priority.toLowerCase()}
-              </span>
-            </li>
-          ))}
-        </ul>
-      )}
-      {data && data.total > data.tasks.length ? (
-        <p className="mt-2 text-xs text-muted-foreground">
-          Showing {data.tasks.length} of {data.total}.
-        </p>
-      ) : null}
-      <Link
-        href={`/app/${slug}/projects`}
-        className="mt-4 inline-block font-mono text-[11px] uppercase tracking-wider text-primary hover:text-foreground"
-      >
-        View all projects →
-      </Link>
-    </Panel>
-  );
+  return <p className="py-6 text-sm text-muted-foreground">{text}</p>;
 }
 
 function RecentActivity() {
   const { orgId } = useOrg();
-
   const { data, isLoading, isError } = useQuery({
     queryKey: ['home-activity', orgId],
     queryFn: () => listNotifications(orgId, { limit: 8 }),
   });
 
   return (
-    <Panel title="Recent activity" icon={<Bell className="h-4 w-4" />}>
+    <Panel title="Recent activity" index={1}>
       {isLoading ? (
-        <LoadingSkeleton />
+        <LoadingRows />
       ) : isError ? (
         <Failed />
       ) : !data || data.length === 0 ? (
         <Empty text="No recent activity." />
       ) : (
-        <ul className="space-y-2">
-          {data.map((n) => (
-            <li key={n.id} className="border-b border-border/70 py-3 text-sm last:border-0">
+        <ol className="relative pl-4">
+          <span className="absolute bottom-2 left-[3px] top-2 w-px bg-border" aria-hidden />
+          {data.map((n, i) => (
+            <li
+              key={n.id}
+              className="relative animate-[slide-up_0.5s_var(--ease-out-expo)_backwards] py-2.5 text-sm"
+              style={{ animationDelay: `${350 + i * 45}ms` }}
+            >
+              <span
+                className={cn('absolute -left-4 top-[15px] h-[7px] w-[7px] rounded-full border-2 border-background', n.read_at ? 'bg-foreground/30' : 'bg-signal')}
+                aria-hidden
+              />
               <p className={n.read_at ? 'text-muted-foreground' : 'font-medium'}>{n.title}</p>
-              {n.body ? <p className="text-xs text-muted-foreground">{n.body}</p> : null}
+              {n.body ? <p className="mt-0.5 line-clamp-2 text-xs text-muted-foreground">{n.body}</p> : null}
             </li>
           ))}
-        </ul>
-      )}
-    </Panel>
-  );
-}
-
-function Projects() {
-  const { orgId, slug } = useOrg();
-
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['home-projects', orgId],
-    queryFn: () => listProjects(orgId, {}),
-  });
-
-  const recent = data?.slice(0, 6);
-
-  return (
-    <Panel title="Projects" icon={<FolderKanban className="h-4 w-4" />}>
-      {isLoading ? (
-        <LoadingSkeleton />
-      ) : isError ? (
-        <Failed />
-      ) : !recent || recent.length === 0 ? (
-        <Empty text="No projects yet." />
-      ) : (
-        <ul className="space-y-1">
-          {recent.map((p) => (
-            <li key={p.id}>
-              <Link
-                href={`/app/${slug}/projects/${p.key}`}
-                className="flex items-center gap-3 border-b border-border/70 px-0 py-3 text-sm transition-colors hover:text-primary"
-              >
-                <span
-                  className="h-2.5 w-2.5 shrink-0 rounded-full"
-                  style={{ backgroundColor: p.color || 'hsl(var(--muted-foreground))' }}
-                />
-                <span className="truncate">{p.name}</span>
-                <span className="ml-auto shrink-0 text-xs text-muted-foreground">{p.key}</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
+        </ol>
       )}
     </Panel>
   );

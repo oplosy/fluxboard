@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 
 import { listMyOrgs, resolveOrgBySlug } from '@/lib/api/orgs';
+import { Spinner } from '@/components/ui/spinner';
 import type { Org, Role } from '@/lib/api/types';
 
 interface OrgContextValue {
@@ -87,8 +88,9 @@ export function useOrg(): OrgContextValue {
 
 function ShellLoading() {
   return (
-    <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-muted-foreground">Loading workspace…</p>
+    <div className="flex min-h-screen flex-col items-center justify-center gap-4 text-muted-foreground">
+      <Spinner size="lg" className="text-foreground" />
+      <p className="font-mono text-[10px] uppercase tracking-[0.2em]">Loading workspace</p>
     </div>
   );
 }
@@ -96,7 +98,7 @@ function ShellLoading() {
 function ShellError({ message }: { message: string }) {
   return (
     <div className="flex min-h-screen items-center justify-center">
-      <p className="text-sm text-destructive">{message}</p>
+      <p className="animate-[shake_0.5s_var(--ease-out-expo)] rounded-md border border-destructive/30 bg-destructive/[0.07] px-4 py-3 text-sm text-destructive">{message}</p>
     </div>
   );
 }

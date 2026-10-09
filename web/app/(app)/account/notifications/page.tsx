@@ -118,7 +118,7 @@ export default function NotificationsPage() {
               </label>
               <select
                 id="org"
-                className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                className="h-9 rounded-md border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 value={orgId}
                 onChange={(e) => setOrgId(e.target.value)}
               >

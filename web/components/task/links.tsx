@@ -107,7 +107,7 @@ export function TaskLinks({ taskId, canEdit }: { taskId: string; canEdit: boolea
               value={q}
               onChange={(e) => setQ(e.target.value)}
               placeholder="Search tasks to block this one…"
-              className="w-full rounded-lg border border-input bg-background px-2 py-1.5 text-xs outline-none"
+              className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
             />
             {searchQ.data ? (
               <ul className="mt-1 max-h-40 overflow-y-auto">

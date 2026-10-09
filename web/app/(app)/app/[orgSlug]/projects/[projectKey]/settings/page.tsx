@@ -111,7 +111,7 @@ function GeneralSection({ project }: { project: Project }) {
             onChange={(e) => setDescription(e.target.value)}
             disabled={archived}
             rows={3}
-            className="flex w-full rounded-xl border-0 bg-secondary/60 px-4 py-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+            className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
         </Field>
         <Field id="p-color" label="Color">
@@ -121,7 +121,7 @@ function GeneralSection({ project }: { project: Project }) {
             value={color || '#6366f1'}
             onChange={(e) => setColor(e.target.value)}
             disabled={archived}
-            className="h-9 w-16 rounded border border-input bg-background"
+            className="h-9 w-16 rounded border border-input bg-card transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
         </Field>
         <div className="space-y-1.5">
@@ -350,7 +350,7 @@ function ColumnRow({
           <select
             value={target}
             onChange={(e) => setTarget(e.target.value)}
-            className="h-8 rounded border border-input bg-background px-2"
+            className="h-8 rounded border border-input bg-card px-2 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           >
             {others.map((o) => (
               <option key={o.id} value={o.id}>

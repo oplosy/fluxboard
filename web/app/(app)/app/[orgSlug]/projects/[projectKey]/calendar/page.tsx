@@ -73,7 +73,7 @@ export default function ProjectCalendarPage({ params }: { params: { projectKey: 
               if (e.key === 'Escape') setPendingDue(null);
             }}
             placeholder="Task title…"
-            className="min-w-0 flex-1 rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="min-w-0 flex-1 rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
           <Button
             size="sm"

@@ -105,7 +105,7 @@ export function MentionInput({
         placeholder={placeholder}
         disabled={disabled}
         rows={rows}
-        className="flex w-full rounded-xl border-0 bg-secondary/60 px-4 py-3 text-sm ring-offset-background placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+        className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm placeholder:text-muted-foreground focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
       />
       {query !== null && suggestions.length > 0 ? (
         <ul className="absolute z-20 mt-1 w-64 overflow-hidden rounded-md border bg-card shadow-md">

@@ -67,7 +67,7 @@ export function BoardToolbar({
         value={filter.text}
         onChange={(e) => onFilter({ ...filter, text: e.target.value })}
         placeholder="Filter tasks…  ( / )"
-        className="h-10 w-56 rounded-xl border-0 bg-secondary/60 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        className="h-10 w-56 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
       />
       <select
         value={filter.priority}

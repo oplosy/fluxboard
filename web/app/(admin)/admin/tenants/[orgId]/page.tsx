@@ -79,7 +79,7 @@ export default function AdminTenantDetailPage() {
         <button
           onClick={() => impersonate.mutate()}
           disabled={impersonate.isPending}
-          className="inline-flex h-9 items-center gap-2 rounded-md border border-amber-500/50 px-4 text-sm font-medium text-amber-400 hover:bg-amber-500/10 disabled:opacity-50"
+          className="inline-flex h-9 items-center gap-2 rounded-md border border-signal/50 px-4 text-sm font-medium text-signal hover:bg-signal/10 disabled:opacity-50"
         >
           <UserCog className="h-4 w-4" />
           {impersonate.isPending ? 'Starting…' : 'Impersonate (read-only)'}
@@ -373,7 +373,7 @@ function WebhooksSection({
                     className={`rounded-full px-2 py-0.5 text-xs ${
                       w.handled
                         ? 'bg-emerald-500/20 text-emerald-400'
-                        : 'bg-amber-500/20 text-amber-400'
+                        : 'bg-signal/20 text-signal'
                     }`}
                   >
                     {w.handled ? 'handled' : 'unhandled'}

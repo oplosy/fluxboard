@@ -146,7 +146,7 @@ export function FormsManager({ projectId }: { projectId: string }) {
               id="form-target"
               value={targetColumn || (columns[0]?.id ?? '')}
               onChange={(e) => setTargetColumn(e.target.value)}
-              className="h-9 w-full rounded-lg border border-input bg-background px-2 text-sm"
+              className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
             >
               {columns.map((c) => (
                 <option key={c.id} value={c.id}>
