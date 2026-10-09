@@ -13,9 +13,11 @@ import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/context';
 import { PENDING_2FA_KEY } from '@/lib/auth/pending';
 import { sanitizeNext } from '@/lib/nav/safe-next';
+import { useTransitionNav } from '@/components/motion/route-transition';
 
 function TwoFactorForm() {
   const router = useRouter();
+  const { go } = useTransitionNav();
   const params = useSearchParams();
   const next = sanitizeNext(params.get('next'));
   const { adopt } = useAuth();
@@ -38,7 +40,7 @@ function TwoFactorForm() {
     onSuccess: (tok) => {
       sessionStorage.removeItem(PENDING_2FA_KEY);
       adopt(tok);
-      router.replace(next);
+      go(next, { replace: true });
     },
   });
 
