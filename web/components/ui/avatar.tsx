@@ -50,11 +50,11 @@ export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
   return (
     <span
       className={cn(
-        'inline-flex shrink-0 items-center justify-center rounded-full font-medium text-white ring-2 ring-background',
+        'inline-flex shrink-0 select-none items-center justify-center rounded-full font-mono font-medium tracking-tight text-white ring-2 ring-background transition-transform duration-300 ease-spring hover:z-10 hover:scale-110',
         sizes[size],
         className,
       )}
-      style={{ backgroundColor: `hsl(${hue}, 55%, 50%)` }}
+      style={{ backgroundColor: `hsl(${hue} 28% 38%)` }}
       title={displayName}
       aria-label={displayName}
     >

@@ -1,15 +1,12 @@
 import { cn } from '@/lib/utils';
 
-/** Shimmer-animated skeleton placeholder for loading states. */
-export function Skeleton({
-  className,
-  ...props
-}: React.HTMLAttributes<HTMLDivElement>) {
+/** Placeholder block with a diagonal sheen sweeping across it. */
+export function Skeleton({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
   return (
     <div
       className={cn(
-        'rounded-md bg-muted animate-shimmer',
-        'bg-gradient-to-r from-muted via-muted/50 to-muted',
+        'animate-shimmer rounded-sm bg-[length:220%_100%]',
+        'bg-[linear-gradient(105deg,hsl(var(--muted))_35%,hsl(var(--foreground)/0.04)_50%,hsl(var(--muted))_65%)]',
         className,
       )}
       {...props}
