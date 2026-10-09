@@ -1,57 +1,59 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
+import { ArrowLeft } from 'lucide-react';
 
-// Split-screen auth layout: left = quiet brand statement, right = form.
-// On mobile, only the form is shown with a subtle branded header.
+import { Logo, LogoMark } from '@/components/brand/logo';
+import { DotMatrix } from '@/components/canvas/dot-matrix';
+import { ThemeToggle } from '@/components/ui/theme-toggle';
+
+// Split-screen auth layout: an ink panel with the LED dot-matrix canvas on the
+// left, the form on the right. On mobile only the form shows.
 export default function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen">
-      {/* Left branding panel, hidden on mobile */}
-      <div className="relative hidden w-1/2 overflow-hidden bg-[#183a36] lg:block">
-        <div className="absolute -right-24 -top-24 h-72 w-72 rounded-full bg-[#d4e66d]" />
-        <div className="absolute -bottom-32 -left-20 h-80 w-80 rounded-full bg-[#2b6257]" />
-
-        {/* Content */}
-        <div className="relative flex h-full flex-col items-center justify-center p-12 text-white">
-          <div className="animate-slide-up">
-            <Link href="/" className="flex items-center gap-3 text-2xl font-semibold tracking-tight text-[#eef4ee]">
-              <span className="flex h-10 w-10 items-center justify-center rounded-2xl bg-[#d4e66d] text-lg font-black text-[#183a36]">
-                f
-              </span>
-              Fluxboard
-            </Link>
-            <p className="mt-8 max-w-sm text-3xl font-semibold leading-tight tracking-[-0.05em] text-[#eef4ee]">
-              Keep the important work close.
-            </p>
-            <div className="mt-10 flex flex-col gap-4">
-              {[
-                'Kanban boards with real-time sync',
-                'Multi-tenant team isolation',
-                'Usage-based billing via Stripe',
-              ].map((feature) => (
-                <div key={feature} className="flex items-center gap-3 text-sm text-[#eef4ee]/65">
-                  <span className="h-2 w-2 rounded-full bg-[#d4e66d]" />
-                  {feature}
-                </div>
-              ))}
-            </div>
-          </div>
+      <aside className="relative hidden w-[46%] max-w-[760px] flex-col overflow-hidden bg-ink text-paper lg:flex">
+        <div className="absolute inset-0">
+          <DotMatrix words={['PLAN', 'MOVE', 'SHIP']} />
         </div>
-      </div>
+        <div className="relative flex items-center justify-between p-8">
+          <Link href="/" className="group/logo flex items-center gap-2.5">
+            <LogoMark className="h-6 w-6" />
+            <span className="font-display text-[17px] font-semibold tracking-[-0.03em]">fluxboard</span>
+          </Link>
+          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper/40">v1 · workspace</span>
+        </div>
+        <div className="relative mt-auto p-8">
+          <p className="max-w-[22ch] animate-slide-up font-display text-4xl font-semibold leading-[1.02] tracking-[-0.045em]">
+            Keep the important work in motion.
+          </p>
+          <ul className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-paper/10 bg-paper/10 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/60">
+            {['Realtime boards', 'Tenant isolation', 'Metered billing'].map((f, i) => (
+              <li key={f} className="animate-slide-up bg-ink p-3" style={{ animationDelay: `${200 + i * 90}ms` }}>
+                <span className="block text-paper/30">0{i + 1}</span>
+                {f}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </aside>
 
-      {/* Right form panel */}
-      <div className="flex flex-1 flex-col items-center justify-center bg-background p-4">
-        {/* Mobile-only logo */}
-        <Link
-          href="/"
-          className="mb-8 flex items-center gap-2 text-xl font-semibold tracking-tight lg:hidden"
-        >
-          <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-black text-primary-foreground">
-            f
-          </span>
-          <span>Fluxboard</span>
-        </Link>
-        <div className="w-full max-w-sm animate-slide-up">{children}</div>
+      <div className="relative flex flex-1 flex-col bg-background">
+        <div className="flex items-center justify-between p-5 sm:p-8">
+          <div className="lg:hidden">
+            <Logo />
+          </div>
+          <Link
+            href="/"
+            className="group hidden items-center gap-2 text-sm text-muted-foreground transition-colors hover:text-foreground lg:flex"
+          >
+            <ArrowLeft className="h-4 w-4 transition-transform duration-500 ease-spring group-hover:-translate-x-1" />
+            Back to site
+          </Link>
+          <ThemeToggle compact />
+        </div>
+        <div className="flex flex-1 items-center justify-center px-5 pb-16 sm:px-8">
+          <div className="auth-form w-full max-w-[400px] animate-[slide-up_0.8s_var(--ease-out-expo)_backwards]">{children}</div>
+        </div>
       </div>
     </div>
   );
