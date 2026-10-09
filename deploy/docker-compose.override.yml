@@ -8,7 +8,7 @@
 services:
   api:
     build: !reset null
-    image: golang:1.25
+    image: golang:1.26
     working_dir: /src
     command: ["sh", "-c", "go run github.com/air-verse/air@v1.61.7 -c .air.toml"]
     volumes:
@@ -17,7 +17,7 @@ services:
 
   worker:
     build: !reset null
-    image: golang:1.25
+    image: golang:1.26
     working_dir: /src
     command: ["sh", "-c", "go run ./cmd/worker"]
     volumes:
