@@ -2,7 +2,7 @@
 # Multi-stage build (docs/10-INFRA-DEVOPS.md §1). One build stage compiles both
 # binaries; two final targets (api/worker) ship each on distroless static as
 # nonroot. Static (CGO_ENABLED=0) => the tiny distroless/static base works.
-FROM golang:1.25 AS build
+FROM golang:1.26 AS build
 WORKDIR /src
 
 # Cache module downloads independently of source changes.

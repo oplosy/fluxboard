@@ -9,7 +9,7 @@ on:
 # Jobs mirror docs/10-INFRA-DEVOPS.md §4. PRs to main require lint +
 # test-backend + build green (branch protection).
 env:
-  GO_VERSION: "1.25"
+  GO_VERSION: "1.26"
 
 jobs:
   lint:
