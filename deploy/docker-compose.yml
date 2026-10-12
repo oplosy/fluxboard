@@ -153,6 +153,27 @@ services:
     depends_on:
       - api
       - worker
+      - alertmanager
+      - blackbox
+
+  # Delivers firing alerts by email over the same SMTP settings as the API
+  # (Mailpit locally). render.sh builds the config from the env and refuses to
+  # start in prod without ALERT_EMAIL_TO.
+  alertmanager:
+    image: prom/alertmanager:v0.28.1
+    env_file: ../.env
+    entrypoint: ["/bin/sh", "/etc/alertmanager/render.sh"]
+    ports:
+      - "${ALERTMANAGER_HOST_PORT:-9093}:9093"
+    volumes:
+      - ./alertmanager:/etc/alertmanager:ro
+      - alertmanagerdata:/alertmanager
+
+  # HTTP probe of /readyz (the "readyz failing" alert). In production the same
+  # probe must also run from outside the hosting network to count as an
+  # external uptime check.
+  blackbox:
+    image: prom/blackbox-exporter:v0.25.0
 
   grafana:
     image: grafana/grafana
@@ -198,3 +219,4 @@ volumes:
   redisdata:
   rustfsdata:
   grafanadata:
+  alertmanagerdata:

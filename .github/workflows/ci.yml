@@ -40,6 +40,12 @@ jobs:
         run: |
           curl -sSL https://github.com/sqlc-dev/sqlc/releases/download/v1.27.0/sqlc_1.27.0_linux_amd64.tar.gz | tar -xz -C /usr/local/bin sqlc
           sqlc diff
+      - name: alerting config (promtool rules + config, amtool)
+        working-directory: deploy
+        run: |
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool             prom/prometheus:v2.55.1 test rules /etc/prometheus/alerts_test.yml
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool             prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm -e APP_ENV=prod -e ALERT_EMAIL_TO=oncall@example.com             -e SMTP_HOST=smtp.example.com -e SMTP_PORT=587 -e SMTP_FROM=alerts@example.com             -v "$PWD/alertmanager:/etc/alertmanager:ro" --entrypoint /bin/sh             prom/alertmanager:v0.28.1 /etc/alertmanager/render.sh check
 
   test-backend:
     runs-on: ubuntu-latest

@@ -1,8 +1,8 @@
-# Prometheus alert rules (docs/10-INFRA-DEVOPS.md §5). Only metrics the api and
-# worker actually export are used; spec'd alerts with no metric yet (Asynq
-# dead-letter count, queue depth, readyz probe) are listed at the bottom.
-# No Alertmanager is configured: rules evaluate and show under /alerts in
-# Prometheus, but nothing is delivered until a receiver is chosen.
+# Prometheus alert rules (docs/10-INFRA-DEVOPS.md §5). Only metrics the api,
+# worker and the /readyz blackbox probe actually export are used; spec'd alerts
+# with no metric yet (Asynq dead-letter count, queue depth) are listed at the
+# bottom. Firing alerts go to Alertmanager, which emails them
+# (deploy/alertmanager).
 groups:
   - name: fluxboard-availability
     rules:
@@ -21,6 +21,15 @@ groups:
           severity: page
         annotations:
           summary: "Worker target {{ $labels.instance }} has not been scraped for 2m"
+
+      # Three failed probes in a row at the 15s scrape interval (docs/10 §5).
+      - alert: ReadyzFailing
+        expr: probe_success{job="readyz"} == 0
+        for: 45s
+        labels:
+          severity: page
+        annotations:
+          summary: "/readyz at {{ $labels.instance }} has failed for 45s (3 probes)"
 
       - alert: APIHighErrorRate
         expr: |
@@ -74,4 +83,3 @@ groups:
 
 # Not yet expressible (no metric exported):
 #   - Asynq dead-letter > 0 and queue depth > 1000 need an Asynq queue exporter.
-#   - "readyz failing 3x" needs a blackbox probe of /readyz.

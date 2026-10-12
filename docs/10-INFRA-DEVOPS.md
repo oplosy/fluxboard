@@ -14,7 +14,9 @@
 | api | build backend (target api) | 8080 | depends_on healthy pg/redis/rustfs; hot reload via `air` in dev override |
 | worker | build backend (target worker) | — | shares image with api |
 | web | build web / `next dev` | 3000 | |
-| prometheus | prom/prometheus | 9090 | scrape api:8080/metrics, worker:8081/metrics |
+| prometheus | prom/prometheus | 9090 | scrape api:8080/metrics, worker:8081/metrics, the /readyz probe; rules `deploy/prometheus/alerts.yml`; sends to alertmanager |
+| alertmanager | prom/alertmanager:v0.28.1 | 9093 | email receiver over the API's SMTP settings; config rendered from env by `deploy/alertmanager/render.sh` (`ALERT_EMAIL_TO` required in prod) |
+| blackbox | prom/blackbox-exporter:v0.25.0 | — | HTTP probe of `api:8080/readyz` |
 | grafana | grafana/grafana | 3001 | provisioned datasource + dashboards from `deploy/grafana/` |
 | asynqmon | hibiken/asynqmon | 8082 | queue introspection UI |
 
@@ -62,8 +64,9 @@ make audit                     govulncheck (backend only)
 
 Jobs (parallel where independent):
 
-1. **lint:** golangci-lint, go-arch-lint (dependency rule 03 §3), and `sqlc diff`
-   (generated code current).
+1. **lint:** golangci-lint, go-arch-lint (dependency rule 03 §3), `sqlc diff`
+   (generated code current), and the alerting config (`promtool test rules`,
+   `promtool check config`, `amtool check-config` on a prod-style render).
 2. **test-backend:** unit and integration-tag tests with PostgreSQL, Redis, and
    RustFS (S3, ADR-027) service containers. The integration suites fail rather
    than skip when `TEST_DATABASE_URL` / `TEST_S3_ENDPOINT` are missing.
@@ -118,11 +121,19 @@ in the binary); `/healthz` is liveness only. (6.7.5)
 webhook error-rate > 5%/10 m, dead-letter > 0, readyz failing 3×,
 refresh_reuse > 0 (info-level security alert), queue depth > 1000.
 Implemented in `deploy/prometheus/alerts.yml` (unit-tested by
-`alerts_test.yml` via `promtool test rules`): api/worker down, API 5xx > 5%,
-webhook error-rate, reconcile drift, job failure rate, refresh reuse.
-Dead-letter, queue depth and readyz need an Asynq exporter / blackbox probe
-first. No Alertmanager receiver is configured yet, so alerts are visible in
-Prometheus but not delivered.
+`alerts_test.yml` via `promtool test rules`, in CI): api/worker down, readyz
+failing (blackbox probe, 3 failed probes = 45 s), API 5xx > 5%, webhook
+error-rate, reconcile drift, job failure rate, refresh reuse. Dead-letter and
+queue depth still need an Asynq exporter.
+
+**Delivery:** Prometheus sends to Alertmanager, which emails every alert
+(firing and resolved; grouped by alertname+job, repeat every 4 h) to
+`ALERT_EMAIL_TO` over the same SMTP settings as the API. Locally the mail lands
+in Mailpit; verified end to end on 2026-10-12 by stopping the api container:
+`ReadyzFailing` mailed after ~2 min, `APIDown` after ~3 min, both `RESOLVED`
+mails after restart. The blackbox probe runs inside the stack here; in
+production the same probe must also run from outside the hosting network to
+count as the external uptime check (report B07).
 
 ## 6. Operational Behaviors
 
