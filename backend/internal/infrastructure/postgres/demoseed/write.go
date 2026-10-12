@@ -1,4 +1,4 @@
-package main
+package demoseed
 
 import (
 	"context"
@@ -9,13 +9,13 @@ import (
 	"github.com/jackc/pgx/v5"
 )
 
-// write loads the fixture in one transaction on the owner pool (cross-tenant
+// Write loads the fixture in one transaction on the owner pool (cross-tenant
 // writes; the owner is not subject to the non-FORCE RLS, ADR-014). Re-running
 // resets the seed orgs to the fixture: they are deleted (every tenant row they
 // own cascades) and rebuilt. Users are upserted by fixed ID instead, so a seed
 // user's activity elsewhere never blocks a re-run. Rows that merely share a
 // seed email or slug but have a different ID are refused, never deleted.
-func write(ctx context.Context, db pgx.Tx, f Fixture, passwordHash, totpSecret string) error {
+func Write(ctx context.Context, db pgx.Tx, f Fixture, passwordHash, totpSecret string) error {
 	if err := checkCollisions(ctx, db, f); err != nil {
 		return err
 	}

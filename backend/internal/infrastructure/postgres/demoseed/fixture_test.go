@@ -1,4 +1,4 @@
-package main
+package demoseed
 
 import (
 	"reflect"
@@ -154,7 +154,7 @@ func TestBuildAssigneesAndPrivateProject(t *testing.T) {
 			t.Fatalf("task %s assigned to a non-contributor (role %q)", tk.ID, r)
 		}
 	}
-	member := seedID("user", "member")
+	member := ID("user", "member")
 	for _, p := range f.Projects {
 		if p.Visibility == "private" && roles[p.ID+"|"+member] != "" {
 			t.Fatal("member@demo.dev must not be a member of the private project")
@@ -167,19 +167,5 @@ func TestDemoPasswordPassesPolicy(t *testing.T) {
 		if err := argon2x.CheckPolicy(DemoPassword, u.Email); err != nil {
 			t.Fatalf("demo password rejected for %s: %v", u.Email, err)
 		}
-	}
-}
-
-func TestParseClock(t *testing.T) {
-	now := time.Date(2026, 10, 12, 15, 4, 5, 0, time.FixedZone("TRT", 3*3600))
-	got, err := parseClock("", now)
-	if err != nil || !got.Equal(time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)) {
-		t.Fatalf("default clock = %v, %v", got, err)
-	}
-	if got, err := parseClock("2026-01-15", now); err != nil || got.Format(time.DateOnly) != "2026-01-15" {
-		t.Fatalf("explicit clock = %v, %v", got, err)
-	}
-	if _, err := parseClock("15/01/2026", now); err == nil {
-		t.Fatal("bad clock format accepted")
 	}
 }

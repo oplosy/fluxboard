@@ -26,6 +26,7 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mesutokul/fluxboard/backend/internal/config"
+	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/postgres/demoseed"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/aesgcm"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/argon2x"
 )
@@ -60,7 +61,7 @@ func run(logger *slog.Logger, args []string) error {
 		return errors.New("seed: DATABASE_URL_MIGRATE (owner role) is required; the fixture writes across tenants")
 	}
 
-	passwordHash, err := argon2x.Hash(DemoPassword)
+	passwordHash, err := argon2x.Hash(demoseed.DemoPassword)
 	if err != nil {
 		return fmt.Errorf("hash demo password: %w", err)
 	}
@@ -79,9 +80,9 @@ func run(logger *slog.Logger, args []string) error {
 	}
 	defer pool.Close()
 
-	f := Build(clock)
+	f := demoseed.Build(clock)
 	if err := pgx.BeginFunc(ctx, pool, func(tx pgx.Tx) error {
-		return write(ctx, tx, f, passwordHash, totpSecret)
+		return demoseed.Write(ctx, tx, f, passwordHash, totpSecret)
 	}); err != nil {
 		return err
 	}
@@ -91,7 +92,7 @@ func run(logger *slog.Logger, args []string) error {
 		"projects", len(f.Projects), "tasks", len(f.Tasks), "usage_rows", len(f.Usage),
 		"password", "see docs/12-TESTING.md §5")
 	if totpSecret != "" {
-		logger.Info("platform admin 2FA (dev only)", "email", "padmin@demo.dev", "totp_secret", PlatformAdminTOTPSecret)
+		logger.Info("platform admin 2FA (dev only)", "email", "padmin@demo.dev", "totp_secret", demoseed.PlatformAdminTOTPSecret)
 	}
 	return nil
 }
@@ -123,5 +124,5 @@ func encryptAdminTOTP(key string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	return c.Encrypt(PlatformAdminTOTPSecret)
+	return c.Encrypt(demoseed.PlatformAdminTOTPSecret)
 }
