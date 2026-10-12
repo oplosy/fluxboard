@@ -1,0 +1,90 @@
+# promtool unit tests for alerts.yml. Run from the repo root:
+#   docker run --rm -v "$PWD/deploy/prometheus:/p" --entrypoint promtool prom/prometheus test rules /p/alerts_test.yml
+rule_files:
+  - alerts.yml
+
+evaluation_interval: 1m
+
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'up{job="api", instance="api:8080"}'
+        values: "1 1 0 0 0 0"
+      - series: 'up{job="worker", instance="worker:8081"}'
+        values: "1 1 1 1 1 1"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: APIDown
+        exp_alerts: []
+      - eval_time: 5m
+        alertname: APIDown
+        exp_alerts:
+          - exp_labels: { severity: page, job: api, instance: "api:8080" }
+            exp_annotations:
+              summary: "API target api:8080 has not been scraped for 2m"
+      - eval_time: 5m
+        alertname: WorkerDown
+        exp_alerts: []
+
+  # 10% of webhook deliveries fail for 20m -> both error-rate alerts fire.
+  - interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/v1/webhooks/stripe", status="200"}'
+        values: "0+9x30"
+      - series: 'http_request_duration_seconds_count{route="/api/v1/webhooks/stripe", status="500"}'
+        values: "0+1x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: StripeWebhookErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "More than 5% of Stripe webhook deliveries failed over 10m (06 §4)"
+      - eval_time: 25m
+        alertname: APIHighErrorRate
+        exp_alerts:
+          - exp_labels: { severity: page }
+            exp_annotations:
+              summary: "More than 5% of API requests returned 5xx over 10m"
+
+  # 2% failure stays under the 5% threshold.
+  - interval: 1m
+    input_series:
+      - series: 'http_request_duration_seconds_count{route="/api/v1/webhooks/stripe", status="200"}'
+        values: "0+49x30"
+      - series: 'http_request_duration_seconds_count{route="/api/v1/webhooks/stripe", status="500"}'
+        values: "0+1x30"
+    alert_rule_test:
+      - eval_time: 25m
+        alertname: StripeWebhookErrorRate
+        exp_alerts: []
+
+  - interval: 1m
+    input_series:
+      - series: 'auth_refresh_reuse_total{instance="api:8080", job="api"}'
+        values: "0 0 1 1"
+      - series: 'billing_reconciliation_drift_total{instance="worker:8081", job="worker"}'
+        values: "0 0 0 2"
+      - series: 'asynq_task_processed_total{type="email:send", status="success"}'
+        values: "0+1x40"
+      - series: 'asynq_task_processed_total{type="email:send", status="error"}'
+        values: "0+1x40"
+    alert_rule_test:
+      - eval_time: 3m
+        alertname: RefreshTokenReuse
+        exp_alerts:
+          - exp_labels: { severity: info, instance: "api:8080", job: api }
+            exp_annotations:
+              summary: "Refresh-token reuse detected; a token family was revoked"
+      - eval_time: 3m
+        alertname: BillingReconciliationDrift
+        exp_alerts:
+          - exp_labels: { severity: warning, instance: "worker:8081", job: worker }
+            exp_annotations:
+              summary: "Nightly reconcile found subscriptions drifted from Stripe (06 §8)"
+      - eval_time: 35m
+        alertname: JobFailureRate
+        exp_alerts:
+          - exp_labels: { severity: warning, type: "email:send" }
+            exp_annotations:
+              summary: "More than 10% of email:send jobs failed over 15m"
