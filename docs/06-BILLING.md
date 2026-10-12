@@ -12,8 +12,8 @@ api:8080/api/v1/webhooks/stripe`); §10 has the setup.
 | Local | Stripe | Notes |
 |---|---|---|
 | organization | Customer | created lazily on first paid action; `metadata.org_id` set — webhook consumer resolves org by metadata, never by email |
-| subscription row | Subscription | one active per org; local row mirrors id, status, price ids, period end, cancel_at_period_end |
-| plans table | Products/Prices | seeded by `make stripe-seed` (MODE=live: Billing Meters, product `fluxboard_<plan>`, licensed seat price and metered prices found by lookup key `fluxboard_<plan>_<kind>_v1`); price IDs land in `plans` table, not env vars. The adapter maps a subscription back to its plan by the seat item's price id |
+| subscription row | Subscription | one active per org; local row mirrors id, status, price ids, period end, cancel_at_period_end. The licensed item's quantity = billable seats (non-guest members), set at checkout and re-synced on membership changes and nightly (ADR-030) |
+| plans table | Products/Prices | the single plan catalog (ADR-030), served by `GET /api/v1/plans`; seeded by `make stripe-seed` (MODE=live: Billing Meters, product `fluxboard_<plan>`, licensed seat price and metered prices found by lookup key `fluxboard_<plan>_<kind>_v1`); price IDs land in `plans` table, not env vars. The adapter maps a subscription back to its plan by the seat item's price id |
 | usage_records | Billing Meter events | Business plan only; `storage_bytes` (meter `fluxboard_storage_bytes`, aggregation `last`) and `api_calls` (`fluxboard_api_calls`, `sum`); active members are billed as licensed seats |
 | invoices (mirror) | Invoices | synced on `invoice.finalized` / `invoice.payment_succeeded` |
 

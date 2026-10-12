@@ -33,17 +33,26 @@ a specific production engineering competency, not to maximize feature count.
 
 ## 3. Plan Tiers
 
+The catalog has exactly one source: `backend/internal/infrastructure/postgres/planseed`
+(written to the `plans` table by `make stripe-seed`, which also creates the
+matching Stripe prices). The marketing site and the app read it from
+`GET /api/v1/plans`; nothing else may restate the numbers (ADR-030, report B02).
+Catalog `v1`, monthly, priced **per billable seat** (every member except guests):
+
 | | Free | Pro | Business |
 |---|---|---|---|
-| Price (base, monthly) | $0 | $12/seat | $24/seat |
-| Members | 3 | 25 | unlimited (metered) |
-| Projects | 2 | 20 | unlimited |
-| Storage | 100 MB | 10 GB | 100 GB + $0.10/GB overage |
-| API rate limit | 60 req/min | 600 req/min | 3000 req/min |
-| Metered dimensions | — | — | seats above 25, storage overage, API calls above 1M/mo |
-| Audit log retention | 7 days | 90 days | 2 years |
+| Price | $0 | $12 / seat / month | $49 / seat / month |
+| Members (billable seats) | 5 | 25 | unlimited |
+| Projects | 3 | 50 | unlimited |
+| Storage | 2 GiB | 50 GiB | 500 GiB |
+| API rate limit | 60 req/min | 300 req/min | 1200 req/min |
+| Audit log retention | 7 days | 30 days | 365 days |
+| Usage metering | — | — | storage and API calls measured; not charged yet ($0 usage prices) |
 | SSO (Google OAuth) | ✓ | ✓ | ✓ |
-| Priority webhook events | — | — | ✓ |
+
+The seat quantity follows membership: checkout bills the current billable
+members, and joining, leaving, removal or a change to/from GUEST re-syncs the
+subscription (prorated); the nightly reconcile heals a missed sync.
 
 Plan limits are enforced server-side by the **entitlement middleware**
 (06-BILLING.md §7) — never only in the UI.
