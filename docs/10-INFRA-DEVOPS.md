@@ -34,6 +34,12 @@ is prod-shaped.
 `SMTP_*`, `WEB_ORIGIN`, `TOTP_ENC_KEY`, `AI_PROVIDER` (default mock),
 `AI_MONTHLY_CAP` (default 200).
 Secrets never logged; config struct implements a redacting `String()`.
+`APP_ENV` must be `dev` or `prod`. With `APP_ENV=prod` the dev fallbacks are
+refused at boot: the API requires `JWT_PRIVATE_KEY_PEM`, `TOTP_ENC_KEY`,
+`SMTP_HOST`, `MINIO_ENDPOINT`/`MINIO_ACCESS_KEY`/`MINIO_SECRET_KEY`, an
+https `WEB_ORIGIN` (and https `GOOGLE_REDIRECT_URL` when Google login is
+configured); the worker requires the same minus the auth keys. A MinIO init
+error fails boot in prod instead of disabling attachments.
 
 ## 3. Makefile Targets
 
