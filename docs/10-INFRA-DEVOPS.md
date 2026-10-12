@@ -157,10 +157,15 @@ count as the external uptime check (report B07).
   `fluxboard-migrations` image (never on api boot in prod shape); expand-only
   per release so the previous binaries survive a rollback; CI runs every down
   migration on each PR (`docs/runbooks/release.md`).
-- **Backups (documented posture):** automated nightly `pg_dump` to the MinIO
-  `backups/` bucket is planned but is not currently provisioned by Compose.
-  The manual validation procedure is in `docs/runbooks/restore.md`; it must be
-  exercised against a real dump before being described as a tested DR control.
+- **Backups:**
+  - Compose has none. The manual dump/restore procedure is in
+    `docs/runbooks/restore.md` §1–§4.
+  - Production on AWS (`deploy/aws`, ADR-028) has:
+    - RDS automated backups (PITR, 14 days by default);
+    - S3 versioning (30 days, at least the PITR window);
+    - daily AWS Backup copies in a locked vault.
+  - The PITR procedure is in `docs/runbooks/restore.md` §5. Neither is a tested
+    DR control until it has been exercised and its timing recorded.
 
 ## 7. Production-Shape Notes (documented, not required to deploy)
 

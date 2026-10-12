@@ -45,9 +45,24 @@ jobs:
       - name: alerting config (promtool rules + config, amtool)
         working-directory: deploy
         run: |
-          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool             prom/prometheus:v2.55.1 test rules /etc/prometheus/alerts_test.yml
-          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool             prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
-          docker run --rm -e APP_ENV=prod -e ALERT_EMAIL_TO=oncall@example.com             -e SMTP_HOST=smtp.example.com -e SMTP_PORT=587 -e SMTP_FROM=alerts@example.com             -v "$PWD/alertmanager:/etc/alertmanager:ro" --entrypoint /bin/sh             prom/alertmanager:v0.28.1 /etc/alertmanager/render.sh check
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool \
+            prom/prometheus:v2.55.1 test rules /etc/prometheus/alerts_test.yml
+          docker run --rm -v "$PWD/prometheus:/etc/prometheus" --entrypoint promtool \
+            prom/prometheus:v2.55.1 check config /etc/prometheus/prometheus.yml
+          docker run --rm -e APP_ENV=prod -e ALERT_EMAIL_TO=oncall@example.com \
+            -e SMTP_HOST=smtp.example.com -e SMTP_PORT=587 -e SMTP_FROM=alerts@example.com \
+            -v "$PWD/alertmanager:/etc/alertmanager:ro" --entrypoint /bin/sh \
+            prom/alertmanager:v0.28.1 /etc/alertmanager/render.sh check
+      # deploy/aws (ADR-028): formatting, validity and the mocked input-guard
+      # tests; no AWS account involved.
+      - name: terraform (fmt, validate, test)
+        working-directory: deploy/aws
+        run: |
+          tf() { docker run --rm -v "$PWD:/tf" -w /tf hashicorp/terraform:1.9.8 "$@"; }
+          tf fmt -check -recursive
+          tf init -backend=false -input=false
+          tf validate
+          tf test
 
   test-backend:
     runs-on: ubuntu-latest

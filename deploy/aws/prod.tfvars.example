@@ -1,0 +1,16 @@
+# Copy to prod.tfvars (git-ignored) and fill in. None of these are secrets.
+region      = "eu-central-1" # must match the data-location promise (report B09)
+environment = "prod"
+
+vpc_id                 = "vpc-0123456789abcdef0"
+db_subnet_ids          = ["subnet-0aaaaaaaaaaaaaaaa", "subnet-0bbbbbbbbbbbbbbbb"]
+app_security_group_ids = ["sg-0cccccccccccccccc"]
+
+web_origins = ["https://app.example.com"]
+
+# Defaults, shown for reference:
+# db_instance_class                 = "db.t4g.medium"
+# db_multi_az                       = true
+# pitr_retention_days               = 14
+# backup_vault_retention_days       = 35
+# noncurrent_version_retention_days = 30
