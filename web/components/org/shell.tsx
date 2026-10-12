@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 
 import { useOrg } from '@/lib/org/context';
 import { useRouteEnter } from '@/components/motion/route-transition';
@@ -12,6 +12,15 @@ import { Realtime } from './realtime';
 
 const SIDEBAR_KEY = 'fluxboard-sidebar-collapsed';
 
+const noSubscribe = () => () => {};
+function readSidebarCollapsed(): boolean {
+  try {
+    return localStorage.getItem(SIDEBAR_KEY) === 'true';
+  } catch {
+    return false; // Storage unavailable (private mode) — keep the default.
+  }
+}
+
 // Task routes open as an intercepted modal over the board; animating the page
 // underneath would make the board jump, so they are excluded.
 const NO_ENTER = /\/tasks\/\d+$/;
@@ -20,31 +29,23 @@ const NO_ENTER = /\/tasks\/\d+$/;
 // the restore screen; otherwise the standard sidebar + topbar frame renders.
 export function OrgShell({ children }: { children: ReactNode }) {
   const { org } = useOrg();
-  const [collapsed, setCollapsed] = useState(false);
+  // Stored preference (expanded on the server), until the user toggles it here.
+  const stored = useSyncExternalStore(noSubscribe, readSidebarCollapsed, () => false);
+  const [toggled, setToggled] = useState<boolean | null>(null);
+  const collapsed = toggled ?? stored;
   const [mobileOpen, setMobileOpen] = useState(false);
   const main = useRef<HTMLElement>(null);
   useRouteEnter(main, NO_ENTER);
 
-  // Restore sidebar state from localStorage
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(SIDEBAR_KEY) === 'true') setCollapsed(true);
-    } catch {
-      // Storage unavailable (private mode) — keep the default.
-    }
-  }, []);
-
   const toggleSidebar = useCallback(() => {
-    setCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem(SIDEBAR_KEY, String(next));
-      } catch {
-        // Non-critical preference.
-      }
-      return next;
-    });
-  }, []);
+    const next = !collapsed;
+    setToggled(next);
+    try {
+      localStorage.setItem(SIDEBAR_KEY, String(next));
+    } catch {
+      // Non-critical preference.
+    }
+  }, [collapsed]);
 
   if (org.deleted_at) return <SoftDeleteScreen />;
 

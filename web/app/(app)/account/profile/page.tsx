@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -16,15 +16,15 @@ export default function ProfilePage() {
   const fileRef = useRef<HTMLInputElement>(null);
 
   const { data: me, isLoading } = useQuery({ queryKey: ['me'], queryFn: getMe });
-  const [name, setName] = useState('');
-  useEffect(() => {
-    if (me) setName(me.name);
-  }, [me]);
+  // Unsaved edit of the name; null shows the saved one (first load, after save).
+  const [nameEdit, setName] = useState<string | null>(null);
+  const name = nameEdit ?? me?.name ?? '';
 
   const saveName = useMutation({
     mutationFn: () => updateMe({ name }),
     onSuccess: (p) => {
       queryClient.setQueryData(['me'], p);
+      setName(null);
       toast({ title: 'Profile updated', variant: 'success' });
     },
     onError: () => toast({ title: 'Could not update profile', variant: 'error' }),

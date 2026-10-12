@@ -1,6 +1,6 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useSyncExternalStore, type ReactNode } from 'react';
 
 type Theme = 'light' | 'dark' | 'system';
 
@@ -24,6 +24,24 @@ function getStoredTheme(): Theme {
   return (localStorage.getItem(STORAGE_KEY) as Theme) || 'system';
 }
 
+// The stored choice and the system preference are external stores, read with
+// useSyncExternalStore. setTheme notifies the providers; the pre-paint script in
+// app/layout.tsx sets the initial class, so nothing is applied on mount.
+const themeListeners = new Set<() => void>();
+
+function subscribeStoredTheme(onChange: () => void): () => void {
+  themeListeners.add(onChange);
+  return () => {
+    themeListeners.delete(onChange);
+  };
+}
+
+function subscribeSystemTheme(onChange: () => void): () => void {
+  const mq = window.matchMedia('(prefers-color-scheme: dark)');
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
 function applyTheme(resolved: 'light' | 'dark') {
   const root = document.documentElement;
   root.classList.remove('light', 'dark');
@@ -31,38 +49,23 @@ function applyTheme(resolved: 'light' | 'dark') {
 }
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<Theme>('system');
-  const [resolvedTheme, setResolvedTheme] = useState<'light' | 'dark'>('light');
+  const theme = useSyncExternalStore(subscribeStoredTheme, getStoredTheme, () => 'system' as Theme);
+  const systemTheme = useSyncExternalStore(subscribeSystemTheme, getSystemTheme, () => 'light' as const);
+  const resolvedTheme = theme === 'system' ? systemTheme : theme;
 
-  // Initialize from localStorage on mount
+  // Follow system theme changes while in "system" mode.
   useEffect(() => {
-    const stored = getStoredTheme();
-    const resolved = stored === 'system' ? getSystemTheme() : stored;
-    setThemeState(stored);
-    setResolvedTheme(resolved);
-    applyTheme(resolved);
-  }, []);
-
-  // Listen for system theme changes when in "system" mode
-  useEffect(() => {
+    if (theme !== 'system') return;
     const mq = window.matchMedia('(prefers-color-scheme: dark)');
-    const handler = () => {
-      if (theme === 'system') {
-        const resolved = getSystemTheme();
-        setResolvedTheme(resolved);
-        applyTheme(resolved);
-      }
-    };
+    const handler = () => applyTheme(getSystemTheme());
     mq.addEventListener('change', handler);
     return () => mq.removeEventListener('change', handler);
   }, [theme]);
 
   const setTheme = useCallback((next: Theme) => {
-    const resolved = next === 'system' ? getSystemTheme() : next;
-    setThemeState(next);
-    setResolvedTheme(resolved);
     localStorage.setItem(STORAGE_KEY, next);
-    applyTheme(resolved);
+    applyTheme(next === 'system' ? getSystemTheme() : next);
+    themeListeners.forEach((l) => l());
   }, []);
 
   return (

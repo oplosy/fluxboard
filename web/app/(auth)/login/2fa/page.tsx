@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useState, useSyncExternalStore } from 'react';
 import { useMutation } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
@@ -15,6 +15,10 @@ import { PENDING_2FA_KEY } from '@/lib/auth/pending';
 import { sanitizeNext } from '@/lib/nav/safe-next';
 import { useTransitionNav } from '@/components/motion/route-transition';
 
+// sessionStorage has no change events for this tab; read it once per render.
+const noSubscribe = () => () => {};
+const readPending = () => sessionStorage.getItem(PENDING_2FA_KEY);
+
 function TwoFactorForm() {
   const router = useRouter();
   const { go } = useTransitionNav();
@@ -22,17 +26,12 @@ function TwoFactorForm() {
   const next = sanitizeNext(params.get('next'));
   const { adopt } = useAuth();
 
-  const [pending, setPending] = useState<string | null>(null);
+  const pending = useSyncExternalStore(noSubscribe, readPending, () => null);
   const [code, setCode] = useState('');
 
   // The pending token was stashed by /login. Without it there's nothing to verify.
   useEffect(() => {
-    const t = sessionStorage.getItem(PENDING_2FA_KEY);
-    if (!t) {
-      router.replace('/login');
-      return;
-    }
-    setPending(t);
+    if (!readPending()) router.replace('/login');
   }, [router]);
 
   const mutation = useMutation({

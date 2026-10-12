@@ -2,6 +2,7 @@
 
 import { useRef } from 'react';
 
+import { useLatest } from '@/lib/motion/hooks';
 import { cn } from '@/lib/utils';
 import { createNoise, hsl, rng, useScene, type Palette, type Scene } from './scene';
 
@@ -203,8 +204,7 @@ function createFluxScene(onShip: () => void): Scene {
 
 export function FluxField({ className, onShip }: { className?: string; onShip?: () => void }) {
   const ref = useRef<HTMLCanvasElement>(null);
-  const shipRef = useRef(onShip);
-  shipRef.current = onShip;
+  const shipRef = useLatest(onShip);
   useScene(ref, () => createFluxScene(() => shipRef.current?.()), { pointerTarget: 'window' });
   return <canvas ref={ref} className={cn('block h-full w-full', className)} aria-hidden />;
 }

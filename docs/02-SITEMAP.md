@@ -111,7 +111,7 @@ Guard legend: **P** public · **A** authenticated · **V** authenticated+verifie
 | `/api/v1/orgs/{orgId}/events` | SSE stream |
 | `/api/v1/webhooks/stripe` | Stripe webhook receiver (signature-gated, no session auth) |
 | `/api/v1/openapi.json`, `/api/docs` | OpenAPI + Swagger UI (non-prod) |
-| `/healthz`, `/readyz` | Liveness (process up) / readiness (DB+Redis ping) |
+| `/healthz`, `/readyz` | Liveness (process up) / readiness (DB+Redis ping, schema migrated to the binary's version) |
 | `/metrics` | Prometheus exposition (internal network only) |
 
 ## 9. Error & Edge Pages

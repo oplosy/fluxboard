@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Pause, Play, Trash2 } from 'lucide-react';
 
@@ -17,16 +17,7 @@ import {
 } from '@/lib/api/tasks';
 import { useToast } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
-
-function useNowTick(active: boolean): number {
-  const [now, setNow] = useState(() => Date.now());
-  useEffect(() => {
-    if (!active) return;
-    const id = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(id);
-  }, [active]);
-  return now;
-}
+import { useNow } from '@/lib/use-now';
 
 // Time tracker (FR-TIME): start/stop timer, manual entries, per-task total.
 export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: boolean }) {
@@ -39,7 +30,7 @@ export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: bool
 
   const { data: entries = [] } = useQuery({ queryKey: key, queryFn: () => listTimeEntries(orgId, taskId) });
   const running = entries.find((e) => !e.ended_at);
-  useNowTick(Boolean(running));
+  const now = useNow(Boolean(running));
 
   const [showManual, setShowManual] = useState(false);
   const [mStart, setMStart] = useState('');
@@ -96,7 +87,7 @@ export function TimeTracker({ taskId, canEdit }: { taskId: string; canEdit: bool
               aria-label="Stop timer"
             >
               <Pause className="h-3.5 w-3.5" />
-              {formatDuration(Math.floor((Date.now() - new Date(running.started_at).getTime()) / 1000))}
+              {formatDuration(Math.floor((now - new Date(running.started_at).getTime()) / 1000))}
             </Button>
           ) : (
             <Button

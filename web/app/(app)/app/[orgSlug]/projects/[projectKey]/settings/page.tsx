@@ -1,6 +1,6 @@
 'use client';
 
-import { use, useEffect, useState } from 'react';
+import { use, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
@@ -230,7 +230,8 @@ function ColumnsSection({ project }: { project: Project }) {
         <div className="space-y-2">
           {columns.map((c, i) => (
             <ColumnRow
-              key={c.id}
+              // Remount on a saved change so the drafts start from the new values.
+              key={`${c.id}:${c.name}:${c.wip_limit ?? ''}`}
               column={c}
               index={i}
               total={columns.length}
@@ -287,10 +288,6 @@ function ColumnRow({
   const [confirming, setConfirming] = useState(false);
   const [target, setTarget] = useState(others[0]?.id ?? '');
 
-  useEffect(() => {
-    setName(column.name);
-    setWip(column.wip_limit != null ? String(column.wip_limit) : '');
-  }, [column.name, column.wip_limit]);
 
   function commit() {
     const parsedWip = wip.trim() === '' ? null : Number.parseInt(wip, 10);

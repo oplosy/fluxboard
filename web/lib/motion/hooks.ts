@@ -1,22 +1,22 @@
 'use client';
 
-import { useEffect, useRef, useState, type RefObject } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type RefObject } from 'react';
 
-/** Live `prefers-reduced-motion` flag. SSR-safe (false until mounted). */
+const REDUCED_MOTION = '(prefers-reduced-motion: reduce)';
+
+function subscribeReducedMotion(onChange: () => void): () => void {
+  const mq = window.matchMedia(REDUCED_MOTION);
+  mq.addEventListener('change', onChange);
+  return () => mq.removeEventListener('change', onChange);
+}
+
+/** Live `prefers-reduced-motion` flag. SSR-safe (false on the server). */
 export function useReducedMotion(): boolean {
-  const [reduced, setReduced] = useState(false);
-  useEffect(() => {
-    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
-    const update = () => setReduced(mq.matches);
-    update();
-    mq.addEventListener('change', update);
-    return () => mq.removeEventListener('change', update);
-  }, []);
-  return reduced;
+  return useSyncExternalStore(subscribeReducedMotion, prefersReducedMotion, () => false);
 }
 
 export function prefersReducedMotion(): boolean {
-  return typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  return typeof window !== 'undefined' && window.matchMedia(REDUCED_MOTION).matches;
 }
 
 /**
@@ -33,8 +33,9 @@ export function useInView<T extends Element>(
     const el = observeParent ? ref.current?.parentElement : ref.current;
     if (!el) return;
     if (typeof IntersectionObserver === 'undefined') {
-      setInView(true);
-      return;
+      // No observer to wait for: reveal on the next frame.
+      const raf = requestAnimationFrame(() => setInView(true));
+      return () => cancelAnimationFrame(raf);
     }
     const io = new IntersectionObserver(
       ([entry]) => {
@@ -60,22 +61,28 @@ export function useInView<T extends Element>(
  * the exit before it leaves the DOM.
  */
 export function usePresence(open: boolean, duration = 200): { mounted: boolean; state: 'open' | 'closed' } {
-  const [mounted, setMounted] = useState(open);
-  const [state, setState] = useState<'open' | 'closed'>(open ? 'open' : 'closed');
+  // The last `open` value whose transition finished (entered after the extra
+  // frame, or exited after `duration`). Only async callbacks write it; mounted
+  // and state derive from it, so a change of `open` shows up in the same render.
+  const [settled, setSettled] = useState(open);
 
   useEffect(() => {
     if (open) {
-      setMounted(true);
       // Next frame so the "closed" styles apply before transitioning to "open".
-      const raf = requestAnimationFrame(() => requestAnimationFrame(() => setState('open')));
-      return () => cancelAnimationFrame(raf);
+      let inner = 0;
+      const outer = requestAnimationFrame(() => {
+        inner = requestAnimationFrame(() => setSettled(true));
+      });
+      return () => {
+        cancelAnimationFrame(outer);
+        cancelAnimationFrame(inner);
+      };
     }
-    setState('closed');
-    const t = window.setTimeout(() => setMounted(false), duration);
+    const t = window.setTimeout(() => setSettled(false), duration);
     return () => window.clearTimeout(t);
   }, [open, duration]);
 
-  return { mounted, state };
+  return { mounted: open || settled, state: open && settled ? 'open' : 'closed' };
 }
 
 /** Scroll progress (0..1) of an element travelling through the viewport. */
@@ -107,9 +114,14 @@ export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T | null
   return progress;
 }
 
-/** Keeps the latest value in a ref (for use inside long-lived callbacks). */
+/**
+ * Keeps the latest value in a ref (for use inside long-lived callbacks). The ref
+ * is updated after commit, never during render.
+ */
 export function useLatest<T>(value: T) {
   const ref = useRef(value);
-  ref.current = value;
+  useLayoutEffect(() => {
+    ref.current = value;
+  });
   return ref;
 }

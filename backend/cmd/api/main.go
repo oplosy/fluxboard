@@ -56,6 +56,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/taskuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/tenantuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/useruc"
+	"github.com/mesutokul/fluxboard/backend/migrations"
 )
 
 // version is injected at build time via -ldflags "-X main.version=...".
@@ -172,6 +173,12 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 			a.Close()
 		}
 	}()
+
+	// Schema version this build needs; /readyz stays 503 until it is applied.
+	schemaWant, err := migrations.Latest()
+	if err != nil {
+		return nil, err
+	}
 
 	// Data clients. pgxpool connects lazily; a down DB does not block boot.
 	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
@@ -500,7 +507,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	a.handler = httpx.NewRouter(httpx.Deps{
 		Logger:         logger,
 		WebOrigin:      cfg.WebOrigin,
-		Health:         httpx.Health{DB: pool, Redis: redisPinger{rdb}},
+		Health:         httpx.Health{DB: pool, Redis: redisPinger{rdb}, Migrations: postgres.SchemaVersion{Pool: pool, Want: schemaWant}},
 		MetricsHTTP:    promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
 		Auth:           authHandlers,
 		User:           userHandlers,

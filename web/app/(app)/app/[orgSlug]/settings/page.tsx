@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, Check, Loader2, X } from 'lucide-react';
@@ -10,7 +10,8 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/auth/field';
 import { useOrg } from '@/lib/org/context';
 import { useToast } from '@/components/ui/toast';
-import { isSlugAvailable, logoUploadURL, updateOrg } from '@/lib/api/orgs';
+import { logoUploadURL, updateOrg } from '@/lib/api/orgs';
+import { useSlugAvailability } from '@/lib/org/use-slug-availability';
 import { putToPresignedUrl } from '@/lib/api/user';
 import { ApiError } from '@/lib/api/client';
 
@@ -23,7 +24,6 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-type SlugState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
 
 export default function OrgGeneralSettingsPage() {
   const { orgId, org, slug: currentSlug, isOwner } = useOrg();
@@ -31,34 +31,15 @@ export default function OrgGeneralSettingsPage() {
   const queryClient = useQueryClient();
   const { toast } = useToast();
 
-  const [name, setName] = useState(org.name);
-  const [slug, setSlug] = useState(org.slug);
-  const [slugState, setSlugState] = useState<SlugState>('idle');
-
-  // Keep drafts in sync if the org changes underneath (e.g. another tab edits it).
-  useEffect(() => {
-    setName(org.name);
-    setSlug(org.slug);
-  }, [org.name, org.slug]);
+  // Unsaved edits; null shows the saved value, so the fields follow changes made
+  // underneath (e.g. another tab edits the org) until the user types.
+  const [nameEdit, setName] = useState<string | null>(null);
+  const [slugEdit, setSlug] = useState<string | null>(null);
+  const name = nameEdit ?? org.name;
+  const slug = slugEdit ?? org.slug;
 
   // Debounced availability check — only when the slug actually changed.
-  useEffect(() => {
-    if (slug === org.slug) {
-      setSlugState('idle');
-      return;
-    }
-    if (slug.length < 3) {
-      setSlugState('invalid');
-      return;
-    }
-    setSlugState('checking');
-    const t = setTimeout(() => {
-      isSlugAvailable(slug)
-        .then((ok) => setSlugState(ok ? 'available' : 'taken'))
-        .catch(() => setSlugState('idle'));
-    }, 400);
-    return () => clearTimeout(t);
-  }, [slug, org.slug]);
+  const slugState = useSlugAvailability(slug, org.slug);
 
   const saveName = useMutation({
     mutationFn: () => updateOrg(orgId, { name: name.trim() }),

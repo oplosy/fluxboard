@@ -111,7 +111,8 @@ internal compose/cluster network only — it is NOT routed through the public
 ingress/LB. Locally, Prometheus reaches it by compose-service DNS
 (`api:8080`, `worker:8081`); in prod, keep the metrics path behind a network
 policy / firewall (no auth is applied at the handler). `/readyz` gates traffic on
-DB + Redis (+ optional MinIO/Stripe); `/healthz` is liveness only. (6.7.5)
+DB + Redis + schema version (clean and at least the newest migration embedded
+in the binary); `/healthz` is liveness only. (6.7.5)
 
 **Alert rules (prometheus rules file, documented even if only local):**
 webhook error-rate > 5%/10 m, dead-letter > 0, readyz failing 3×,

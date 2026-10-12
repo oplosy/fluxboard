@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useEffect, useSyncExternalStore } from 'react';
 import { Loader2, XCircle } from 'lucide-react';
 
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,19 +12,23 @@ import { sanitizeNext } from '@/lib/nav/safe-next';
 //   /oauth/google/callback?next=<path>#access_token=<jwt>
 // The access token arrives in the URL fragment (kept out of server logs/Referer);
 // we lift it into memory and continue to the app. The refresh cookie is already set.
+function readToken(): string | null {
+  const hash = window.location.hash.startsWith('#') ? window.location.hash.slice(1) : window.location.hash;
+  return new URLSearchParams(hash).get('access_token');
+}
+
+const noSubscribe = () => () => {};
+
 export default function OAuthCallbackPage() {
   const router = useRouter();
-  const [failed, setFailed] = useState(false);
+  // The fragment never reaches the server, so the server render shows the spinner.
+  const failed = useSyncExternalStore(noSubscribe, () => !readToken(), () => false);
 
   useEffect(() => {
-    const hash = window.location.hash.startsWith('#')
-      ? window.location.hash.slice(1)
-      : window.location.hash;
-    const token = new URLSearchParams(hash).get('access_token');
+    const token = readToken();
     const next = sanitizeNext(new URLSearchParams(window.location.search).get('next'));
 
     if (!token) {
-      setFailed(true);
       const t = setTimeout(() => router.replace('/login'), 2500);
       return () => clearTimeout(t);
     }

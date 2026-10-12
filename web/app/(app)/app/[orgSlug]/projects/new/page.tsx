@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
@@ -32,16 +32,13 @@ export default function NewProjectPage() {
   const { orgId, slug } = useOrg();
 
   const [name, setName] = useState('');
-  const [key, setKey] = useState('');
-  const [keyEdited, setKeyEdited] = useState(false);
+  // The key follows the name until the user edits it directly.
+  const [keyDraft, setKeyDraft] = useState<string | null>(null);
+  const key = keyDraft ?? suggestKey(name);
   const [description, setDescription] = useState('');
   const [color, setColor] = useState(COLORS[0] as string);
   const [visibility, setVisibility] = useState<Visibility>('org');
   const [templateKey, setTemplateKey] = useState('blank');
-
-  useEffect(() => {
-    if (!keyEdited) setKey(suggestKey(name));
-  }, [name, keyEdited]);
 
   const mutation = useMutation({
     mutationFn: () => {
@@ -116,8 +113,7 @@ export default function NewProjectPage() {
                 required
                 value={key}
                 onChange={(e) => {
-                  setKeyEdited(true);
-                  setKey(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10));
+                  setKeyDraft(e.target.value.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 10));
                 }}
                 placeholder="WEB"
                 className="font-mono uppercase"

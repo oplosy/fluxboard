@@ -20,14 +20,13 @@ const nav = [
 
 export function SiteHeader() {
   const pathname = usePathname();
-  const [mobileOpen, setMobileOpen] = useState(false);
+  // The menu is open for the path it was opened on, so navigating closes it.
+  const [menuOpenOn, setMenuOpenOn] = useState<string | null>(null);
+  const mobileOpen = menuOpenOn === pathname;
   const [scrolled, setScrolled] = useState(false);
   const [hidden, setHidden] = useState(false);
   const { mounted, state } = usePresence(mobileOpen, 450);
 
-  useEffect(() => {
-    setMobileOpen(false);
-  }, [pathname]);
 
   // Condense after the first scroll; slide away while scrolling down, return on scroll up.
   useEffect(() => {
@@ -75,7 +74,7 @@ export function SiteHeader() {
             </Link>
             <button
               type="button"
-              onClick={() => setMobileOpen((v) => !v)}
+              onClick={() => setMenuOpenOn(mobileOpen ? null : pathname)}
               className="relative flex h-9 w-9 items-center justify-center md:hidden"
               aria-label={mobileOpen ? 'Close menu' : 'Open menu'}
               aria-expanded={mobileOpen}
