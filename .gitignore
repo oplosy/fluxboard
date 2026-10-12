@@ -6,6 +6,13 @@
 backups/
 *.dump
 
+# Terraform working state (deploy/aws); the lock file IS committed
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+
 # Go build output
 backend/tmp/
 backend/bin/
