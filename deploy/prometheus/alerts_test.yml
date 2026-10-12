@@ -6,6 +6,22 @@ rule_files:
 evaluation_interval: 1m
 
 tests:
+  # /readyz probe fails from 1m on -> pending at 1m, firing once 45s have passed.
+  - interval: 1m
+    input_series:
+      - series: 'probe_success{job="readyz", instance="http://api:8080/readyz"}'
+        values: "1 0 0 0"
+    alert_rule_test:
+      - eval_time: 1m
+        alertname: ReadyzFailing
+        exp_alerts: []
+      - eval_time: 2m
+        alertname: ReadyzFailing
+        exp_alerts:
+          - exp_labels: { severity: page, job: readyz, instance: "http://api:8080/readyz" }
+            exp_annotations:
+              summary: "/readyz at http://api:8080/readyz has failed for 45s (3 probes)"
+
   - interval: 1m
     input_series:
       - series: 'up{job="api", instance="api:8080"}'
