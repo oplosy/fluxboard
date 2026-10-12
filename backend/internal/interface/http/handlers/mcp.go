@@ -92,7 +92,7 @@ func (h *AIHandlers) dispatchMCP(r *http.Request, orgID, userID string, orgRole 
 		}
 		return map[string]any{"run_id": out.RunID, "replayed": out.Replayed, "text": out.Text, "items": out.Items}, nil
 	case MCPDigest:
-		out, err := h.svc.Digest(ctx, orgID, userID, str("project_id"))
+		out, err := h.svc.Digest(ctx, orgID, userID, orgRole, str("project_id"))
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ func (h *AIHandlers) dispatchMCP(r *http.Request, orgID, userID string, orgRole 
 		}
 		return map[string]any{"run_id": out.RunID, "text": out.Text}, nil
 	case MCPRisksScan:
-		risks, err := h.svc.ScanRisks(ctx, orgID, userID, str("project_id"))
+		risks, err := h.svc.ScanRisks(ctx, orgID, userID, orgRole, str("project_id"))
 		if err != nil {
 			return nil, err
 		}
@@ -131,7 +131,7 @@ func (h *AIHandlers) dispatchMCP(r *http.Request, orgID, userID string, orgRole 
 		}
 		return map[string]any{"risks": out}, nil
 	case MCPRisksList:
-		risks, err := h.svc.ListRisks(ctx, orgID, userID, str("project_id"))
+		risks, err := h.svc.ListRisks(ctx, orgID, userID, orgRole, str("project_id"))
 		if err != nil {
 			return nil, err
 		}
@@ -141,7 +141,7 @@ func (h *AIHandlers) dispatchMCP(r *http.Request, orgID, userID string, orgRole 
 		}
 		return map[string]any{"risks": out}, nil
 	case MCPRisksDismiss:
-		if err := h.svc.DismissRisk(ctx, orgID, userID, str("task_id")); err != nil {
+		if err := h.svc.DismissRisk(ctx, orgID, userID, orgRole, str("task_id")); err != nil {
 			return nil, err
 		}
 		return map[string]any{"dismissed": true}, nil

@@ -13,6 +13,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/audit"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 	infraai "github.com/mesutokul/fluxboard/backend/internal/infrastructure/ai"
 )
 
@@ -185,6 +186,24 @@ func (f *fakeProjects) SetArchived(_ context.Context, _, _ string, _ *time.Time)
 }
 func (f *fakeProjects) NextNumber(_ context.Context, _, _ string) (int, error) { return 1, nil }
 
+// fakeMembers maps projectID+"/"+userID to a project role.
+type fakeMembers struct {
+	roles map[string]project.ProjectRole
+}
+
+func (f *fakeMembers) Get(_ context.Context, _, projectID, userID string) (*project.ProjectMember, error) {
+	if r, ok := f.roles[projectID+"/"+userID]; ok {
+		return &project.ProjectMember{Role: r}, nil
+	}
+	return nil, domain.ErrNotFound
+}
+
+func (f *fakeMembers) Add(_ context.Context, _, _, _ string, _ project.ProjectRole) error { return nil }
+func (f *fakeMembers) List(_ context.Context, _, _ string) ([]project.ProjectMember, error) {
+	return nil, nil
+}
+func (f *fakeMembers) Remove(_ context.Context, _, _, _ string) error { return nil }
+
 type fakeAudit struct{ entries []audit.Entry }
 
 func (f *fakeAudit) Append(_ context.Context, e audit.Entry) error {
@@ -236,16 +255,23 @@ func newHarness(flags map[string]bool, cap int) *harness {
 	owner := "u-owner"
 	t1 := &project.Task{ID: "t1", OrgID: "o1", ProjectID: "p1", Title: "overdue hot", Priority: project.PriorityUrgent, DueDate: &past}
 	t2 := &project.Task{ID: "t2", OrgID: "o1", ProjectID: "p1", Title: "normal", Priority: project.PriorityLow, AssigneeID: &owner}
+	// t3 lives in private project p2, where only u-secret is a member.
+	t3 := &project.Task{ID: "t3", OrgID: "o1", ProjectID: "p2", Title: "secret overdue", Priority: project.PriorityUrgent, DueDate: &past}
 	tasks := &fakeTasks{
-		byID:      map[string]*project.Task{"t1": t1, "t2": t2},
-		byProject: map[string][]project.Task{"p1": {*t1, *t2}},
+		byID:      map[string]*project.Task{"t1": t1, "t2": t2, "t3": t3},
+		byProject: map[string][]project.Task{"p1": {*t1, *t2}, "p2": {*t3}},
 	}
 	projs := &fakeProjects{byID: map[string]*project.Project{
-		"p1": {ID: "p1", OrgID: "o1", Key: "PAY", Name: "Payments"},
+		"p1": {ID: "p1", OrgID: "o1", Key: "PAY", Name: "Payments", Visibility: project.VisibilityOrg},
+		"p2": {ID: "p2", OrgID: "o1", Key: "SEC", Name: "Secret", Visibility: project.VisibilityPrivate},
+	}}
+	members := &fakeMembers{roles: map[string]project.ProjectRole{
+		"p1/u1":       project.RoleContributor,
+		"p2/u-secret": project.RoleViewer,
 	}}
 	svc := New(Deps{
 		Runs: runs, Risks: risks, Flags: &fakeFlags{m: flags},
-		Tasks: tasks, Projects: projs, Audit: aud,
+		Tasks: tasks, Projects: projs, Members: members, Audit: aud,
 		Provider: infraai.NewMock(), Idem: newFakeIdem(),
 		Entitlements: &fakeEnt{plan: billing.PlanBusiness},
 		MonthlyCap:   cap,
@@ -327,7 +353,7 @@ func TestPlanDraftReplay(t *testing.T) {
 
 func TestDigestStats(t *testing.T) {
 	h := newHarness(nil, 0)
-	out, err := h.svc.Digest(context.Background(), "o1", "u1", "p1")
+	out, err := h.svc.Digest(context.Background(), "o1", "u1", tenant.RoleMember, "p1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +363,7 @@ func TestDigestStats(t *testing.T) {
 	if out.Text == "" {
 		t.Fatal("empty digest text")
 	}
-	if _, err := h.svc.Digest(context.Background(), "o1", "u1", "nope"); !errors.Is(err, domain.ErrNotFound) {
+	if _, err := h.svc.Digest(context.Background(), "o1", "u1", tenant.RoleMember, "nope"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want not_found, got %v", err)
 	}
 }
@@ -345,24 +371,24 @@ func TestDigestStats(t *testing.T) {
 func TestScanRisksAndDismiss(t *testing.T) {
 	h := newHarness(nil, 0)
 	ctx := context.Background()
-	risks, err := h.svc.ScanRisks(ctx, "o1", "u1", "p1")
+	risks, err := h.svc.ScanRisks(ctx, "o1", "u1", tenant.RoleMember, "p1")
 	if err != nil {
 		t.Fatal(err)
 	}
 	if len(risks) != 1 || risks[0].TaskID != "t1" || risks[0].Score != ai.ScoreHigh {
 		t.Fatalf("risks = %+v", risks)
 	}
-	listed, err := h.svc.ListRisks(ctx, "o1", "u1", "p1")
+	listed, err := h.svc.ListRisks(ctx, "o1", "u1", tenant.RoleMember, "p1")
 	if err != nil || len(listed) != 1 {
 		t.Fatalf("list = %+v, err = %v", listed, err)
 	}
-	if err := h.svc.DismissRisk(ctx, "o1", "u1", "t1"); err != nil {
+	if err := h.svc.DismissRisk(ctx, "o1", "u1", tenant.RoleMember, "t1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := h.svc.DismissRisk(ctx, "o1", "u1", "t1"); !errors.Is(err, domain.ErrNotFound) {
+	if err := h.svc.DismissRisk(ctx, "o1", "u1", tenant.RoleMember, "t1"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want not_found on re-dismiss, got %v", err)
 	}
-	if err := h.svc.DismissRisk(ctx, "o1", "u1", "foreign"); !errors.Is(err, domain.ErrNotFound) {
+	if err := h.svc.DismissRisk(ctx, "o1", "u1", tenant.RoleMember, "foreign"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("want not_found on foreign task, got %v", err)
 	}
 }
@@ -370,8 +396,58 @@ func TestScanRisksAndDismiss(t *testing.T) {
 func TestScanRisksPlanGate(t *testing.T) {
 	h := newHarness(nil, 0)
 	h.svc.entitlements = &fakeEnt{plan: billing.PlanPro}
-	if _, err := h.svc.ScanRisks(context.Background(), "o1", "u1", "p1"); !errors.Is(err, domain.ErrPlanLimit) {
+	if _, err := h.svc.ScanRisks(context.Background(), "o1", "u1", tenant.RoleMember, "p1"); !errors.Is(err, domain.ErrPlanLimit) {
 		t.Fatalf("want plan_limit, got %v", err)
+	}
+}
+
+// B06: org-level read is not project access. A non-member must not reach a
+// private project's stats or risks through the AI surface, and the denial
+// happens before metering or any provider call.
+func TestAIPrivateProjectHiddenFromNonMembers(t *testing.T) {
+	ctx := context.Background()
+	for _, role := range []tenant.OrgRole{tenant.RoleMember, tenant.RoleGuest} {
+		h := newHarness(nil, 0)
+		if _, err := h.svc.Digest(ctx, "o1", "u1", role, "p2"); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("%s digest: want not_found, got %v", role, err)
+		}
+		if _, err := h.svc.ScanRisks(ctx, "o1", "u1", role, "p2"); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("%s scan: want not_found, got %v", role, err)
+		}
+		if _, err := h.svc.ListRisks(ctx, "o1", "u1", role, "p2"); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("%s list: want not_found, got %v", role, err)
+		}
+		if err := h.svc.DismissRisk(ctx, "o1", "u1", role, "t3"); !errors.Is(err, domain.ErrNotFound) {
+			t.Fatalf("%s dismiss: want not_found, got %v", role, err)
+		}
+		if n := len(h.runs.rows); n != 0 {
+			t.Fatalf("%s: %d AI runs recorded for denied calls", role, n)
+		}
+	}
+}
+
+func TestAIPrivateProjectMemberAndAdmin(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness(nil, 0)
+	if _, err := h.svc.Digest(ctx, "o1", "u-secret", tenant.RoleMember, "p2"); err != nil {
+		t.Fatalf("viewer member digest: %v", err)
+	}
+	if _, err := h.svc.ScanRisks(ctx, "o1", "u-secret", tenant.RoleMember, "p2"); err != nil {
+		t.Fatalf("viewer member scan: %v", err)
+	}
+	if err := h.svc.DismissRisk(ctx, "o1", "u-secret", tenant.RoleMember, "t3"); !errors.Is(err, domain.ErrForbidden) {
+		t.Fatalf("viewer dismiss: want forbidden, got %v", err)
+	}
+	if err := h.svc.DismissRisk(ctx, "o1", "u-admin", tenant.RoleAdmin, "t3"); err != nil {
+		t.Fatalf("org admin dismiss: %v", err)
+	}
+}
+
+func TestAIOrgProjectGuestHidden(t *testing.T) {
+	h := newHarness(nil, 0)
+	// p1 is org-visible, but a GUEST who is not a project member sees nothing.
+	if _, err := h.svc.ListRisks(context.Background(), "o1", "u-guest", tenant.RoleGuest, "p1"); !errors.Is(err, domain.ErrNotFound) {
+		t.Fatalf("guest list: want not_found, got %v", err)
 	}
 }
 

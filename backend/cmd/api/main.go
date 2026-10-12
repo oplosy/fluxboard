@@ -400,7 +400,7 @@ func run(logger *slog.Logger) error {
 	aiSvc := aiuc.New(aiuc.Deps{
 		Runs: postgres.NewAIRepo(tenantPool), Risks: postgres.NewAIRepo(tenantPool),
 		Flags: postgres.NewFeatureFlagRepo(tenantPool),
-		Tasks: taskRepo, Projects: projectRepo, Audit: auditRepo,
+		Tasks: taskRepo, Projects: projectRepo, Members: projectMemberRepo, Audit: auditRepo,
 		Provider: aiProvider, Idem: redisx.NewIdempotencyStore(rdb),
 		Entitlements: billingSvc, Creator: taskCreator{svc: taskSvc},
 		MonthlyCap: cfg.AIMonthlyCap, Logger: logger,

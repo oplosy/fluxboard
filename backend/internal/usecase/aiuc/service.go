@@ -22,6 +22,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/audit"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/uuidv7"
 )
 
@@ -55,6 +56,7 @@ type Deps struct {
 	Flags        admin.FeatureFlagRepository
 	Tasks        project.TaskRepository
 	Projects     project.ProjectRepository
+	Members      project.ProjectMemberRepository // private-project access (same policy as taskuc)
 	Audit        audit.Writer
 	Provider     ai.Provider
 	Idem         IdempotencyStore
@@ -72,6 +74,7 @@ type Service struct {
 	flags        admin.FeatureFlagRepository
 	tasks        project.TaskRepository
 	projects     project.ProjectRepository
+	members      project.ProjectMemberRepository
 	audit        audit.Writer
 	provider     ai.Provider
 	idem         IdempotencyStore
@@ -98,7 +101,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		runs: d.Runs, risks: d.Risks, flags: d.Flags,
-		tasks: d.Tasks, projects: d.Projects, audit: d.Audit,
+		tasks: d.Tasks, projects: d.Projects, members: d.Members, audit: d.Audit,
 		provider: d.Provider, idem: d.Idem, entitlements: d.Entitlements,
 		creator: d.Creator,
 		cap:     cap, now: now, logger: logger,
@@ -210,10 +213,10 @@ func (s *Service) PlanDraft(ctx context.Context, orgID, userID, brief, idemKey s
 // ---- digest ----------------------------------------------------------------
 
 // Digest builds the sponsor-ready report from LIVE data (FR-AI-003).
-func (s *Service) Digest(ctx context.Context, orgID, userID, projectID string) (*DigestOut, error) {
-	p, err := s.projects.Get(ctx, orgID, projectID)
+func (s *Service) Digest(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string) (*DigestOut, error) {
+	p, err := s.access(ctx, orgID, projectID, userID, orgRole, project.RoleViewer)
 	if err != nil {
-		return nil, err // ErrNotFound covers cross-tenant probes (404)
+		return nil, err // ErrNotFound covers cross-tenant and hidden private-project probes (404)
 	}
 	if err := s.pipeline(ctx, orgID, ai.KindDigest); err != nil {
 		return nil, err
@@ -265,8 +268,8 @@ func (s *Service) Chat(ctx context.Context, orgID, userID, message string, histo
 
 // ScanRisks recomputes open risks for a project (FR-AI-004). BUSINESS+ only:
 // the engine signals are cheap, the narrated review is the gated value.
-func (s *Service) ScanRisks(ctx context.Context, orgID, userID, projectID string) ([]ai.Risk, error) {
-	if _, err := s.projects.Get(ctx, orgID, projectID); err != nil {
+func (s *Service) ScanRisks(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string) ([]ai.Risk, error) {
+	if _, err := s.access(ctx, orgID, projectID, userID, orgRole, project.RoleViewer); err != nil {
 		return nil, err
 	}
 	if err := s.pipeline(ctx, orgID, ai.KindRisk); err != nil {
@@ -314,8 +317,8 @@ func (s *Service) ScanRisks(ctx context.Context, orgID, userID, projectID string
 }
 
 // ListRisks returns open risks for a project (risk board, FR-AI-004).
-func (s *Service) ListRisks(ctx context.Context, orgID, _ string, projectID string) ([]ai.Risk, error) {
-	if _, err := s.projects.Get(ctx, orgID, projectID); err != nil {
+func (s *Service) ListRisks(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string) ([]ai.Risk, error) {
+	if _, err := s.access(ctx, orgID, projectID, userID, orgRole, project.RoleViewer); err != nil {
 		return nil, err
 	}
 	risks, err := s.risks.ListOpen(ctx, orgID, projectID)
@@ -328,10 +331,15 @@ func (s *Service) ListRisks(ctx context.Context, orgID, _ string, projectID stri
 	return risks, nil
 }
 
-// DismissRisk stamps a risk dismissed (FR-AI-004). The task read first proves
-// org visibility, so dismissing a foreign task 404s instead of leaking.
-func (s *Service) DismissRisk(ctx context.Context, orgID, userID, taskID string) error {
-	if _, err := s.tasks.Get(ctx, orgID, taskID); err != nil {
+// DismissRisk stamps a risk dismissed (FR-AI-004). It changes what the whole
+// project sees, so it needs CONTRIBUTOR on the task's project; a foreign or
+// hidden private-project task 404s instead of leaking.
+func (s *Service) DismissRisk(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, taskID string) error {
+	t, err := s.tasks.Get(ctx, orgID, taskID)
+	if err != nil {
+		return err
+	}
+	if _, err := s.access(ctx, orgID, t.ProjectID, userID, orgRole, project.RoleContributor); err != nil {
 		return err
 	}
 	if err := s.risks.Dismiss(ctx, orgID, taskID); err != nil {
@@ -344,6 +352,44 @@ func (s *Service) DismissRisk(ctx context.Context, orgID, userID, taskID string)
 // PurgeExpired deletes ledger rows past retention (job path, FR-AI-008).
 func (s *Service) PurgeExpired(ctx context.Context, orgID string) (int64, error) {
 	return s.runs.PurgeBefore(ctx, orgID, s.now().Add(-RetentionWindow))
+}
+
+// ---- authorization (mirrors taskuc; kept local so the services stay
+// independent). Org RLS only isolates tenants: private-project visibility
+// inside the org is enforced here, before any metering or provider call. ----
+
+func (s *Service) effectiveRole(ctx context.Context, orgID string, p *project.Project, userID string, orgRole tenant.OrgRole) (project.ProjectRole, error) {
+	if orgRole.AtLeast(tenant.RoleAdmin) {
+		return project.RoleLead, nil
+	}
+	m, err := s.members.Get(ctx, orgID, p.ID, userID)
+	if err == nil {
+		return m.Role, nil
+	}
+	if !errors.Is(err, domain.ErrNotFound) {
+		return "", err
+	}
+	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
+		return project.RoleViewer, nil
+	}
+	return "", domain.ErrNotFound
+}
+
+// access loads the project and requires at least min on it. Below min →
+// ErrForbidden; not visible at all → ErrNotFound.
+func (s *Service) access(ctx context.Context, orgID, projectID, userID string, orgRole tenant.OrgRole, min project.ProjectRole) (*project.Project, error) {
+	p, err := s.projects.Get(ctx, orgID, projectID)
+	if err != nil {
+		return nil, err
+	}
+	role, err := s.effectiveRole(ctx, orgID, p, userID, orgRole)
+	if err != nil {
+		return nil, err
+	}
+	if !role.AtLeast(min) {
+		return nil, domain.ErrForbidden
+	}
+	return p, nil
 }
 
 // ---- pipeline ---------------------------------------------------------------

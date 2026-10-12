@@ -155,7 +155,7 @@ func (h *AIHandlers) Digest(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, domain.ErrForbidden)
 		return
 	}
-	out, err := h.svc.Digest(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "projectId"))
+	out, err := h.svc.Digest(r.Context(), tc.OrgID, tc.UserID, tc.Role, chi.URLParam(r, "projectId"))
 	if err != nil {
 		response.Error(w, err)
 		return
@@ -211,7 +211,7 @@ func (h *AIHandlers) ScanRisks(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	risks, err := h.svc.ScanRisks(r.Context(), tc.OrgID, tc.UserID, req.ProjectID)
+	risks, err := h.svc.ScanRisks(r.Context(), tc.OrgID, tc.UserID, tc.Role, req.ProjectID)
 	if err != nil {
 		response.Error(w, err)
 		return
@@ -230,7 +230,7 @@ func (h *AIHandlers) ListRisks(w http.ResponseWriter, r *http.Request) {
 		response.Error(w, domain.ErrForbidden)
 		return
 	}
-	risks, err := h.svc.ListRisks(r.Context(), tc.OrgID, tc.UserID, r.URL.Query().Get("project_id"))
+	risks, err := h.svc.ListRisks(r.Context(), tc.OrgID, tc.UserID, tc.Role, r.URL.Query().Get("project_id"))
 	if err != nil {
 		response.Error(w, err)
 		return
@@ -257,7 +257,7 @@ func (h *AIHandlers) DismissRisk(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if err := h.svc.DismissRisk(r.Context(), tc.OrgID, tc.UserID, req.TaskID); err != nil {
+	if err := h.svc.DismissRisk(r.Context(), tc.OrgID, tc.UserID, tc.Role, req.TaskID); err != nil {
 		response.Error(w, err)
 		return
 	}
