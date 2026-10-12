@@ -112,15 +112,76 @@ func run(logger *slog.Logger) error {
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
 	defer stop()
 
-	// Data clients. pgxpool connects lazily; a down DB does not block boot.
-	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	a, err := newApp(ctx, cfg, logger)
 	if err != nil {
 		return err
 	}
-	defer pool.Close()
+	defer a.Close()
+
+	srv := &http.Server{
+		Addr:              cfg.HTTPAddr,
+		Handler:           a.handler,
+		ReadHeaderTimeout: 10 * time.Second,
+	}
+
+	serveErr := make(chan error, 1)
+	go func() {
+		logger.Info("listening", "addr", cfg.HTTPAddr)
+		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
+			serveErr <- err
+			return
+		}
+		serveErr <- nil
+	}()
+
+	select {
+	case err := <-serveErr:
+		return err
+	case <-ctx.Done():
+		logger.Info("shutdown signal received, draining", "drain", shutdownDrain.String())
+		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownDrain)
+		defer cancel()
+		if err := srv.Shutdown(shutdownCtx); err != nil {
+			return err
+		}
+		logger.Info("shutdown complete")
+		return nil
+	}
+}
+
+// app is the wired API: its HTTP handler plus the clients it owns.
+type app struct {
+	handler http.Handler
+	closers []func()
+}
+
+// Close releases the clients in reverse order of creation.
+func (a *app) Close() {
+	for i := len(a.closers) - 1; i >= 0; i-- {
+		a.closers[i]()
+	}
+}
+
+// newApp is the composition root: it builds every client, repository, usecase
+// and the router from cfg. run serves the result; the tenant-isolation
+// integration test drives the same wiring in-process.
+func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *app, err error) {
+	a := &app{}
+	defer func() {
+		if err != nil {
+			a.Close()
+		}
+	}()
+
+	// Data clients. pgxpool connects lazily; a down DB does not block boot.
+	pool, err := pgxpool.New(ctx, cfg.DatabaseURL)
+	if err != nil {
+		return nil, err
+	}
+	a.closers = append(a.closers, pool.Close)
 
 	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
-	defer func() { _ = rdb.Close() }()
+	a.closers = append(a.closers, func() { _ = rdb.Close() })
 
 	// Metrics registry.
 	reg := prometheus.NewRegistry()
@@ -137,7 +198,7 @@ func run(logger *slog.Logger) error {
 	// Auth wiring: signer/verifier, repositories, session cache, usecase.
 	signer, err := loadSigner(cfg, logger)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	verifier := jwtx.VerifierFromSigners(signer)
 
@@ -159,7 +220,7 @@ func run(logger *slog.Logger) error {
 
 	cipher, err := loadTOTPCipher(cfg, logger)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	google := loadGoogleProvider(cfg, logger)
 
@@ -205,7 +266,7 @@ func run(logger *slog.Logger) error {
 	membershipCache := redisx.NewMembershipCache(rdb)
 	enforcer, err := casbinx.New()
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Phase 5 — realtime bus + notification fan-out (docs/09 §1/§3). eventBus is
@@ -227,7 +288,7 @@ func run(logger *slog.Logger) error {
 	// (FR-TASK-006); in dev nil disables those surfaces instead of failing boot.
 	objectStore, err := loadObjectStore(ctx, cfg, logger)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	tenantSvc := tenantuc.New(tenantuc.Deps{
@@ -279,7 +340,7 @@ func run(logger *slog.Logger) error {
 	// TenantPool. BaseURL is the public app origin for Checkout/Portal returns.
 	stripeGW, err := stripex.New(cfg.StripeMode, cfg.StripeWebhookSecret, cfg.WebOrigin)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	entitlementCache := redisx.NewEntitlementCache(rdb)
 	billingSvc := billinguc.New(billinguc.Deps{
@@ -316,15 +377,15 @@ func run(logger *slog.Logger) error {
 	} else {
 		ownerPool, err := pgxpool.New(ctx, cfg.DatabaseURLMigrate)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		defer ownerPool.Close()
+		a.closers = append(a.closers, ownerPool.Close)
 
 		asynqOpt := asynq.RedisClientOpt{Addr: cfg.RedisAddr}
 		asynqClient := asynq.NewClient(asynqOpt)
-		defer func() { _ = asynqClient.Close() }()
+		a.closers = append(a.closers, func() { _ = asynqClient.Close() })
 		inspector := asynq.NewInspector(asynqOpt)
-		defer func() { _ = inspector.Close() }()
+		a.closers = append(a.closers, func() { _ = inspector.Close() })
 
 		analyticsRepo := postgres.NewAnalyticsRepo(tenantPool)
 		apikeySvc := apikeyuc.New(apikeyuc.Deps{
@@ -434,7 +495,7 @@ func run(logger *slog.Logger) error {
 		Logger:   logger,
 	}
 
-	router := httpx.NewRouter(httpx.Deps{
+	a.handler = httpx.NewRouter(httpx.Deps{
 		Logger:         logger,
 		WebOrigin:      cfg.WebOrigin,
 		Health:         httpx.Health{DB: pool, Redis: redisPinger{rdb}},
@@ -467,35 +528,7 @@ func run(logger *slog.Logger) error {
 		HTTPMetrics:    httpMetrics,
 	})
 
-	srv := &http.Server{
-		Addr:              cfg.HTTPAddr,
-		Handler:           router,
-		ReadHeaderTimeout: 10 * time.Second,
-	}
-
-	serveErr := make(chan error, 1)
-	go func() {
-		logger.Info("listening", "addr", cfg.HTTPAddr)
-		if err := srv.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
-			serveErr <- err
-			return
-		}
-		serveErr <- nil
-	}()
-
-	select {
-	case err := <-serveErr:
-		return err
-	case <-ctx.Done():
-		logger.Info("shutdown signal received, draining", "drain", shutdownDrain.String())
-		shutdownCtx, cancel := context.WithTimeout(context.Background(), shutdownDrain)
-		defer cancel()
-		if err := srv.Shutdown(shutdownCtx); err != nil {
-			return err
-		}
-		logger.Info("shutdown complete")
-		return nil
-	}
+	return a, nil
 }
 
 // loadSigner resolves the ES256 signing key: inline PEM, a file path, or (dev
