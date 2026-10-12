@@ -120,27 +120,29 @@ type emailPayload struct {
 	OrgID    string `json:"org_id"`
 }
 
-// HandleOutboxDrain claims undrained outbox rows per org and hands each to
-// Asynq with TaskID = the outbox row id: the claim is at-least-once, the
-// TaskID makes the enqueue at-most-once, and idempotent handlers give
-// exactly-once effect (ADR-011).
+// errUnknownOutboxKind marks an outbox row no handler exists for; retrying
+// cannot fix it.
+var errUnknownOutboxKind = errors.New("unknown outbox kind")
+
+// HandleOutboxDrain drains undrained outbox rows per org, handing each to
+// Asynq with TaskID = the outbox row id: a row is marked drained only after its
+// enqueue succeeds (at-least-once handoff), the TaskID makes the enqueue
+// at-most-once, and idempotent handlers give exactly-once effect (ADR-011).
+// An enqueue failure stops the org's batch and is retried on the next tick.
 func (b *Billing) HandleOutboxDrain(ctx context.Context, _ *asynq.Task) error {
 	return forEachOrg(ctx, b.d.Orgs, b.d.Logger, TypeOutboxDrain, func(orgID string) (int, error) {
-		items, err := b.d.Outbox.ClaimBatch(ctx, orgID, outboxDrainBatch)
-		if err != nil {
-			return 0, err
-		}
-		n := 0
-		for _, item := range items {
-			if err := b.enqueueOutboxItem(ctx, item); err != nil {
-				// The row is already drained; a lost enqueue is logged loudly
-				// rather than failing the whole batch (surfaced in admin later).
-				b.d.Logger.Error("outbox: enqueue failed", "outbox_id", item.ID, "kind", item.Kind, "err", err)
-				continue
+		return b.d.Outbox.Drain(ctx, orgID, outboxDrainBatch, func(item billing.OutboxItem) error {
+			err := b.enqueueOutboxItem(ctx, item)
+			if errors.Is(err, errUnknownOutboxKind) {
+				// Drain it anyway so it cannot block the rows queued behind it.
+				b.d.Logger.Error("outbox: dropping row", "outbox_id", item.ID, "kind", item.Kind, "err", err)
+				return nil
 			}
-			n++
-		}
-		return n, nil
+			if err != nil {
+				return fmt.Errorf("outbox %s: enqueue: %w", item.ID, err)
+			}
+			return nil
+		})
 	})
 }
 
@@ -150,7 +152,7 @@ func (b *Billing) enqueueOutboxItem(ctx context.Context, item billing.OutboxItem
 	case billing.OutboxEmailSend:
 		taskType = TypeEmailSend
 	default:
-		return fmt.Errorf("unknown outbox kind %q", item.Kind)
+		return fmt.Errorf("%w %q", errUnknownOutboxKind, item.Kind)
 	}
 	_, err := b.d.Client.EnqueueContext(ctx, asynq.NewTask(taskType, item.Payload),
 		asynq.TaskID("outbox:"+item.ID), asynq.Queue(QueueDefault), asynq.MaxRetry(5))

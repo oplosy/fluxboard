@@ -21,27 +21,43 @@ func NewOutboxRepo(tp *TenantPool) *OutboxRepo { return &OutboxRepo{tp: tp} }
 
 var _ billing.OutboxRepository = (*OutboxRepo)(nil)
 
-func (r *OutboxRepo) ClaimBatch(ctx context.Context, orgID string, limit int) ([]billing.OutboxItem, error) {
-	var out []billing.OutboxItem
+func (r *OutboxRepo) Drain(ctx context.Context, orgID string, limit int, handoff func(billing.OutboxItem) error) (int, error) {
+	var drained int
+	var handoffErr error
 	err := r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		drained, handoffErr = 0, nil
 		oid, _ := parseUUID(orgID)
-		rows, err := q.ClaimOutboxBatch(ctx, gen.ClaimOutboxBatchParams{OrgID: oid, Lim: int32(limit)})
+		rows, err := q.LockOutboxBatch(ctx, gen.LockOutboxBatchParams{OrgID: oid, Lim: int32(limit)})
 		if err != nil {
 			return err
 		}
+		ids := make([]uuid.UUID, 0, len(rows))
 		for _, row := range rows {
-			out = append(out, billing.OutboxItem{
+			if handoffErr = handoff(billing.OutboxItem{
 				ID:        row.ID.String(),
 				OrgID:     row.OrgID.String(),
 				Kind:      billing.OutboxKind(row.Kind),
 				Payload:   row.Payload,
 				CreatedAt: row.CreatedAt,
 				DrainedAt: tsPtr(row.DrainedAt),
-			})
+			}); handoffErr != nil {
+				break // keep this row and the rest undrained for the next drain
+			}
+			ids = append(ids, row.ID)
 		}
+		if len(ids) == 0 {
+			return nil
+		}
+		if err := q.MarkOutboxDrained(ctx, gen.MarkOutboxDrainedParams{OrgID: oid, Ids: ids}); err != nil {
+			return err
+		}
+		drained = len(ids)
 		return nil
 	})
-	return out, err
+	if err != nil {
+		return 0, err
+	}
+	return drained, handoffErr
 }
 
 // InsertEmail enqueues an email:send outbox row in its own tenant tx (satisfies

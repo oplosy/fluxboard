@@ -23,9 +23,6 @@ type Querier interface {
 	// distinct rank, so the repo issues per-task MoveTask calls instead of a set-based
 	// UPDATE (the (column_id, rank) unique index forbids sharing a rank).
 	BulkAssignTasks(ctx context.Context, arg BulkAssignTasksParams) (int64, error)
-	// Atomically mark up to @lim undrained rows drained and return them. FOR UPDATE
-	// SKIP LOCKED lets concurrent drainers make progress without contending.
-	ClaimOutboxBatch(ctx context.Context, arg ClaimOutboxBatchParams) ([]Outbox, error)
 	// Removes the org logo (empty-string logo_key in UpdateProfile). A separate
 	// query because coalesce() above cannot express "set NULL".
 	ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
@@ -264,9 +261,16 @@ type Querier interface {
 	// Metered aggregates for a day not yet pushed to Stripe.
 	ListUsageForPush(ctx context.Context, arg ListUsageForPushParams) ([]UsageRecord, error)
 	ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]ListUsersByIDsRow, error)
+	// Lock up to @lim undrained rows for the drain tx. FOR UPDATE SKIP LOCKED lets
+	// concurrent drainers make progress without contending. The lock dies with the
+	// tx, so a crash before MarkOutboxDrained leaves the rows undrained.
+	LockOutboxBatch(ctx context.Context, arg LockOutboxBatchParams) ([]Outbox, error)
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) (int64, error)
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (int64, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
+	// Stamp drained_at on rows already handed off to Asynq, in the same tx that
+	// locked them.
+	MarkOutboxDrained(ctx context.Context, arg MarkOutboxDrainedParams) error
 	MarkSessionRotated(ctx context.Context, id uuid.UUID) error
 	MarkUsagePushed(ctx context.Context, arg MarkUsagePushedParams) error
 	MarkUserEmailVerified(ctx context.Context, id uuid.UUID) error
