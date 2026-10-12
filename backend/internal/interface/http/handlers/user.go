@@ -19,6 +19,8 @@ import (
 type UserHandlers struct {
 	svc    *useruc.Service
 	logger *slog.Logger
+	// Export reads sessions and memberships for GET /me/export (set by cmd/api).
+	Export ExportSources
 }
 
 // NewUserHandlers builds UserHandlers.

@@ -58,3 +58,37 @@ func (q *Queries) GetOAuthIdentity(ctx context.Context, arg GetOAuthIdentityPara
 	)
 	return i, err
 }
+
+const listOAuthIdentitiesByUser = `-- name: ListOAuthIdentitiesByUser :many
+SELECT id, user_id, provider, provider_sub, created_at
+FROM oauth_identities
+WHERE user_id = $1
+ORDER BY created_at
+`
+
+// The caller's linked sign-in identities, for the personal data export (B09).
+func (q *Queries) ListOAuthIdentitiesByUser(ctx context.Context, userID uuid.UUID) ([]OauthIdentity, error) {
+	rows, err := q.db.Query(ctx, listOAuthIdentitiesByUser, userID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []OauthIdentity
+	for rows.Next() {
+		var i OauthIdentity
+		if err := rows.Scan(
+			&i.ID,
+			&i.UserID,
+			&i.Provider,
+			&i.ProviderSub,
+			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

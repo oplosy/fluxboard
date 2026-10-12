@@ -63,3 +63,23 @@ func (r *OAuthRepo) Create(ctx context.Context, oi *auth.OAuthIdentity) error {
 	}
 	return err
 }
+
+// ListByUser returns the user's linked identities, oldest first.
+func (r *OAuthRepo) ListByUser(ctx context.Context, userID string) ([]*auth.OAuthIdentity, error) {
+	uid, err := parseUUID(userID)
+	if err != nil {
+		return nil, fmt.Errorf("oauth list: %w", err)
+	}
+	rows, err := r.q.ListOAuthIdentitiesByUser(ctx, uid)
+	if err != nil {
+		return nil, fmt.Errorf("oauth list: %w", err)
+	}
+	out := make([]*auth.OAuthIdentity, 0, len(rows))
+	for _, row := range rows {
+		out = append(out, &auth.OAuthIdentity{
+			ID: row.ID.String(), UserID: row.UserID.String(), Provider: row.Provider,
+			ProviderSub: row.ProviderSub, CreatedAt: row.CreatedAt,
+		})
+	}
+	return out, nil
+}
