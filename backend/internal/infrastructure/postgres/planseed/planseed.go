@@ -51,14 +51,38 @@ ON CONFLICT (code) DO UPDATE SET
   metered              = EXCLUDED.metered,
   monthly_price        = EXCLUDED.monthly_price`
 
+// Currency of every catalog price (minor units in MonthlyPrice).
+const Currency = "usd"
+
 // Upsert writes every plan, keyed on plans.code, so re-running keeps the table
-// in sync with the catalog.
+// in sync with the catalog. Stripe ids are left untouched (SetStripeIDs).
 func Upsert(ctx context.Context, db Execer) error {
 	for _, p := range Plans {
 		if _, err := db.Exec(ctx, upsert, p.Code, p.Name, p.MaxMembers, p.MaxProjects,
 			p.MaxStorageBytes, p.APIRatePerMin, p.AuditRetentionDays, p.Metered, p.MonthlyPrice); err != nil {
 			return fmt.Errorf("seed plan %q: %w", p.Code, err)
 		}
+	}
+	return nil
+}
+
+const setStripeIDs = `
+UPDATE plans
+SET stripe_product_id        = $2,
+    seat_price_id            = $3,
+    metered_storage_price_id = nullif($4, ''),
+    metered_api_price_id     = nullif($5, '')
+WHERE code = $1`
+
+// SetStripeIDs records the Stripe product and price ids stripe-seed created
+// for a plan (MODE=live). The plan row must already exist (Upsert first).
+func SetStripeIDs(ctx context.Context, db Execer, code, productID, seatPriceID, storagePriceID, apiPriceID string) error {
+	tag, err := db.Exec(ctx, setStripeIDs, code, productID, seatPriceID, storagePriceID, apiPriceID)
+	if err != nil {
+		return fmt.Errorf("set stripe ids for plan %q: %w", code, err)
+	}
+	if tag.RowsAffected() != 1 {
+		return fmt.Errorf("set stripe ids: plan %q not found", code)
 	}
 	return nil
 }

@@ -345,13 +345,17 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	// key). Plan + processed-event tables are global (plain pool);
 	// subscription/invoice/usage/outbox/webhook are [T] over the RLS-enforcing
 	// TenantPool. BaseURL is the public app origin for Checkout/Portal returns.
-	stripeGW, err := stripex.New(cfg.StripeMode, cfg.StripeWebhookSecret, cfg.WebOrigin)
+	planRepo := postgres.NewPlanRepo(pool)
+	stripeGW, err := stripex.New(stripex.Config{
+		Mode: cfg.StripeMode, SecretKey: cfg.StripeSecretKey,
+		WebhookSecret: cfg.StripeWebhookSecret, BaseURL: cfg.WebOrigin,
+	}, planRepo)
 	if err != nil {
 		return nil, err
 	}
 	entitlementCache := redisx.NewEntitlementCache(rdb)
 	billingSvc := billinguc.New(billinguc.Deps{
-		Plans:    postgres.NewPlanRepo(pool),
+		Plans:    planRepo,
 		Subs:     postgres.NewSubscriptionRepo(tenantPool),
 		Invoices: postgres.NewInvoiceRepo(tenantPool),
 		Events:   postgres.NewProcessedEventRepo(pool),

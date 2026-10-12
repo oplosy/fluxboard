@@ -107,7 +107,7 @@ type WebhookRepository interface {
 
 // The gateway abstracts Stripe so the usecase never touches stripe-go. The stub
 // implementation (MODE=stub) fakes it with no external calls; the live
-// implementation wraps stripe-go/v78 behind the same interface.
+// implementation wraps stripe-go behind the same interface (ADR-029).
 
 // CheckoutParams describes a hosted-Checkout session request (06 §3).
 type CheckoutParams struct {
@@ -170,9 +170,10 @@ type StripeGateway interface {
 	// CreateCheckout returns a hosted Checkout URL (+ resolved customer id).
 	CreateCheckout(ctx context.Context, p CheckoutParams) (CheckoutSession, error)
 	// UpcomingInvoice returns the prorated amount (minor units) + currency for a
-	// plan change preview (FR-BILL-003).
+	// plan change preview (FR-BILL-003). seats <= 0 keeps the current seat count.
 	UpcomingInvoice(ctx context.Context, subscriptionID string, newPlan Plan, seats int64) (amount int64, currency string, err error)
 	// UpdateSubscription changes the plan with create_prorations under idemKey.
+	// seats <= 0 keeps the current seat count.
 	UpdateSubscription(ctx context.Context, subscriptionID string, newPlan Plan, seats int64, idemKey string) error
 	// CancelSubscription cancels immediately or at period end.
 	CancelSubscription(ctx context.Context, subscriptionID string, atPeriodEnd bool) error
@@ -180,8 +181,10 @@ type StripeGateway interface {
 	Resume(ctx context.Context, subscriptionID string) error
 	// PortalSession returns a Billing Portal URL for payment-method management.
 	PortalSession(ctx context.Context, customerID, returnURL string) (string, error)
-	// PushUsage reports a metered aggregate to Stripe with action=set (06 §5).
-	PushUsage(ctx context.Context, subscriptionID string, metric UsageMetric, quantity int64, ts time.Time) error
+	// PushUsage reports one day's aggregate of a metered dimension for the
+	// customer (06 §5). Re-pushing the same customer/metric/day is deduplicated
+	// by Stripe; dimensions that are not billed by usage are a no-op.
+	PushUsage(ctx context.Context, customerID string, metric UsageMetric, quantity int64, ts time.Time) error
 	// FetchSubscription reads the authoritative remote subscription state for
 	// the nightly reconcile (06 §8, ADR-010). Returns ErrReconcileUnsupported
 	// when the gateway has no remote to read (MODE=stub).

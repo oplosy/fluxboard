@@ -334,7 +334,7 @@ func TestUsagePushSkipsUnmeteredAndPushesMetered(t *testing.T) {
 	store := &fakeUsageStore{forPush: []billing.UsageRecord{rec}}
 	gw := &fakeGateway{}
 	sub := &billing.Subscription{OrgID: "org1", PlanCode: billing.PlanBusiness,
-		Status: billing.StatusActive, StripeSubscriptionID: str("sub_1")}
+		Status: billing.StatusActive, StripeSubscriptionID: str("sub_1"), StripeCustomerID: str("cus_1")}
 	deps := BillingDeps{
 		Usage: store, Subs: &fakeSubs{sub: sub},
 		Plans:   &fakePlans{plan: billing.Plan{Code: billing.PlanBusiness, Metered: false}},

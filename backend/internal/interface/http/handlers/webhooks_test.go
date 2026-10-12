@@ -25,7 +25,7 @@ func (r *recordOnlyEvents) Record(context.Context, billing.ProcessedEvent) (bool
 
 func newWebhookHarness(t *testing.T) (*WebhookHandlers, *recordOnlyEvents) {
 	t.Helper()
-	gw, err := stripex.New("stub", webhookTestSecret, "http://web.test")
+	gw, err := stripex.New(stripex.Config{Mode: "stub", WebhookSecret: webhookTestSecret, BaseURL: "http://web.test"}, nil)
 	if err != nil {
 		t.Fatalf("gateway: %v", err)
 	}

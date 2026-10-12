@@ -231,7 +231,8 @@ func (b *Billing) HandleUsagePush(ctx context.Context, _ *asynq.Task) error {
 		if err != nil {
 			return 0, err
 		}
-		if sub.StripeSubscriptionID == nil || *sub.StripeSubscriptionID == "" {
+		if sub.StripeSubscriptionID == nil || *sub.StripeSubscriptionID == "" ||
+			sub.StripeCustomerID == nil || *sub.StripeCustomerID == "" {
 			return 0, nil
 		}
 		plan, err := b.d.Plans.Get(ctx, sub.PlanCode)
@@ -247,7 +248,7 @@ func (b *Billing) HandleUsagePush(ctx context.Context, _ *asynq.Task) error {
 		}
 		n := 0
 		for _, rec := range recs {
-			if err := b.d.Gateway.PushUsage(ctx, *sub.StripeSubscriptionID, rec.Metric, rec.Value, rec.PeriodDate); err != nil {
+			if err := b.d.Gateway.PushUsage(ctx, *sub.StripeCustomerID, rec.Metric, rec.Value, rec.PeriodDate); err != nil {
 				return n, err
 			}
 			if err := b.d.Usage.MarkPushed(ctx, orgID, rec.Metric, rec.PeriodDate, now); err != nil {

@@ -100,7 +100,11 @@ func run(logger *slog.Logger) error {
 	})
 
 	// Billing jobs (Phase 4 §7): outbox drain, usage pipeline, reconciliation.
-	stripeGW, err := stripex.New(cfg.StripeMode, cfg.StripeWebhookSecret, cfg.WebOrigin)
+	planRepo := postgres.NewPlanRepo(pool)
+	stripeGW, err := stripex.New(stripex.Config{
+		Mode: cfg.StripeMode, SecretKey: cfg.StripeSecretKey,
+		WebhookSecret: cfg.StripeWebhookSecret, BaseURL: cfg.WebOrigin,
+	}, planRepo)
 	if err != nil {
 		return err
 	}
@@ -119,7 +123,7 @@ func run(logger *slog.Logger) error {
 		Outbox:      postgres.NewOutboxRepo(tenantPool),
 		Usage:       postgres.NewUsageRepo(tenantPool),
 		Subs:        postgres.NewSubscriptionRepo(tenantPool),
-		Plans:       postgres.NewPlanRepo(pool),
+		Plans:       planRepo,
 		Gateway:     stripeGW,
 		Cache:       redisx.NewEntitlementCache(rdb),
 		Counters:    redisx.NewUsageCounter(rdb),
@@ -138,7 +142,7 @@ func run(logger *slog.Logger) error {
 	processedEventRepo := postgres.NewProcessedEventRepo(pool)
 	eventBus := redisx.NewEventBus(rdb, logger)
 	billingSvc := billinguc.New(billinguc.Deps{
-		Plans:    postgres.NewPlanRepo(pool),
+		Plans:    planRepo,
 		Subs:     postgres.NewSubscriptionRepo(tenantPool),
 		Invoices: postgres.NewInvoiceRepo(tenantPool),
 		Events:   processedEventRepo,

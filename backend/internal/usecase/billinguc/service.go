@@ -211,8 +211,8 @@ func (s *Service) PreviewChange(ctx context.Context, orgID string, planCode bill
 	if err != nil {
 		return 0, "", err
 	}
-	// TODO(seats): seat quantity isn't mirrored locally; preview current seats.
-	return s.gw.UpcomingInvoice(ctx, *sub.StripeSubscriptionID, *plan, 1)
+	// Seats are not mirrored locally; 0 keeps the subscription's current count.
+	return s.gw.UpcomingInvoice(ctx, *sub.StripeSubscriptionID, *plan, 0)
 }
 
 // ApplyChange switches the org to planCode with create_prorations under an
@@ -224,8 +224,8 @@ func (s *Service) ApplyChange(ctx context.Context, orgID string, planCode billin
 		return err
 	}
 	idemKey := fmt.Sprintf("chg:%s:%s:%d", orgID, planCode, s.now().Unix()/300)
-	// TODO(seats): preserve current seat quantity once mirrored.
-	if err := s.gw.UpdateSubscription(ctx, *sub.StripeSubscriptionID, *plan, 1, idemKey); err != nil {
+	// 0 keeps the current seat count: a plan change must not reset it to 1.
+	if err := s.gw.UpdateSubscription(ctx, *sub.StripeSubscriptionID, *plan, 0, idemKey); err != nil {
 		return fmt.Errorf("update subscription: %w", err)
 	}
 	s.bust(ctx, orgID)

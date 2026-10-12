@@ -13,16 +13,31 @@ const secret = "whsec_stub_test"
 
 func newStub(t *testing.T) *StubGateway {
 	t.Helper()
-	g, err := New("stub", secret, "https://app.test")
+	g, err := New(Config{Mode: "stub", WebhookSecret: secret, BaseURL: "https://app.test"}, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 	return g.(*StubGateway)
 }
 
-func TestNewLiveNotImplemented(t *testing.T) {
-	if _, err := New("live", secret, ""); err == nil {
-		t.Fatal("MODE=live should error until the real adapter lands")
+func TestNewLiveRequiresKeys(t *testing.T) {
+	plans := fakePlans{}
+	for name, cfg := range map[string]Config{
+		"no secret key":      {Mode: "live", WebhookSecret: "whsec_x"},
+		"publishable key":    {Mode: "live", SecretKey: "pk_test_x", WebhookSecret: "whsec_x"},
+		"no webhook secret":  {Mode: "live", SecretKey: "sk_test_x"},
+		"not a whsec secret": {Mode: "live", SecretKey: "sk_test_x", WebhookSecret: "not-a-whsec"},
+		"unknown mode":       {Mode: "sandbox", SecretKey: "sk_test_x", WebhookSecret: "whsec_x"},
+	} {
+		if _, err := New(cfg, plans); err == nil {
+			t.Errorf("%s: want an error", name)
+		}
+	}
+	if _, err := New(Config{Mode: "live", SecretKey: "sk_test_x", WebhookSecret: "whsec_x"}, nil); err == nil {
+		t.Error("live without a plan repository: want an error")
+	}
+	if _, err := New(Config{Mode: "live", SecretKey: "sk_test_x", WebhookSecret: "whsec_x"}, plans); err != nil {
+		t.Errorf("valid live config: %v", err)
 	}
 }
 
@@ -59,7 +74,7 @@ func TestConstructEventBadSignature(t *testing.T) {
 }
 
 func TestConstructEventEmptySecretFailsClosed(t *testing.T) {
-	g, _ := New("stub", "", "https://app.test")
+	g, _ := New(Config{Mode: "stub", BaseURL: "https://app.test"}, nil)
 	body := []byte(`{"id":"e","type":"t","created":1,"org_id":"o"}`)
 	// With no secret configured, even a "correct" empty-key HMAC must be rejected.
 	if _, err := g.ConstructEvent(body, Sign("", body)); !errors.Is(err, domain.ErrValidation) {

@@ -8,14 +8,17 @@ import (
 // prodConfig is a prod config that passes both validators.
 func prodConfig() *Config {
 	return &Config{
-		AppEnv:           EnvProd,
-		JWTPrivateKeyPEM: "-----BEGIN EC PRIVATE KEY-----",
-		TOTPEncKey:       "key",
-		SMTPHost:         "smtp.example.com",
-		MinIOEndpoint:    "s3.example.com",
-		MinIOAccessKey:   "access",
-		MinIOSecretKey:   "secret",
-		WebOrigin:        "https://app.example.com",
+		AppEnv:              EnvProd,
+		JWTPrivateKeyPEM:    "-----BEGIN EC PRIVATE KEY-----",
+		TOTPEncKey:          "key",
+		SMTPHost:            "smtp.example.com",
+		MinIOEndpoint:       "s3.example.com",
+		MinIOAccessKey:      "access",
+		MinIOSecretKey:      "secret",
+		WebOrigin:           "https://app.example.com",
+		StripeMode:          "live",
+		StripeSecretKey:     "sk_live_x",
+		StripeWebhookSecret: "whsec_x",
 	}
 }
 
@@ -41,6 +44,9 @@ func TestValidateAPIProdRejectsDevFallbacks(t *testing.T) {
 		{"no minio", func(c *Config) { c.MinIOEndpoint = "" }, "MINIO_ENDPOINT is required"},
 		{"no minio secret", func(c *Config) { c.MinIOSecretKey = "" }, "MINIO_SECRET_KEY is required"},
 		{"http origin", func(c *Config) { c.WebOrigin = "http://localhost:3000" }, "WEB_ORIGIN must be an https URL"},
+		{"stripe stub", func(c *Config) { c.StripeMode = "stub" }, "STRIPE_MODE must be live"},
+		{"no stripe key", func(c *Config) { c.StripeSecretKey = "" }, "STRIPE_SECRET_KEY is required"},
+		{"no webhook secret", func(c *Config) { c.StripeWebhookSecret = "" }, "STRIPE_WEBHOOK_SECRET is required"},
 		{"google http redirect", func(c *Config) {
 			c.GoogleClientID = "id"
 			c.GoogleRedirectURL = "http://localhost:8080/cb"
