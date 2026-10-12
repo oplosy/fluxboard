@@ -37,7 +37,7 @@ migrate-down: ## Roll back the last migration
 		migrate/migrate -path=/migrations -database "$(DATABASE_URL_MIGRATE)" down 1
 
 sqlc: ## Regenerate query code from SQL (pinned: CI verifies with the same version)
-	docker run --rm -v "$(CURDIR)/backend":/src -w /src sqlc/sqlc:v1.27.0 generate
+	MSYS_NO_PATHCONV=1 docker run --rm -v "$(CURDIR)/backend":/src -w /src sqlc/sqlc:1.27.0 generate
 
 openapi: ## Regenerate the OpenAPI 3.1 spec from swaggo annotations (needs swag v2)
 	cd backend && swag init -g cmd/api/main.go -o docs --parseInternal --parseDepth 2 --v3.1 --outputTypes json
