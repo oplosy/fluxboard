@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
-import { Suspense, useEffect, useState } from 'react';
+import { Suspense, useEffect, useRef, useState } from 'react';
 import { CheckCircle2, XCircle, Loader2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
@@ -13,29 +13,23 @@ function ConfirmInner() {
   const params = useSearchParams();
   const token = params.get('token') ?? '';
   const [state, setState] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const fired = useRef(false);
 
-  // Consume the token exactly once on mount.
+  // Consume the token exactly once. The token is single-use, so the effect must
+  // not re-run it: dev StrictMode mounts, cleans up and re-runs effects, and a
+  // cleanup that discarded the first (successful) response let the second call
+  // fail and show "Link expired". The ref survives that re-run; the response is
+  // always applied (setState after a real unmount is a no-op).
   useEffect(() => {
-    if (!token) return;
-    let active = true;
-    const timeout = window.setTimeout(() => {
-      if (active) setState('error');
-    }, 10_000);
+    if (!token || fired.current) return;
+    fired.current = true;
+    const timeout = window.setTimeout(() => setState((s) => (s === 'pending' ? 'error' : s)), 10_000);
 
     setState('pending');
     void confirmEmail(token)
-      .then(() => {
-        if (active) setState('success');
-      })
-      .catch(() => {
-        if (active) setState('error');
-      })
+      .then(() => setState('success'))
+      .catch(() => setState('error'))
       .finally(() => window.clearTimeout(timeout));
-
-    return () => {
-      active = false;
-      window.clearTimeout(timeout);
-    };
   }, [token]);
 
   let icon = <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />;
