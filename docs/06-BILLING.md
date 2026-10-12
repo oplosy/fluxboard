@@ -1,7 +1,11 @@
 # 06 — Billing & Payments (Stripe)
 
-Implements FR-BILL-001…011. Library: `stripe-go/v78`. Local dev: `stripe-cli`
-container forwards webhooks (`stripe listen --forward-to api:8080/api/v1/webhooks/stripe`).
+Implements FR-BILL-001…011. Library: `stripe-go/v86` (pinned API version
+`2026-08-26.dahlia`, ADR-029). `STRIPE_MODE=stub` (default) is a no-network fake;
+`STRIPE_MODE=live` is the real adapter (`internal/infrastructure/stripe/live.go`),
+used with test-mode keys until the catalog is final (report B02). Local dev:
+`stripe-cli` container forwards webhooks (`stripe listen --forward-to
+api:8080/api/v1/webhooks/stripe`); §10 has the setup.
 
 ## 1. Stripe Object Mapping
 
@@ -9,8 +13,8 @@ container forwards webhooks (`stripe listen --forward-to api:8080/api/v1/webhook
 |---|---|---|
 | organization | Customer | created lazily on first paid action; `metadata.org_id` set — webhook consumer resolves org by metadata, never by email |
 | subscription row | Subscription | one active per org; local row mirrors id, status, price ids, period end, cancel_at_period_end |
-| plans table | Products/Prices | seeded by `make stripe-seed` (idempotent script creating products, licensed seat prices, metered prices); price IDs land in `plans` table, not env vars |
-| usage_records | Usage Records on metered SubscriptionItems | Business plan only |
+| plans table | Products/Prices | seeded by `make stripe-seed` (MODE=live: Billing Meters, product `fluxboard_<plan>`, licensed seat price and metered prices found by lookup key `fluxboard_<plan>_<kind>_v1`); price IDs land in `plans` table, not env vars. The adapter maps a subscription back to its plan by the seat item's price id |
+| usage_records | Billing Meter events | Business plan only; `storage_bytes` (meter `fluxboard_storage_bytes`, aggregation `last`) and `api_calls` (`fluxboard_api_calls`, `sum`); active members are billed as licensed seats |
 | invoices (mirror) | Invoices | synced on `invoice.finalized` / `invoice.payment_succeeded` |
 
 Card data: **never** touches our servers — Stripe Checkout (hosted) for
@@ -56,8 +60,11 @@ Success page does NOT trust the redirect: it polls
 (spinner "finalizing", timeout 60 s → "taking longer than usual" + support hint).
 
 Plan switch (FR-BILL-003): `POST /billing/preview-change {plan}` calls Stripe
-upcoming-invoice for the proration figure; confirm calls Subscription Update
-with `proration_behavior=create_prorations` under an idempotency key.
+`invoices.create_preview` (the upcoming-invoice API is gone in current API
+versions) for the proration figure; confirm calls Subscription Update with
+`proration_behavior=create_prorations` under an idempotency key. The seat item
+switches price and **keeps its quantity**; metered items are added or removed
+to match the target plan.
 
 ## 4. Webhook Consumer (the reliability core)
 
@@ -66,9 +73,17 @@ gated solely by signature verification:
 
 ```go
 event, err := webhook.ConstructEventWithOptions(payload, sigHeader, secret,
-    webhook.ConstructEventOptions{Tolerance: 5 * time.Minute})
+    webhook.ConstructEventOptions{Tolerance: 5 * time.Minute, IgnoreAPIVersionMismatch: true})
 if err != nil { w.WriteHeader(400); return }
 ```
+
+Only the event's id, type, `created` and `data.object.id` are read from the
+payload. The adapter re-reads the object (checkout session → subscription,
+subscription, invoice) from the API at the pinned version, so an endpoint or
+`stripe listen` running on another API version cannot change the parsed shape,
+and the mirror gets the current state. An API failure during that read is a 500
+(Stripe retries); a bad signature is a 400. Orgs are resolved from
+`metadata.org_id` (subscription, invoice parent, then customer), never by email.
 
 Processing contract:
 
@@ -121,10 +136,16 @@ on attachment confirm/delete, nightly reconciliation against SUM(size)),
 Redis (real-time, lossy-tolerant)
   └─ hourly Asynq job: UPSERT usage_records(org_id, metric, period_date, value)
        ON CONFLICT (org_id, metric, period_date) DO UPDATE  ← idempotent, re-runnable
-       └─ daily 02:00 UTC job: for Business orgs, push to Stripe
-            UsageRecord.New(SubscriptionItem, Quantity=aggregate, Action="set")
-            -- "set" (absolute) not "increment": re-running the job is harmless
+       └─ daily 02:00 UTC job: for Business orgs, one Billing Meter event per
+            customer/metric/day {stripe_customer_id, value}, identifier
+            "<customer>:<metric>:<day>" -- Stripe drops a repeated identifier,
+            and pushed days are marked, so re-running the job is harmless
 ```
+
+The legacy usage-records API this section first described was removed by
+Stripe (`2025-03-31.basil`); meters replaced it (ADR-029). Usage prices are $0
+until the catalog sets real amounts (report B02), so usage is recorded and
+shown on invoices without being charged yet.
 
 Consistency model to state honestly (docs + interview): metering is
 **eventually consistent by design**; a Redis loss between flushes costs at
@@ -182,3 +203,25 @@ state), surface in admin panel. This catches missed webhooks (endpoint down
 - Out-of-order test: deliver `subscription.updated(created=T2)` then a stale
   `(created=T1)` → mirror stays at T2 state
 - Clock-skew signature test: tampered payload / stale timestamp → 400
+
+## 10. Stripe test-mode setup and checks (ADR-029)
+
+1. In the Stripe Dashboard (test mode) copy the secret key, and save the
+   Customer Portal settings once (Settings → Billing → Customer portal); the
+   portal session call fails until a configuration exists.
+2. In `.env`: `STRIPE_MODE=live`, `STRIPE_SECRET_KEY=sk_test_…`.
+3. `make stripe-seed`: creates the meters, products and prices and writes their
+   ids into `plans` (refuses live-mode keys until B02).
+4. Webhooks: `docker compose -f deploy/docker-compose.yml --profile stripe up -d stripe-cli`,
+   take the `whsec_…` it prints (`docker compose … logs stripe-cli`) into
+   `STRIPE_WEBHOOK_SECRET`, restart api and worker.
+5. `make stripe-sandbox-test`: runs the adapter against the test account
+   (catalog, customer, Checkout session, preview, plan change keeping seats,
+   meter events, cancel/resume, portal, reconcile fetch, cancel). A browser
+   Checkout with card `4242 4242 4242 4242` then exercises the webhook path:
+   the billing page flips to the new plan once `checkout.session.completed` lands.
+
+Offline coverage without an account: `live_test.go` (fake Stripe server:
+request shapes, idempotency keys, signature tolerance, org routing) and a run of
+every adapter call against `stripe/stripe-mock` (schema validation) during
+development.

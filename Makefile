@@ -12,7 +12,7 @@ DATABASE_URL_MIGRATE ?= postgres://fluxboard_owner:owner_pw@postgres:5432/fluxbo
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down logs migrate migrate-down sqlc openapi gen-client seed stripe-seed \
+.PHONY: help up down logs migrate migrate-down sqlc openapi gen-client seed stripe-seed stripe-sandbox-test \
         api worker web test test-integration lint audit
 
 help: ## List targets
@@ -55,8 +55,13 @@ GO_RUN = MSYS_NO_PATHCONV=1 docker run --rm --network $(NETWORK) --env-file .env
 seed: stripe-seed ## Load the demo fixture (docs/12-TESTING.md §5); re-run resets it. SEED_ARGS="-clock YYYY-MM-DD"
 	$(GO_RUN) ./cmd/seed $(SEED_ARGS)
 
-stripe-seed: ## Upsert the plan catalog into plans (stub mode, no Stripe calls)
+stripe-seed: ## Upsert the plan catalog into plans; STRIPE_MODE=live also creates the Stripe catalog (test keys only)
 	$(GO_RUN) ./cmd/stripeseed
+
+# Real Stripe test-mode account (docs/06-BILLING.md §10); needs STRIPE_SECRET_KEY=sk_test_… in .env.
+stripe-sandbox-test: ## Run the live Stripe adapter against the test-mode account in .env
+	MSYS_NO_PATHCONV=1 docker run --rm --env-file .env -v "$(CURDIR)/backend":/src -v fluxboard_gomod:/go/pkg/mod -w /src \
+		golang:1.26 go test -tags=stripe_sandbox -count=1 -v ./internal/infrastructure/stripe/
 
 api: ## Run the API with hot reload (in-stack)
 	$(COMPOSE) up api
