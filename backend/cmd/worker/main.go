@@ -104,7 +104,7 @@ func run(logger *slog.Logger) error {
 	stripeGW, err := stripex.New(stripex.Config{
 		Mode: cfg.StripeMode, SecretKey: cfg.StripeSecretKey,
 		WebhookSecret: cfg.StripeWebhookSecret, BaseURL: cfg.WebOrigin,
-	}, planRepo)
+	})
 	if err != nil {
 		return err
 	}
@@ -119,6 +119,22 @@ func run(logger *slog.Logger) error {
 	metricsReg.MustRegister(driftCounter)
 	mail := mailer.New(mailer.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom, WebOrigin: cfg.WebOrigin}, logger)
 	membershipRepo := postgres.NewMembershipRepo(tenantPool)
+	processedEventRepo := postgres.NewProcessedEventRepo(pool)
+	eventBus := redisx.NewEventBus(rdb, logger)
+	billingSvc := billinguc.New(billinguc.Deps{
+		Plans:    planRepo,
+		Subs:     postgres.NewSubscriptionRepo(tenantPool),
+		Invoices: postgres.NewInvoiceRepo(tenantPool),
+		Events:   processedEventRepo,
+		Webhooks: postgres.NewWebhookRepo(tenantPool),
+		Usage:    postgres.NewUsageRepo(tenantPool),
+		Gateway:  stripeGW,
+		Cache:    redisx.NewEntitlementCache(rdb),
+		Seats:    membershipRepo,
+		Bus:      eventBus,
+		Logger:   logger,
+		BaseURL:  cfg.WebOrigin,
+	})
 	billingJobs := jobs.NewBilling(jobs.BillingDeps{
 		Outbox:      postgres.NewOutboxRepo(tenantPool),
 		Usage:       postgres.NewUsageRepo(tenantPool),
@@ -132,6 +148,7 @@ func run(logger *slog.Logger) error {
 		Client:      asynqClient,
 		Drift:       driftCounter,
 		Orgs:        maintenanceRepo,
+		Seats:       billingSvc,
 		Logger:      logger,
 	})
 
@@ -139,21 +156,6 @@ func run(logger *slog.Logger) error {
 	// event id; the handler reloads the stored Stripe event and re-runs the
 	// idempotent webhook consumer (billinguc.Service). Built with the same billing
 	// deps as the api so ProcessEvent's side effects and dedup are identical.
-	processedEventRepo := postgres.NewProcessedEventRepo(pool)
-	eventBus := redisx.NewEventBus(rdb, logger)
-	billingSvc := billinguc.New(billinguc.Deps{
-		Plans:    planRepo,
-		Subs:     postgres.NewSubscriptionRepo(tenantPool),
-		Invoices: postgres.NewInvoiceRepo(tenantPool),
-		Events:   processedEventRepo,
-		Webhooks: postgres.NewWebhookRepo(tenantPool),
-		Usage:    postgres.NewUsageRepo(tenantPool),
-		Gateway:  stripeGW,
-		Cache:    redisx.NewEntitlementCache(rdb),
-		Bus:      eventBus,
-		Logger:   logger,
-		BaseURL:  cfg.WebOrigin,
-	})
 	webhookRetry := jobs.NewWebhookRetry(processedEventRepo, billingSvc, logger)
 
 	// Phase 6 §7: audit:retention (FR-AUD-002). The DELETE runs on the OWNER pool —

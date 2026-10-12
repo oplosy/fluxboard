@@ -61,7 +61,7 @@ func TestSandboxLifecycle(t *testing.T) {
 		{Code: billing.PlanBusiness, SeatPriceID: ids["business"].SeatPriceID, Metered: true,
 			MeteredStoragePriceID: ids["business"].StoragePriceID, MeteredAPIPriceID: ids["business"].APIPriceID},
 	}
-	g, err := NewLive(key, "whsec_not_used_by_this_suite", plans)
+	g, err := NewLive(key, "whsec_not_used_by_this_suite")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -121,8 +121,24 @@ func TestSandboxLifecycle(t *testing.T) {
 		}
 		return s
 	}
-	if s := fetch("created"); s.PlanCode != billing.PlanPro || s.Status != billing.StatusActive || s.CurrentPeriodEnd == nil || s.CustomerID != customerID {
+	if s := fetch("created"); s.PlanCode != billing.PlanPro || s.Status != billing.StatusActive || s.CurrentPeriodEnd == nil ||
+		s.CustomerID != customerID || s.Seats != 3 {
 		t.Fatalf("created: %+v", s)
+	}
+	// Report B02: the first invoice is seats × seat price (3 × $12).
+	first, err := sc.V1Invoices.Retrieve(ctx, sub.LatestInvoice.ID, &stripe.InvoiceRetrieveParams{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if first.AmountDue != 3*1200 || first.Currency != "usd" {
+		t.Fatalf("first invoice = %d %s, want 3600 usd", first.AmountDue, first.Currency)
+	}
+	// Seat sync: a fourth member joins.
+	if err := g.SetSeats(ctx, sub.ID, 4, "seats:"+orgID+":4"); err != nil {
+		t.Fatalf("set seats: %v", err)
+	}
+	if s := fetch("seat added"); s.Seats != 4 {
+		t.Fatalf("seats = %d, want 4", s.Seats)
 	}
 
 	amount, currency, err := g.UpcomingInvoice(ctx, sub.ID, *biz, 0)
@@ -148,8 +164,8 @@ func TestSandboxLifecycle(t *testing.T) {
 			seats = it.Quantity
 		}
 	}
-	if seats != 3 || metered != 2 {
-		t.Fatalf("after upgrade: seats %d (want 3, kept), metered items %d (want 2)", seats, metered)
+	if seats != 4 || metered != 2 {
+		t.Fatalf("after upgrade: seats %d (want 4, kept), metered items %d (want 2)", seats, metered)
 	}
 
 	day := time.Now().UTC().Truncate(24 * time.Hour)

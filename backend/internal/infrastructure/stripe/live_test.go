@@ -94,7 +94,7 @@ func newLiveAgainst(t *testing.T, f *fakeStripe) *LiveGateway {
 		MaxNetworkRetries: stripe.Int64(0),
 		LeveledLogger:     &stripe.LeveledLogger{Level: stripe.LevelNull},
 	})
-	g, err := NewLive("sk_test_fake", liveWebhookSecret, fakePlans{},
+	g, err := NewLive("sk_test_fake", liveWebhookSecret,
 		stripe.WithBackends(&stripe.Backends{API: backend, Connect: backend, Uploads: backend, MeterEvents: backend}))
 	if err != nil {
 		t.Fatal(err)
@@ -102,11 +102,17 @@ func newLiveAgainst(t *testing.T, f *fakeStripe) *LiveGateway {
 	return g
 }
 
+// priceProduct is the product each test price belongs to (plans by product id).
+var priceProduct = map[string]string{
+	"price_pro_seat": "fluxboard_pro", "price_pro_seat_v0": "fluxboard_pro",
+	"price_biz_seat": "fluxboard_business", "price_unknown": "prod_someone_else",
+}
+
 // subscriptionJSON is a subscription in the pinned API shape: billing periods
-// on the items, customer as an id.
+// on the items, customer as an id, price product as an id.
 func subscriptionJSON(id, status, seatPrice string, qty int64, metadata string, metered ...string) string {
 	items := []string{fmt.Sprintf(`{"id":"si_seat","object":"subscription_item","quantity":%d,"current_period_end":1767225600,`+
-		`"price":{"id":%q,"object":"price","recurring":{"interval":"month","usage_type":"licensed"}}}`, qty, seatPrice)}
+		`"price":{"id":%q,"object":"price","product":%q,"recurring":{"interval":"month","usage_type":"licensed"}}}`, qty, seatPrice, priceProduct[seatPrice])}
 	for i, p := range metered {
 		items = append(items, fmt.Sprintf(`{"id":"si_m%d","object":"subscription_item","current_period_end":1767225600,`+
 			`"price":{"id":%q,"object":"price","recurring":{"interval":"month","usage_type":"metered"}}}`, i, p))
@@ -357,5 +363,48 @@ func TestPlanChangeRejectsAmbiguousSubscriptions(t *testing.T) {
 	}
 	if _, err := planChange(&sub, billing.Plan{Code: billing.PlanPro}, 0); err == nil {
 		t.Error("target plan without a seat price: want an error")
+	}
+}
+
+// A customer still on an older catalog version's price keeps mapping to the
+// plan: the plan is the price's product, not one specific price id (B02).
+func TestOlderCatalogPriceStillMapsToItsPlan(t *testing.T) {
+	f := &fakeStripe{objects: map[string]string{
+		"GET /v1/subscriptions/sub_old": subscriptionJSON("sub_old", "active", "price_pro_seat_v0", 4, `{"org_id":"org-1"}`),
+	}}
+	g := newLiveAgainst(t, f)
+	s, err := g.FetchSubscription(context.Background(), "sub_old")
+	if err != nil || s.PlanCode != billing.PlanPro || s.Seats != 4 {
+		t.Fatalf("legacy price = %+v, %v; want pro with 4 seats", s, err)
+	}
+}
+
+func TestSetSeatsUpdatesOnlyTheSeatQuantity(t *testing.T) {
+	f := &fakeStripe{objects: map[string]string{
+		"GET /v1/subscriptions/sub_1":  subscriptionJSON("sub_1", "active", "price_biz_seat", 5, `{"org_id":"org-1"}`, "price_biz_storage"),
+		"POST /v1/subscriptions/sub_1": subscriptionJSON("sub_1", "active", "price_biz_seat", 6, `{"org_id":"org-1"}`, "price_biz_storage"),
+	}}
+	g := newLiveAgainst(t, f)
+	ctx := context.Background()
+
+	if err := g.SetSeats(ctx, "sub_1", 6, "seats:org-1:6:1"); err != nil {
+		t.Fatal(err)
+	}
+	req, ok := f.last(http.MethodPost, "/v1/subscriptions/sub_1")
+	if !ok || req.idemKey != "seats:org-1:6:1" || req.form.Get("items[0][id]") != "si_seat" ||
+		req.form.Get("items[0][quantity]") != "6" || req.form.Get("items[0][price]") != "" ||
+		req.form.Get("items[1][id]") != "" || req.form.Get("proration_behavior") != "create_prorations" {
+		t.Fatalf("set seats = idem %q form %v", req.idemKey, req.form)
+	}
+
+	n := len(f.requests)
+	if err := g.SetSeats(ctx, "sub_1", 5, "seats:org-1:5:1"); err != nil {
+		t.Fatal(err)
+	}
+	if posts := len(f.requests) - n; posts != 1 { // the retrieve only: 5 seats already
+		t.Errorf("unchanged seat count made %d requests, want only the retrieve", posts)
+	}
+	if err := g.SetSeats(ctx, "sub_1", 0, "k"); err == nil {
+		t.Error("zero seats: want an error")
 	}
 }

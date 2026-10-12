@@ -79,6 +79,10 @@ func NewRouter(d Deps) http.Handler {
 		// verifying the payload signature through the gateway. docs/06 §4.
 		api.Post("/webhooks/stripe", d.Webhooks.Stripe)
 
+		// Plan catalog (report B02) — public: the marketing pricing page and the
+		// app's plan picker render prices and limits from this one source.
+		api.Get("/plans", d.Billing.Catalog)
+
 		// OpenAPI 3.1 spec (FR-API-003) — public, outside auth so client codegen
 		// and Swagger UI can fetch it without a token.
 		if d.OpenAPI != nil {

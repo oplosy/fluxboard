@@ -172,6 +172,9 @@ func (s *Service) AcceptInvitation(ctx context.Context, userID, rawToken string)
 		return nil, err
 	}
 	_ = s.cache.Invalidate(ctx, inv.OrgID, userID)
+	if inv.Role != tenant.RoleGuest {
+		s.syncSeats(ctx, inv.OrgID)
+	}
 	s.writeAudit(ctx, audit.Entry{
 		OrgID:       inv.OrgID,
 		ActorUserID: userID,

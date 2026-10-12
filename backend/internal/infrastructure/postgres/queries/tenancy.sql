@@ -113,8 +113,9 @@ DELETE FROM memberships WHERE org_id = @org_id AND user_id = @user_id;
 SELECT count(*) FROM memberships WHERE org_id = @org_id AND role = @role;
 
 -- name: CountMembers :one
--- Total member (seat) count for the plan-limit gate (FR-BILL-009).
-SELECT count(*) FROM memberships WHERE org_id = @org_id;
+-- Billable seats: members other than GUEST (FR-TEN-010). The same number gates
+-- max_members (FR-BILL-009) and is the paid subscription's seat quantity (B02).
+SELECT count(*) FROM memberships WHERE org_id = @org_id AND role <> 'GUEST';
 
 -- name: ListOrgOwnerEmails :many
 -- OWNER addresses for billing notifications (dunning/cancel emails, 06 §4).

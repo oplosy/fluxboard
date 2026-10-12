@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"sort"
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
@@ -33,7 +34,8 @@ type Deps struct {
 	Usage    billing.UsageRepository
 	Gateway  billing.StripeGateway
 	Cache    billing.EntitlementCache
-	Bus      notify.EventBus // realtime billing.status_changed; nil ⇒ no publish
+	Seats    billing.SeatCounter // billable members = Stripe seat quantity (B02)
+	Bus      notify.EventBus     // realtime billing.status_changed; nil ⇒ no publish
 	Logger   *slog.Logger
 	Now      func() time.Time // injectable for tests; defaults to time.Now
 	BaseURL  string           // public app base, for Checkout/Portal return URLs
@@ -49,6 +51,7 @@ type Service struct {
 	usage    billing.UsageRepository
 	gw       billing.StripeGateway
 	cache    billing.EntitlementCache
+	seats    billing.SeatCounter
 	bus      notify.EventBus
 	logger   *slog.Logger
 	now      func() time.Time
@@ -68,7 +71,7 @@ func New(d Deps) *Service {
 	return &Service{
 		plans: d.Plans, subs: d.Subs, invoices: d.Invoices, events: d.Events,
 		webhooks: d.Webhooks, usage: d.Usage, gw: d.Gateway, cache: d.Cache,
-		bus: d.Bus, logger: logger, now: now, baseURL: d.BaseURL,
+		seats: d.Seats, bus: d.Bus, logger: logger, now: now, baseURL: d.BaseURL,
 	}
 }
 
@@ -155,6 +158,17 @@ func (s *Service) Summary(ctx context.Context, orgID string) (SummaryView, error
 	return v, nil
 }
 
+// Catalog returns the plan catalog (report B02) ordered by seat price: the one
+// source the marketing site and the app render prices and limits from.
+func (s *Service) Catalog(ctx context.Context) ([]billing.Plan, error) {
+	plans, err := s.plans.List(ctx)
+	if err != nil {
+		return nil, err
+	}
+	sort.SliceStable(plans, func(i, j int) bool { return plans[i].MonthlyPrice < plans[j].MonthlyPrice })
+	return plans, nil
+}
+
 // ListInvoices returns an org's invoice mirror, newest-first. FR-BILL-008.
 func (s *Service) ListInvoices(ctx context.Context, orgID string) ([]billing.Invoice, error) {
 	return s.invoices.ListByOrg(ctx, orgID)
@@ -162,20 +176,26 @@ func (s *Service) ListInvoices(ctx context.Context, orgID string) ([]billing.Inv
 
 // ---- Subscription lifecycle -----------------------------------------------
 
-// Checkout starts a hosted Stripe Checkout for a paid plan (FR-BILL-002, 06 §3).
-// It lazily creates+persists the org's Stripe customer, then returns a Checkout
-// URL. The subscription mirror is not written here — it flips to active when the
+// Checkout starts a hosted Stripe Checkout for a paid plan (FR-BILL-002, 06 §3)
+// for the org's billable seats, counted server-side (report B02). It lazily
+// creates+persists the org's Stripe customer, then returns a Checkout URL. The
+// subscription mirror is not written here — it flips to active when the
 // checkout.session.completed webhook arrives.
-func (s *Service) Checkout(ctx context.Context, orgID string, planCode billing.PlanCode, seats int64) (billing.CheckoutSession, error) {
+func (s *Service) Checkout(ctx context.Context, orgID string, planCode billing.PlanCode) (billing.CheckoutSession, error) {
 	if !planCode.Valid() || planCode == billing.PlanFree {
 		return billing.CheckoutSession{}, domain.ErrValidation
-	}
-	if seats < 1 {
-		seats = 1
 	}
 	plan, err := s.plans.Get(ctx, planCode)
 	if err != nil {
 		return billing.CheckoutSession{}, err
+	}
+	seats, err := s.billableSeats(ctx, orgID)
+	if err != nil {
+		return billing.CheckoutSession{}, err
+	}
+	if plan.MaxMembers >= 0 && seats > int64(plan.MaxMembers) {
+		// More seats than the plan allows: pick a bigger plan instead.
+		return billing.CheckoutSession{}, fmt.Errorf("%w: %d billable members exceed the %s plan's %d", domain.ErrValidation, seats, planCode, plan.MaxMembers)
 	}
 
 	existing, sub, err := s.currentCustomer(ctx, orgID)
@@ -264,6 +284,47 @@ func (s *Service) Resume(ctx context.Context, orgID string) error {
 	}
 	s.bust(ctx, orgID)
 	return nil
+}
+
+// SyncSeats sets the paid subscription's seat quantity to the org's billable
+// members (report B02); prorated by Stripe. No paid subscription → no-op. Called
+// after membership changes and by the nightly reconcile.
+func (s *Service) SyncSeats(ctx context.Context, orgID string) error {
+	sub, err := s.subs.Get(ctx, orgID)
+	if errors.Is(err, domain.ErrNotFound) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if sub.StripeSubscriptionID == nil || *sub.StripeSubscriptionID == "" || !sub.Status.Entitled() {
+		return nil
+	}
+	seats, err := s.billableSeats(ctx, orgID)
+	if err != nil {
+		return err
+	}
+	idemKey := fmt.Sprintf("seats:%s:%d:%d", orgID, seats, s.now().Unix()/300)
+	if err := s.gw.SetSeats(ctx, *sub.StripeSubscriptionID, seats, idemKey); err != nil {
+		return fmt.Errorf("set seats: %w", err)
+	}
+	return nil
+}
+
+// billableSeats is the org's non-guest member count, at least 1 (a paid
+// subscription always bills its owner's seat).
+func (s *Service) billableSeats(ctx context.Context, orgID string) (int64, error) {
+	if s.seats == nil {
+		return 0, errors.New("billing: no seat counter configured")
+	}
+	n, err := s.seats.CountMembers(ctx, orgID)
+	if err != nil {
+		return 0, fmt.Errorf("count billable seats: %w", err)
+	}
+	if n < 1 {
+		n = 1
+	}
+	return n, nil
 }
 
 // Portal returns a Stripe Billing Portal URL for payment-method management

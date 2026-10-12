@@ -145,9 +145,8 @@ func (r *MembershipRepo) CountByRole(ctx context.Context, orgID string, role ten
 	return n, err
 }
 
-// CountMembers returns the org's total member (seat) count for the plan-limit
-// gate (FR-BILL-009). Concrete-only (not on MembershipRepository) — called by
-// the entitlement middleware over the concrete repo.
+// CountMembers returns the org's billable seats: members other than GUEST
+// (FR-TEN-010). It gates max_members and is the Stripe seat quantity.
 func (r *MembershipRepo) CountMembers(ctx context.Context, orgID string) (int64, error) {
 	var n int64
 	err := r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {

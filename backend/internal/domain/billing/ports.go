@@ -19,6 +19,12 @@ type PlanRepository interface {
 	List(ctx context.Context) ([]Plan, error)
 }
 
+// SeatCounter returns an org's billable seats: members other than GUEST
+// (FR-TEN-010). The same number gates max_members and is the Stripe quantity.
+type SeatCounter interface {
+	CountMembers(ctx context.Context, orgID string) (int64, error)
+}
+
 // SubscriptionRepository persists the per-org subscription mirror.
 type SubscriptionRepository interface {
 	// Get returns an org's subscription, or domain.ErrNotFound if it has none
@@ -135,6 +141,7 @@ type StripeSubscription struct {
 	PlanCode          PlanCode
 	CurrentPeriodEnd  *time.Time
 	CancelAtPeriodEnd bool
+	Seats             int64 // quantity of the licensed seat item (0 when unknown, e.g. stub)
 }
 
 // StripeInvoice is the gateway-normalized invoice view on an invoice.* event.
@@ -175,6 +182,9 @@ type StripeGateway interface {
 	// UpdateSubscription changes the plan with create_prorations under idemKey.
 	// seats <= 0 keeps the current seat count.
 	UpdateSubscription(ctx context.Context, subscriptionID string, newPlan Plan, seats int64, idemKey string) error
+	// SetSeats sets the seat quantity with prorations under idemKey; a no-op
+	// when the subscription already has that many seats.
+	SetSeats(ctx context.Context, subscriptionID string, seats int64, idemKey string) error
 	// CancelSubscription cancels immediately or at period end.
 	CancelSubscription(ctx context.Context, subscriptionID string, atPeriodEnd bool) error
 	// Resume clears a scheduled at-period-end cancellation.
