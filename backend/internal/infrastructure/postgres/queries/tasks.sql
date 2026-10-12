@@ -75,9 +75,10 @@ WHERE org_id = @org_id AND deleted_at IS NOT NULL AND deleted_at < @cutoff;
 
 -- name: SearchTasks :many
 -- Org-wide task search over title+description with optional facet filters.
--- Visibility is enforced in-DB: a caller sees a task only if it is in an 'org'
--- project, or the caller is an org admin (@see_all), or the caller is a member of
--- the (private) project. Archived projects are excluded. count(*) OVER() yields
+-- Visibility is enforced in-DB: a caller sees a task only if the caller is an
+-- org admin (@see_all), or a member of the project, or the project is 'org'-
+-- visible and the caller may see those (@see_org_visible: org MEMBER+, never
+-- GUEST — FR-TEN-010). Archived projects are excluded. count(*) OVER() yields
 -- the unpaged total for pagination; the label filter pins one label_id per row so
 -- DISTINCT is unnecessary.
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
@@ -91,7 +92,7 @@ WHERE t.org_id = @org_id
   AND t.deleted_at IS NULL
   AND p.archived_at IS NULL
   AND t.search_vector @@ websearch_to_tsquery('simple', @query)
-  AND (@see_all::bool OR p.visibility = 'org' OR EXISTS (
+  AND (@see_all::bool OR (@see_org_visible::bool AND p.visibility = 'org') OR EXISTS (
         SELECT 1 FROM project_members pm
         WHERE pm.project_id = p.id AND pm.user_id = @user_id))
   AND (sqlc.narg('project_id')::uuid IS NULL OR t.project_id = sqlc.narg('project_id'))

@@ -230,8 +230,9 @@ type Querier interface {
 	// Analytics reads — Phase 6 (FR-AN-001/002). Rollup + usage aggregates only; both
 	// tables are [T] and read under a tenant tx (TenantPool). No live aggregation.
 	ListProjectStatsDaily(ctx context.Context, arg ListProjectStatsDailyParams) ([]ProjectStatsDaily, error)
-	// Visibility filter (FR-PROJ-002/003): see_all (org ADMIN+) returns every
-	// project; otherwise 'org'-visible plus 'private' ones the user is a member of.
+	// Visibility filter (FR-PROJ-002/003, FR-TEN-010): see_all (org ADMIN+) returns
+	// every project; otherwise the user's memberships plus, with see_org_visible
+	// (org MEMBER+, never GUEST), the 'org'-visible ones.
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error)
 	// Project stats rollup — Phase 5 (FR-AN-001). project_stats_daily [T]: nightly
 	// recompute of yesterday's grain (set-semantics UPSERT). Completion/cycle metrics
@@ -298,9 +299,10 @@ type Querier interface {
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) (int64, error)
 	// Full-text search (FR-TASK-007) --------------------------------------------
 	// Org-wide task search over title+description with optional facet filters.
-	// Visibility is enforced in-DB: a caller sees a task only if it is in an 'org'
-	// project, or the caller is an org admin (@see_all), or the caller is a member of
-	// the (private) project. Archived projects are excluded. count(*) OVER() yields
+	// Visibility is enforced in-DB: a caller sees a task only if the caller is an
+	// org admin (@see_all), or a member of the project, or the project is 'org'-
+	// visible and the caller may see those (@see_org_visible: org MEMBER+, never
+	// GUEST — FR-TEN-010). Archived projects are excluded. count(*) OVER() yields
 	// the unpaged total for pagination; the label filter pins one label_id per row so
 	// DISTINCT is unnecessary.
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)

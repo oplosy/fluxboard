@@ -91,11 +91,11 @@ func (r *ProjectRepo) Get(ctx context.Context, orgID, id string) (*project.Proje
 	return out, nil
 }
 
-func (r *ProjectRepo) List(ctx context.Context, orgID, userID string, seeAll, includeArchived bool) ([]project.Project, error) {
+func (r *ProjectRepo) List(ctx context.Context, orgID, userID string, scope project.Scope, includeArchived bool) ([]project.Project, error) {
 	// A non-user principal — an org API key (userID "apikey:<id>") — has no project
 	// membership. Fall back to the nil uuid so the visibility filter returns only
 	// 'org'-visible projects (no private memberships match); real users always
-	// carry a valid uuid. seeAll callers ignore the id entirely.
+	// carry a valid uuid. scope.All callers ignore the id entirely.
 	uid, err := parseUUID(userID)
 	if err != nil {
 		uid = uuid.Nil
@@ -104,7 +104,8 @@ func (r *ProjectRepo) List(ctx context.Context, orgID, userID string, seeAll, in
 	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
 		oid, _ := parseUUID(orgID)
 		rows, err := q.ListProjects(ctx, gen.ListProjectsParams{
-			OrgID: oid, UserID: uid, SeeAll: seeAll, IncludeArchived: includeArchived,
+			OrgID: oid, UserID: uid, SeeAll: scope.All, SeeOrgVisible: scope.OrgVisible,
+			IncludeArchived: includeArchived,
 		})
 		if err != nil {
 			return err

@@ -43,7 +43,7 @@ func (f *projectsRepo) Get(_ context.Context, _, id string) (*project.Project, e
 	return nil, domain.ErrNotFound
 }
 func (f *projectsRepo) Create(context.Context, string, *project.Project) error { return nil }
-func (f *projectsRepo) List(context.Context, string, string, bool, bool) ([]project.Project, error) {
+func (f *projectsRepo) List(context.Context, string, string, project.Scope, bool) ([]project.Project, error) {
 	return nil, nil
 }
 func (f *projectsRepo) Update(context.Context, string, *project.Project) error        { return nil }

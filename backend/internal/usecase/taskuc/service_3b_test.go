@@ -46,15 +46,15 @@ func TestSearchValidationAndClamp(t *testing.T) {
 		t.Fatalf("bad priority: err %v, want ErrValidation", err)
 	}
 
-	// Over-limit clamps to MaxSearchLimit; SeeAll set for org ADMIN+.
+	// Over-limit clamps to MaxSearchLimit; scope comes from the org role.
 	if _, err := s.Search(ctx, "o", "u", project.SearchFilter{Query: "hi", Limit: 9999}, tenant.RoleAdmin); err != nil {
 		t.Fatalf("search: %v", err)
 	}
 	if ft.gotFilter.Limit != project.MaxSearchLimit {
 		t.Errorf("limit = %d, want clamp to %d", ft.gotFilter.Limit, project.MaxSearchLimit)
 	}
-	if !ft.gotFilter.SeeAll {
-		t.Error("org admin should search with SeeAll=true")
+	if ft.gotFilter.Scope != (project.Scope{All: true, OrgVisible: true}) {
+		t.Errorf("org admin scope = %+v, want all", ft.gotFilter.Scope)
 	}
 	if ft.gotFilter.UserID != "u" {
 		t.Errorf("UserID = %q, want u", ft.gotFilter.UserID)

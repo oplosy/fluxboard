@@ -19,7 +19,7 @@ func (f fakeProjects) Get(_ context.Context, _, id string) (*Project, error) {
 	return nil, domain.ErrNotFound
 }
 func (fakeProjects) Create(context.Context, string, *Project) error { return nil }
-func (fakeProjects) List(context.Context, string, string, bool, bool) ([]Project, error) {
+func (fakeProjects) List(context.Context, string, string, Scope, bool) ([]Project, error) {
 	return nil, nil
 }
 func (fakeProjects) Update(context.Context, string, *Project) error                { return nil }
@@ -81,6 +81,20 @@ func TestEffectiveRole(t *testing.T) {
 	boom := errors.New("db down")
 	if _, err := EffectiveRole(context.Background(), fakeMembers{err: boom}, "org", open, "x", tenant.RoleMember); !errors.Is(err, boom) {
 		t.Fatalf("repository error must propagate, got %v", err)
+	}
+}
+
+func TestScopeFor(t *testing.T) {
+	cases := map[tenant.OrgRole]Scope{
+		tenant.RoleOwner:  {All: true, OrgVisible: true},
+		tenant.RoleAdmin:  {All: true, OrgVisible: true},
+		tenant.RoleMember: {OrgVisible: true},
+		tenant.RoleGuest:  {}, // FR-TEN-010: memberships only
+	}
+	for role, want := range cases {
+		if got := ScopeFor(role); got != want {
+			t.Errorf("ScopeFor(%s) = %+v, want %+v", role, got, want)
+		}
 	}
 }
 

@@ -18,6 +18,8 @@
 //     org's org_id is rejected by the policy's WITH CHECK;
 //   - search never returns another org's or a hidden private project's marker,
 //     with positive controls proving the markers are searchable;
+//   - an org GUEST sees only the projects it is a member of, never the other
+//     'org'-visible ones (FR-TEN-010), in lists, search and direct reads;
 //   - a foreign attachment download 404s before any presign.
 //
 // Env (missing → fail, never skip): TEST_DATABASE_URL (fluxboard_app),
@@ -87,6 +89,7 @@ func TestTenantIsolation(t *testing.T) {
 	t.Run("raw RLS fails closed", e.testRawRLS)
 	t.Run("RLS WITH CHECK rejects foreign org_id", e.testWithCheck)
 	t.Run("search never crosses orgs or private projects", e.testSearch)
+	t.Run("guest sees only its own projects", e.testGuestVisibility)
 	t.Run("foreign attachment download 404s before presign", e.testAttachmentDownload)
 }
 
@@ -198,7 +201,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		t.Fatalf("introspected only %d org routes; the router walk is broken", len(e.routes))
 	}
 
-	for _, email := range append(attackers, "user01@demo.dev", "beta.owner@demo.dev") {
+	for _, email := range append(attackers, "user01@demo.dev", "beta.owner@demo.dev", "guest@demo.dev") {
 		e.tokens[email] = e.login(t, email)
 	}
 	return e
@@ -639,6 +642,74 @@ func (e *isoEnv) testSearch(t *testing.T) {
 			t.Errorf("%s search %q in %s: hits=%v, want %v", c.who, c.q, c.org, got, c.wantHits)
 		}
 	}
+}
+
+// FR-TEN-010: an org GUEST sees only projects it is a member of. guest@ is
+// VIEWER on acme WEB; API is org-visible and must stay hidden from it, while
+// member@ (org MEMBER, in neither project) sees API as the control.
+func (e *isoEnv) testGuestVisibility(t *testing.T) {
+	org := "/api/v1/orgs/" + e.orgA
+	web, api := demoseed.ID("project", e.orgA, "WEB"), demoseed.ID("project", e.orgA, "API")
+
+	listed := func(who string) []string {
+		rec := e.as(who, http.MethodGet, org+"/projects", "")
+		var out struct {
+			Projects []struct {
+				ID string `json:"id"`
+			} `json:"projects"`
+		}
+		if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &out) != nil {
+			t.Fatalf("%s list projects: %d %s", who, rec.Code, snippet(rec.Body.Bytes()))
+		}
+		ids := make([]string, 0, len(out.Projects))
+		for _, p := range out.Projects {
+			ids = append(ids, p.ID)
+		}
+		return ids
+	}
+	if got := listed("guest@demo.dev"); len(got) != 1 || got[0] != web {
+		t.Errorf("guest lists %v, want only WEB %s", got, web)
+	}
+	if got := listed("member@demo.dev"); !contains(got, api) {
+		t.Errorf("control: member lists %v, want it to include API %s", got, api)
+	}
+
+	// Search: the guest's hits are all in WEB, and filtering to API finds
+	// nothing for the guest while the member finds API tasks.
+	rec := e.as("guest@demo.dev", http.MethodGet, org+"/tasks/search?q=Fix&limit=100", "")
+	var hits struct {
+		Tasks []struct {
+			ProjectID string `json:"project_id"`
+		} `json:"tasks"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &hits) != nil || len(hits.Tasks) == 0 {
+		t.Fatalf("guest search: %d %s, want WEB hits", rec.Code, snippet(rec.Body.Bytes()))
+	}
+	for _, h := range hits.Tasks {
+		if h.ProjectID != web {
+			t.Errorf("guest search returned a task of project %s, want only WEB", h.ProjectID)
+		}
+	}
+	apiSearch := org + "/tasks/search?q=Fix&project_id=" + api
+	if rec := e.as("member@demo.dev", http.MethodGet, apiSearch, ""); rec.Code != http.StatusOK || searchTotal(rec) == 0 {
+		t.Errorf("control: member search in API = %d %s, want hits", rec.Code, snippet(rec.Body.Bytes()))
+	}
+	if rec := e.as("guest@demo.dev", http.MethodGet, apiSearch, ""); rec.Code != http.StatusOK || searchTotal(rec) != 0 {
+		t.Errorf("guest search in API = %d %s, want 0 hits", rec.Code, snippet(rec.Body.Bytes()))
+	}
+
+	if rec := e.as("guest@demo.dev", http.MethodGet, org+"/projects/"+api, ""); rec.Code != http.StatusNotFound {
+		t.Errorf("guest GET API project = %d, want 404", rec.Code)
+	}
+}
+
+func contains(xs []string, x string) bool {
+	for _, v := range xs {
+		if v == x {
+			return true
+		}
+	}
+	return false
 }
 
 func (e *isoEnv) testAttachmentDownload(t *testing.T) {

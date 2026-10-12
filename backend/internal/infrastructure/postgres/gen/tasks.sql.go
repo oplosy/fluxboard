@@ -480,31 +480,32 @@ WHERE t.org_id = $1
   AND t.deleted_at IS NULL
   AND p.archived_at IS NULL
   AND t.search_vector @@ websearch_to_tsquery('simple', $2)
-  AND ($3::bool OR p.visibility = 'org' OR EXISTS (
+  AND ($3::bool OR ($4::bool AND p.visibility = 'org') OR EXISTS (
         SELECT 1 FROM project_members pm
-        WHERE pm.project_id = p.id AND pm.user_id = $4))
-  AND ($5::uuid IS NULL OR t.project_id = $5)
-  AND ($6::uuid IS NULL OR t.assignee_id = $6)
-  AND ($7::uuid IS NULL OR t.column_id = $7)
-  AND ($8::text IS NULL OR t.priority = $8)
-  AND ($9::uuid IS NULL OR tl.label_id = $9)
+        WHERE pm.project_id = p.id AND pm.user_id = $5))
+  AND ($6::uuid IS NULL OR t.project_id = $6)
+  AND ($7::uuid IS NULL OR t.assignee_id = $7)
+  AND ($8::uuid IS NULL OR t.column_id = $8)
+  AND ($9::text IS NULL OR t.priority = $9)
+  AND ($10::uuid IS NULL OR tl.label_id = $10)
 ORDER BY ts_rank(t.search_vector, websearch_to_tsquery('simple', $2)) DESC,
          t.created_at DESC
-LIMIT $11 OFFSET $10
+LIMIT $12 OFFSET $11
 `
 
 type SearchTasksParams struct {
-	OrgID      uuid.UUID   `json:"org_id"`
-	Query      string      `json:"query"`
-	SeeAll     bool        `json:"see_all"`
-	UserID     uuid.UUID   `json:"user_id"`
-	ProjectID  pgtype.UUID `json:"project_id"`
-	AssigneeID pgtype.UUID `json:"assignee_id"`
-	ColumnID   pgtype.UUID `json:"column_id"`
-	Priority   *string     `json:"priority"`
-	LabelID    pgtype.UUID `json:"label_id"`
-	Off        int32       `json:"off"`
-	Lim        int32       `json:"lim"`
+	OrgID         uuid.UUID   `json:"org_id"`
+	Query         string      `json:"query"`
+	SeeAll        bool        `json:"see_all"`
+	SeeOrgVisible bool        `json:"see_org_visible"`
+	UserID        uuid.UUID   `json:"user_id"`
+	ProjectID     pgtype.UUID `json:"project_id"`
+	AssigneeID    pgtype.UUID `json:"assignee_id"`
+	ColumnID      pgtype.UUID `json:"column_id"`
+	Priority      *string     `json:"priority"`
+	LabelID       pgtype.UUID `json:"label_id"`
+	Off           int32       `json:"off"`
+	Lim           int32       `json:"lim"`
 }
 
 type SearchTasksRow struct {
@@ -529,9 +530,10 @@ type SearchTasksRow struct {
 
 // Full-text search (FR-TASK-007) --------------------------------------------
 // Org-wide task search over title+description with optional facet filters.
-// Visibility is enforced in-DB: a caller sees a task only if it is in an 'org'
-// project, or the caller is an org admin (@see_all), or the caller is a member of
-// the (private) project. Archived projects are excluded. count(*) OVER() yields
+// Visibility is enforced in-DB: a caller sees a task only if the caller is an
+// org admin (@see_all), or a member of the project, or the project is 'org'-
+// visible and the caller may see those (@see_org_visible: org MEMBER+, never
+// GUEST — FR-TEN-010). Archived projects are excluded. count(*) OVER() yields
 // the unpaged total for pagination; the label filter pins one label_id per row so
 // DISTINCT is unnecessary.
 func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error) {
@@ -539,6 +541,7 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Sea
 		arg.OrgID,
 		arg.Query,
 		arg.SeeAll,
+		arg.SeeOrgVisible,
 		arg.UserID,
 		arg.ProjectID,
 		arg.AssigneeID,

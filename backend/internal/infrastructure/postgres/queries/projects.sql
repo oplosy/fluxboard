@@ -11,8 +11,9 @@ FROM projects
 WHERE org_id = @org_id AND id = @id;
 
 -- name: ListProjects :many
--- Visibility filter (FR-PROJ-002/003): see_all (org ADMIN+) returns every
--- project; otherwise 'org'-visible plus 'private' ones the user is a member of.
+-- Visibility filter (FR-PROJ-002/003, FR-TEN-010): see_all (org ADMIN+) returns
+-- every project; otherwise the user's memberships plus, with see_org_visible
+-- (org MEMBER+, never GUEST), the 'org'-visible ones.
 SELECT p.id, p.org_id, p.key, p.name, p.description, p.color, p.visibility,
        p.archived_at, p.created_by, p.created_at, p.updated_at
 FROM projects p
@@ -20,7 +21,7 @@ WHERE p.org_id = @org_id
   AND (sqlc.arg('include_archived')::bool OR p.archived_at IS NULL)
   AND (
         sqlc.arg('see_all')::bool
-        OR p.visibility = 'org'
+        OR (sqlc.arg('see_org_visible')::bool AND p.visibility = 'org')
         OR EXISTS (
           SELECT 1 FROM project_members pm
           WHERE pm.project_id = p.id AND pm.user_id = @user_id

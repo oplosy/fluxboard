@@ -123,7 +123,7 @@ func (mcpProjects) Get(_ context.Context, _, _ string) (*project.Project, error)
 	return nil, domain.ErrNotFound
 }
 func (mcpProjects) Create(_ context.Context, _ string, _ *project.Project) error { return nil }
-func (mcpProjects) List(_ context.Context, _, _ string, _, _ bool) ([]project.Project, error) {
+func (mcpProjects) List(_ context.Context, _, _ string, _ project.Scope, _ bool) ([]project.Project, error) {
 	return nil, nil
 }
 func (mcpProjects) Update(_ context.Context, _ string, _ *project.Project) error { return nil }
