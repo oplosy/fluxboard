@@ -10,7 +10,6 @@ package projectuc
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -173,42 +172,12 @@ type BoardView struct {
 
 // ---- Authorization --------------------------------------------------------
 
-// effectiveRole resolves the caller's project role. Org ADMIN+ are implicit
-// LEAD (FR-PROJ-003). A non-member sees an 'org'-visible project as VIEWER
-// (unless GUEST); a non-member of a 'private' project gets ErrNotFound so the
-// project stays opaque (FR-PROJ-002).
-func (s *Service) effectiveRole(ctx context.Context, orgID string, p *project.Project, userID string, orgRole tenant.OrgRole) (project.ProjectRole, error) {
-	if orgRole.AtLeast(tenant.RoleAdmin) {
-		return project.RoleLead, nil
-	}
-	m, err := s.members.Get(ctx, orgID, p.ID, userID)
-	if err == nil {
-		return m.Role, nil
-	}
-	if !errors.Is(err, domain.ErrNotFound) {
-		return "", err
-	}
-	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
-		return project.RoleViewer, nil
-	}
-	return "", domain.ErrNotFound
-}
-
-// access loads a project and the caller's effective role, requiring at least
-// min. Below min → ErrForbidden; not visible → ErrNotFound.
+// access loads a project and requires at least min on it, returning the
+// project and the caller's effective role (project.Access holds the policy:
+// org ADMIN+ are implicit LEAD, FR-PROJ-003; a non-member of a private project
+// gets ErrNotFound, FR-PROJ-002). Below min → ErrForbidden.
 func (s *Service) access(ctx context.Context, orgID, projectID, userID string, orgRole tenant.OrgRole, min project.ProjectRole) (*project.Project, project.ProjectRole, error) {
-	p, err := s.projects.Get(ctx, orgID, projectID)
-	if err != nil {
-		return nil, "", err
-	}
-	role, err := s.effectiveRole(ctx, orgID, p, userID, orgRole)
-	if err != nil {
-		return nil, "", err
-	}
-	if !role.AtLeast(min) {
-		return nil, "", domain.ErrForbidden
-	}
-	return p, role, nil
+	return project.Access(ctx, s.projects, s.members, orgID, projectID, userID, orgRole, min)
 }
 
 // ---- Projects -------------------------------------------------------------
@@ -263,7 +232,7 @@ func (s *Service) CreateProject(ctx context.Context, orgID, userID string, in Cr
 
 // ListProjects returns the projects visible to the caller (FR-PROJ-002).
 func (s *Service) ListProjects(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, includeArchived bool) ([]project.Project, error) {
-	seeAll := orgRole.AtLeast(tenant.RoleAdmin)
+	seeAll := project.SeesAllProjects(orgRole)
 	return s.projects.List(ctx, orgID, userID, seeAll, includeArchived)
 }
 

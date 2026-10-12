@@ -7,7 +7,6 @@ package taskuc
 
 import (
 	"context"
-	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -127,40 +126,13 @@ func (s *Service) publish(ctx context.Context, orgID, name, actorID string, data
 
 func newID() string { return uuidv7.New().String() }
 
-// ---- Authorization (mirrors projectuc; kept local so the services stay
-// independent) --------------------------------------------------------------
+// ---- Authorization (policy in project.Access, shared with projectuc/aiuc/analyticsuc)
 
-func (s *Service) effectiveRole(ctx context.Context, orgID string, p *project.Project, userID string, orgRole tenant.OrgRole) (project.ProjectRole, error) {
-	if orgRole.AtLeast(tenant.RoleAdmin) {
-		return project.RoleLead, nil
-	}
-	m, err := s.members.Get(ctx, orgID, p.ID, userID)
-	if err == nil {
-		return m.Role, nil
-	}
-	if !errors.Is(err, domain.ErrNotFound) {
-		return "", err
-	}
-	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
-		return project.RoleViewer, nil
-	}
-	return "", domain.ErrNotFound
-}
-
-// access requires at least min on the project. Below min → ErrForbidden.
+// access requires at least min on the project. Below min → ErrForbidden; not
+// visible → ErrNotFound.
 func (s *Service) access(ctx context.Context, orgID, projectID, userID string, orgRole tenant.OrgRole, min project.ProjectRole) (project.ProjectRole, error) {
-	p, err := s.projects.Get(ctx, orgID, projectID)
-	if err != nil {
-		return "", err
-	}
-	role, err := s.effectiveRole(ctx, orgID, p, userID, orgRole)
-	if err != nil {
-		return "", err
-	}
-	if !role.AtLeast(min) {
-		return "", domain.ErrForbidden
-	}
-	return role, nil
+	_, role, err := project.Access(ctx, s.projects, s.members, orgID, projectID, userID, orgRole, min)
+	return role, err
 }
 
 // taskAccess loads a task and requires min on its project.

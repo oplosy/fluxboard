@@ -154,25 +154,9 @@ func (s *Service) UsageDashboard(ctx context.Context, orgID string) (analytics.U
 	}, nil
 }
 
-// requireViewer mirrors taskuc/aiuc effectiveRole (kept local so the services
-// stay independent): org ADMIN+ is LEAD everywhere, a project member has their
-// project role, an org MEMBER+ is VIEWER on org-visible projects; anything else
-// is ErrNotFound so hidden projects are indistinguishable from missing ones.
+// requireViewer requires VIEWER on the project (project.Access): hidden or
+// missing projects are ErrNotFound so they are indistinguishable.
 func (s *Service) requireViewer(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string) error {
-	p, err := s.projects.Get(ctx, orgID, projectID)
-	if err != nil {
-		return err
-	}
-	if orgRole.AtLeast(tenant.RoleAdmin) {
-		return nil
-	}
-	if _, err := s.members.Get(ctx, orgID, p.ID, userID); err == nil {
-		return nil
-	} else if !errors.Is(err, domain.ErrNotFound) {
-		return err
-	}
-	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
-		return nil
-	}
-	return domain.ErrNotFound
+	_, _, err := project.Access(ctx, s.projects, s.members, orgID, projectID, userID, orgRole, project.RoleViewer)
+	return err
 }

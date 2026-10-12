@@ -354,42 +354,15 @@ func (s *Service) PurgeExpired(ctx context.Context, orgID string) (int64, error)
 	return s.runs.PurgeBefore(ctx, orgID, s.now().Add(-RetentionWindow))
 }
 
-// ---- authorization (mirrors taskuc; kept local so the services stay
-// independent). Org RLS only isolates tenants: private-project visibility
-// inside the org is enforced here, before any metering or provider call. ----
-
-func (s *Service) effectiveRole(ctx context.Context, orgID string, p *project.Project, userID string, orgRole tenant.OrgRole) (project.ProjectRole, error) {
-	if orgRole.AtLeast(tenant.RoleAdmin) {
-		return project.RoleLead, nil
-	}
-	m, err := s.members.Get(ctx, orgID, p.ID, userID)
-	if err == nil {
-		return m.Role, nil
-	}
-	if !errors.Is(err, domain.ErrNotFound) {
-		return "", err
-	}
-	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
-		return project.RoleViewer, nil
-	}
-	return "", domain.ErrNotFound
-}
+// ---- authorization. Org RLS only isolates tenants: private-project visibility
+// inside the org (project.Access) is enforced before any metering or provider
+// call. ----
 
 // access loads the project and requires at least min on it. Below min →
 // ErrForbidden; not visible at all → ErrNotFound.
 func (s *Service) access(ctx context.Context, orgID, projectID, userID string, orgRole tenant.OrgRole, min project.ProjectRole) (*project.Project, error) {
-	p, err := s.projects.Get(ctx, orgID, projectID)
-	if err != nil {
-		return nil, err
-	}
-	role, err := s.effectiveRole(ctx, orgID, p, userID, orgRole)
-	if err != nil {
-		return nil, err
-	}
-	if !role.AtLeast(min) {
-		return nil, domain.ErrForbidden
-	}
-	return p, nil
+	p, _, err := project.Access(ctx, s.projects, s.members, orgID, projectID, userID, orgRole, min)
+	return p, err
 }
 
 // ---- pipeline ---------------------------------------------------------------
