@@ -65,7 +65,8 @@ Jobs (parallel where independent):
 1. **lint:** golangci-lint, go-arch-lint (dependency rule 03 §3), and `sqlc diff`
    (generated code current).
 2. **test-backend:** unit and integration-tag tests with PostgreSQL, Redis, and
-   MinIO service containers.
+   RustFS (S3, ADR-027) service containers. The integration suites fail rather
+   than skip when `TEST_DATABASE_URL` / `TEST_S3_ENDPOINT` are missing.
 3. **build:** Docker-build both backend images with the commit SHA tag.
 4. **web:** frozen pnpm install, TypeScript check, ESLint, Vitest, and Next.js
    production build.

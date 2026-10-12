@@ -67,9 +67,15 @@ test: ## Run unit tests
 # Integration DSN targets the app role on the HOST-exposed postgres port
 # (compose stack up + migrated). Override for CI.
 TEST_DATABASE_URL ?= postgres://fluxboard_app:app_pw@localhost:5432/fluxboard?sslmode=disable
+# Object-store suite targets the compose RustFS on its host port (ADR-027).
+TEST_S3_ENDPOINT ?= localhost:9000
+TEST_S3_ACCESS_KEY ?= minioadmin
+TEST_S3_SECRET_KEY ?= minioadmin
 
 test-integration: ## Run integration suites against the compose stack (make up + migrate first)
-	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" go test -tags=integration ./...
+	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_S3_ENDPOINT="$(TEST_S3_ENDPOINT)" \
+		TEST_S3_ACCESS_KEY="$(TEST_S3_ACCESS_KEY)" TEST_S3_SECRET_KEY="$(TEST_S3_SECRET_KEY)" \
+		go test -tags=integration ./...
 
 lint: ## Run golangci-lint + go-arch-lint dependency check
 	cd backend && golangci-lint run ./...
