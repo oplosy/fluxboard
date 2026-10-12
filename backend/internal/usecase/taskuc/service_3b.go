@@ -69,10 +69,12 @@ func (s *Service) PurgeExpiredTrash(ctx context.Context, orgID string) (int, err
 
 // Search runs a paginated full-text search over the caller's visible tasks.
 // Visibility (org vs. private-membership) is enforced in the query; org ADMIN+
-// see every project.
+// see every project. The text query may be empty when at least one facet is
+// set (e.g. "assigned to me", ADR-016), which lists the matching tasks newest
+// first; with neither there is nothing to search for.
 func (s *Service) Search(ctx context.Context, orgID, userID string, f project.SearchFilter, orgRole tenant.OrgRole) (*project.SearchResult, error) {
 	f.Query = strings.TrimSpace(f.Query)
-	if f.Query == "" {
+	if f.Query == "" && f.ProjectID == "" && f.AssigneeID == "" && f.ColumnID == "" && f.Priority == "" && f.LabelID == "" {
 		return nil, domain.ErrValidation
 	}
 	if f.Priority != "" && !project.Priority(f.Priority).Valid() {

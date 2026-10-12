@@ -40,7 +40,14 @@ func TestSearchValidationAndClamp(t *testing.T) {
 	s := New(Deps{Tasks: ft})
 
 	if _, err := s.Search(ctx, "o", "u", project.SearchFilter{Query: "  "}, tenant.RoleMember); err != domain.ErrValidation {
-		t.Fatalf("empty query: err %v, want ErrValidation", err)
+		t.Fatalf("empty query without a facet: err %v, want ErrValidation", err)
+	}
+	// A facet alone is a valid search ("assigned to me", ADR-016).
+	if _, err := s.Search(ctx, "o", "u", project.SearchFilter{AssigneeID: "u"}, tenant.RoleMember); err != nil {
+		t.Fatalf("facet-only search: %v", err)
+	}
+	if ft.gotFilter.Query != "" || ft.gotFilter.AssigneeID != "u" {
+		t.Errorf("facet-only filter = %+v, want empty query with assignee u", ft.gotFilter)
 	}
 	if _, err := s.Search(ctx, "o", "u", project.SearchFilter{Query: "x", Priority: "bogus"}, tenant.RoleMember); err != domain.ErrValidation {
 		t.Fatalf("bad priority: err %v, want ErrValidation", err)

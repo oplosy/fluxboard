@@ -74,7 +74,9 @@ POST   /invitations/accept                 {token}   (user scope, no org prefix)
 GET/POST/PATCH/DELETE /orgs/{orgId}/labels[/{id}]
 GET    /orgs/{orgId}/audit-log             ?actor=&action=&from=&to=  (ADMIN+)
 GET    /orgs/{orgId}/audit-log/export      CSV ≤10k rows
-GET    /orgs/{orgId}/search?q=             FTS over tasks (FR-TASK-007)
+GET    /orgs/{orgId}/tasks/search      ?q=&project_id=&assignee_id=&column_id=&priority=&label_id=
+                                    FTS over tasks (FR-TASK-007); q may be empty
+                                    when a filter is set (newest first), else 422
 GET    /orgs/{orgId}/events                SSE (09 §1)
 ```
 

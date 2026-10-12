@@ -479,7 +479,7 @@ LEFT JOIN task_labels tl ON tl.task_id = t.id AND tl.org_id = t.org_id
 WHERE t.org_id = $1
   AND t.deleted_at IS NULL
   AND p.archived_at IS NULL
-  AND t.search_vector @@ websearch_to_tsquery('simple', $2)
+  AND ($2::text = '' OR t.search_vector @@ websearch_to_tsquery('simple', $2))
   AND ($3::bool OR ($4::bool AND p.visibility = 'org') OR EXISTS (
         SELECT 1 FROM project_members pm
         WHERE pm.project_id = p.id AND pm.user_id = $5))
@@ -488,7 +488,8 @@ WHERE t.org_id = $1
   AND ($8::uuid IS NULL OR t.column_id = $8)
   AND ($9::text IS NULL OR t.priority = $9)
   AND ($10::uuid IS NULL OR tl.label_id = $10)
-ORDER BY ts_rank(t.search_vector, websearch_to_tsquery('simple', $2)) DESC,
+ORDER BY CASE WHEN $2::text = '' THEN 0
+              ELSE ts_rank(t.search_vector, websearch_to_tsquery('simple', $2)) END DESC,
          t.created_at DESC
 LIMIT $12 OFFSET $11
 `
@@ -529,7 +530,8 @@ type SearchTasksRow struct {
 }
 
 // Full-text search (FR-TASK-007) --------------------------------------------
-// Org-wide task search over title+description with optional facet filters.
+// Org-wide task search over title+description with optional facet filters. An
+// empty @query skips the text match (facet-only listing, newest first).
 // Visibility is enforced in-DB: a caller sees a task only if the caller is an
 // org admin (@see_all), or a member of the project, or the project is 'org'-
 // visible and the caller may see those (@see_org_visible: org MEMBER+, never
