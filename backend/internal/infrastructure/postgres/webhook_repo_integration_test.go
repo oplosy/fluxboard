@@ -9,7 +9,10 @@
 //
 //	TEST_DATABASE_URL=postgres://... go test -tags=integration ./internal/infrastructure/postgres/
 //
-// (make test-integration wires this). Skips when TEST_DATABASE_URL is unset.
+// (make test-integration wires this). The integration tag is an explicit
+// opt-in, so a missing TEST_DATABASE_URL fails instead of skipping: a skipped
+// suite would turn CI green without touching the database. The DSN must use an
+// RLS-subject role (fluxboard_app), never a superuser or BYPASSRLS role.
 package postgres
 
 import (
@@ -33,7 +36,7 @@ func newIntegrationDB(t *testing.T) (*pgxpool.Pool, string) {
 	t.Helper()
 	dsn := os.Getenv("TEST_DATABASE_URL")
 	if dsn == "" {
-		t.Skip("TEST_DATABASE_URL not set; skipping integration test")
+		t.Fatal("TEST_DATABASE_URL not set; integration tests need a migrated database (see make test-integration)")
 	}
 	ctx := context.Background()
 	pool, err := pgxpool.New(ctx, dsn)
@@ -41,6 +44,15 @@ func newIntegrationDB(t *testing.T) (*pgxpool.Pool, string) {
 		t.Fatalf("connect: %v", err)
 	}
 	t.Cleanup(pool.Close)
+
+	var bypassesRLS bool
+	if err := pool.QueryRow(ctx,
+		`SELECT rolsuper OR rolbypassrls FROM pg_roles WHERE rolname = current_user`).Scan(&bypassesRLS); err != nil {
+		t.Fatalf("check role: %v", err)
+	}
+	if bypassesRLS {
+		t.Fatal("TEST_DATABASE_URL role bypasses RLS; use the fluxboard_app role")
+	}
 
 	orgID := uuid.NewString()
 	_, err = pool.Exec(ctx,
