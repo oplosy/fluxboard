@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -93,11 +93,9 @@ function OrgPrefs({ orgId }: { orgId: string }) {
 
 export default function NotificationsPage() {
   const { data: orgs, isLoading } = useQuery({ queryKey: ['orgs'], queryFn: listMyOrgs });
-  const [orgId, setOrgId] = useState<string>('');
-
-  useEffect(() => {
-    if (!orgId && orgs && orgs.length > 0) setOrgId(orgs[0]!.org_id);
-  }, [orgs, orgId]);
+  const [picked, setOrgId] = useState<string>('');
+  // Default to the first org until the user picks one.
+  const orgId = picked || orgs?.[0]?.org_id || '';
 
   return (
     <Card>

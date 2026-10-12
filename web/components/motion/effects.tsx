@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from 'react';
 
-import { prefersReducedMotion, useInView } from '@/lib/motion/hooks';
+import { prefersReducedMotion, useInView, useReducedMotion } from '@/lib/motion/hooks';
 import { cn } from '@/lib/utils';
 
 const GLYPHS = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789/<>_-+=#';
@@ -31,14 +31,13 @@ export function ScrambleText({
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref);
+  const reduced = useReducedMotion();
   const [shown, setShown] = useState(text);
   const raf = useRef(0);
 
+  // Animation only: under reduced motion the span renders `text` directly.
   const play = () => {
-    if (prefersReducedMotion()) {
-      setShown(text);
-      return;
-    }
+    if (prefersReducedMotion()) return;
     cancelAnimationFrame(raf.current);
     const start = performance.now();
     const tick = (now: number) => {
@@ -60,7 +59,7 @@ export function ScrambleText({
     if (inView) play();
     return () => cancelAnimationFrame(raf.current);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [inView, text]);
+  }, [inView, text, reduced]);
 
   return (
     <span
@@ -73,7 +72,7 @@ export function ScrambleText({
         {text}
       </span>
       <span className="absolute inset-0 whitespace-nowrap" aria-hidden>
-        {shown}
+        {reduced ? text : shown}
       </span>
     </span>
   );
@@ -97,14 +96,12 @@ export function CountUp({
 }) {
   const ref = useRef<HTMLSpanElement>(null);
   const inView = useInView(ref);
+  const reduced = useReducedMotion();
   const [n, setN] = useState(0);
 
   useEffect(() => {
-    if (!inView) return;
-    if (prefersReducedMotion()) {
-      setN(value);
-      return;
-    }
+    // Reduced motion shows `value` directly (below); only the animation lives here.
+    if (!inView || reduced) return;
     let raf = 0;
     const start = performance.now();
     const tick = (now: number) => {
@@ -115,12 +112,12 @@ export function CountUp({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, [inView, value, duration]);
+  }, [inView, value, duration, reduced]);
 
   return (
     <span ref={ref} className={cn('tabular', className)}>
       {prefix}
-      {n.toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
+      {(reduced ? value : n).toLocaleString('en-US', { minimumFractionDigits: decimals, maximumFractionDigits: decimals })}
       {suffix}
     </span>
   );

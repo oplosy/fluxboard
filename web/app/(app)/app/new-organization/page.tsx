@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Check, Loader2, X } from 'lucide-react';
 
@@ -10,7 +10,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FormError } from '@/components/auth/field';
-import { createOrg, isSlugAvailable } from '@/lib/api/orgs';
+import { createOrg } from '@/lib/api/orgs';
+import { useSlugAvailability } from '@/lib/org/use-slug-availability';
 import { ApiError } from '@/lib/api/client';
 
 function slugify(s: string): string {
@@ -22,40 +23,15 @@ function slugify(s: string): string {
     .slice(0, 40);
 }
 
-type SlugState = 'idle' | 'checking' | 'available' | 'taken' | 'invalid';
-
 export default function NewOrganizationPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
   const [name, setName] = useState('');
-  const [slug, setSlug] = useState('');
-  const [slugEdited, setSlugEdited] = useState(false);
-  const [slugState, setSlugState] = useState<SlugState>('idle');
-
-  // Keep the slug in sync with the name until the user edits it directly.
-  useEffect(() => {
-    if (!slugEdited) setSlug(slugify(name));
-  }, [name, slugEdited]);
-
-  // Debounced live availability check.
-  useEffect(() => {
-    if (!slug) {
-      setSlugState('idle');
-      return;
-    }
-    if (slug.length < 3) {
-      setSlugState('invalid');
-      return;
-    }
-    setSlugState('checking');
-    const t = setTimeout(() => {
-      isSlugAvailable(slug)
-        .then((ok) => setSlugState(ok ? 'available' : 'taken'))
-        .catch(() => setSlugState('idle'));
-    }, 400);
-    return () => clearTimeout(t);
-  }, [slug]);
+  // The slug follows the name until the user edits it directly.
+  const [slugDraft, setSlugDraft] = useState<string | null>(null);
+  const slug = slugDraft ?? slugify(name);
+  const slugState = useSlugAvailability(slug);
 
   const mutation = useMutation({
     mutationFn: () => createOrg({ name, slug }),
@@ -110,8 +86,7 @@ export default function NewOrganizationPage() {
                   required
                   value={slug}
                   onChange={(e) => {
-                    setSlugEdited(true);
-                    setSlug(slugify(e.target.value));
+                    setSlugDraft(slugify(e.target.value));
                   }}
                   placeholder="acme"
                 />

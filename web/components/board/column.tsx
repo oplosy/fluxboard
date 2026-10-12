@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
@@ -61,7 +61,11 @@ export function Column({
   isDone?: boolean;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
-  const [composing, setComposing] = useState(false);
+  const [composingManual, setComposing] = useState(false);
+  // External trigger (board "c" shortcut): each new signal value opens the
+  // composer until it is closed.
+  const [closedSignal, setClosedSignal] = useState(0);
+  const composing = composingManual || (!!composeSignal && composeSignal !== closedSignal);
   const [title, setTitle] = useState('');
   const [priority, setPriority] = useState<Priority>('none');
   const [assigneeId, setAssigneeId] = useState('');
@@ -70,10 +74,6 @@ export function Column({
 
   const overLimit = column.wip_limit != null && tasks.length >= column.wip_limit;
 
-  // External trigger (board "c" shortcut) opens this column's composer.
-  useEffect(() => {
-    if (composeSignal) setComposing(true);
-  }, [composeSignal]);
 
   function resetComposer() {
     setTitle('');
@@ -82,6 +82,7 @@ export function Column({
     setStartDate('');
     setDueDate('');
     setComposing(false);
+    setClosedSignal(composeSignal ?? 0);
   }
 
   function submit() {

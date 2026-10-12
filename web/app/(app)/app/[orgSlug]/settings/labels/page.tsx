@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
 
@@ -64,7 +64,8 @@ export default function LabelsSettingsPage() {
         <div className="space-y-2">
           {items.map((l) => (
             <LabelRow
-              key={l.id}
+              // Remount on a saved change so the drafts start from the new values.
+              key={`${l.id}:${l.name}:${l.color}`}
               label={l}
               onSave={(name, color) => rename.mutate({ ...l, name, color })}
               onDelete={() => remove.mutate(l.id)}
@@ -117,11 +118,6 @@ function LabelRow({
   const [name, setName] = useState(label.name);
   const [color, setColor] = useState(label.color || DEFAULT_COLOR);
   const [confirming, setConfirming] = useState(false);
-
-  useEffect(() => {
-    setName(label.name);
-    setColor(label.color || DEFAULT_COLOR);
-  }, [label.name, label.color]);
 
   function commit() {
     const n = name.trim();

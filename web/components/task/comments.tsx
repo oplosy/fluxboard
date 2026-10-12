@@ -8,6 +8,7 @@ import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
 import { useOrgMembers, memberName } from '@/lib/org/use-members';
 import { useToast } from '@/components/ui/toast';
+import { useNow } from '@/lib/use-now';
 import { MentionInput } from './mention-input';
 import type { Comment } from '@/lib/api/types';
 
@@ -56,9 +57,11 @@ export function Comments({ taskId, canComment }: { taskId: string; canComment: b
   });
 
   const list = comments ?? [];
+  // Re-render twice a minute so the edit button disappears when the window closes.
+  const now = useNow(true, 30_000);
 
   function withinWindow(c: Comment): boolean {
-    return Date.now() - new Date(c.created_at).getTime() < EDIT_WINDOW_MS;
+    return now - new Date(c.created_at).getTime() < EDIT_WINDOW_MS;
   }
 
   return (

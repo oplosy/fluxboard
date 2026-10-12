@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Trash2 } from 'lucide-react';
@@ -64,17 +64,10 @@ export function TaskDetail({
   const { data: taskLabels } = useQuery({ queryKey: labelKey, queryFn: () => listTaskLabels(orgId, taskId) });
   const { data: orgLabels } = useQuery({ queryKey: ['labels', orgId], queryFn: () => listLabels(orgId) });
 
-  const [titleDraft, setTitleDraft] = useState('');
-  const [descDraft, setDescDraft] = useState('');
-  const [descDirty, setDescDirty] = useState(false);
-
-  useEffect(() => {
-    if (task) {
-      setTitleDraft(task.title);
-      if (!descDirty) setDescDraft(task.description);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [task?.id, task?.title, task?.description]);
+  // In-progress edits, tied to the task they were typed for. Without one the
+  // inputs show the saved text, so they follow refetches and task switches.
+  const [titleEdit, setTitleEdit] = useState<{ taskId: string; text: string } | null>(null);
+  const [descEdit, setDescEdit] = useState<{ taskId: string; text: string } | null>(null);
 
   const patch = useMutation({
     mutationFn: (p: Partial<UpdateTaskInput>) => updateTask(orgId, taskId, toInput(task as Task, p)),
@@ -110,6 +103,10 @@ export function TaskDetail({
   if (isLoading) return <p className="text-sm text-muted-foreground">Loading task…</p>;
   if (isError || !task) return <p className="text-sm text-destructive">Couldn’t load this task.</p>;
 
+  const titleDraft = titleEdit?.taskId === task.id ? titleEdit.text : task.title;
+  const descDirty = descEdit?.taskId === task.id;
+  const descDraft = descDirty ? descEdit.text : task.description;
+
   const attached = taskLabels ?? [];
   const attachedIds = new Set(attached.map((l) => l.id));
   const available = (orgLabels ?? []).filter((l) => !attachedIds.has(l.id));
@@ -123,11 +120,11 @@ export function TaskDetail({
           {canEdit ? (
             <input
               value={titleDraft}
-              onChange={(e) => setTitleDraft(e.target.value)}
+              onChange={(e) => setTitleEdit({ taskId: task.id, text: e.target.value })}
               onBlur={() => {
                 const t = titleDraft.trim();
-                if (t && t !== task.title) patch.mutate({ title: t });
-                else setTitleDraft(task.title);
+                if (t && t !== task.title) patch.mutate({ title: t }, { onSuccess: () => setTitleEdit(null) });
+                else setTitleEdit(null);
               }}
               className="mt-1 w-full rounded-xl border-0 bg-transparent text-xl font-bold tracking-tight outline-none focus:bg-secondary/50"
             />
@@ -142,10 +139,7 @@ export function TaskDetail({
             <div>
               <textarea
                 value={descDraft}
-                onChange={(e) => {
-                  setDescDraft(e.target.value);
-                  setDescDirty(true);
-                }}
+                onChange={(e) => setDescEdit({ taskId: task.id, text: e.target.value })}
                 rows={4}
                 placeholder="Add a description…"
                 className="w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
@@ -154,10 +148,7 @@ export function TaskDetail({
                 <div className="mt-1 flex gap-2">
                   <button
                     type="button"
-                    onClick={() => {
-                      patch.mutate({ description: descDraft });
-                      setDescDirty(false);
-                    }}
+                    onClick={() => patch.mutate({ description: descDraft }, { onSuccess: () => setDescEdit(null) })}
                     disabled={patch.isPending}
                     className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
                   >
@@ -165,10 +156,7 @@ export function TaskDetail({
                   </button>
                   <button
                     type="button"
-                    onClick={() => {
-                      setDescDraft(task.description);
-                      setDescDirty(false);
-                    }}
+                    onClick={() => setDescEdit(null)}
                     className="text-xs text-muted-foreground hover:text-foreground"
                   >
                     Cancel

@@ -1,7 +1,7 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CheckCircle2, Loader2 } from 'lucide-react';
 
@@ -17,8 +17,9 @@ const TIMEOUT_MS = 60_000;
 
 export default function CheckoutSuccessPage() {
   const { orgId, slug } = useOrg();
-  const startedAt = useRef(Date.now());
   const [timedOut, setTimedOut] = useState(false);
+  // Each "Check again" starts a fresh polling window.
+  const [attempt, setAttempt] = useState(0);
 
   const summary = useQuery({
     queryKey: ['billing-summary', orgId],
@@ -33,11 +34,7 @@ export default function CheckoutSuccessPage() {
   useEffect(() => {
     const t = setTimeout(() => setTimedOut(true), TIMEOUT_MS);
     return () => clearTimeout(t);
-  }, []);
-
-  useEffect(() => {
-    if (Date.now() - startedAt.current > TIMEOUT_MS) setTimedOut(true);
-  }, [summary.dataUpdatedAt]);
+  }, [attempt]);
 
   const active = summary.data?.has_subscription;
 
@@ -67,7 +64,7 @@ export default function CheckoutSuccessPage() {
           <button
             onClick={() => {
               setTimedOut(false);
-              startedAt.current = Date.now();
+              setAttempt((a) => a + 1);
               void summary.refetch();
             }}
             className="mt-6 inline-flex h-10 items-center justify-center rounded-md border border-input bg-background px-4 text-sm font-medium hover:bg-secondary"

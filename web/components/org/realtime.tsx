@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
+import { useEffect } from 'react';
 import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 
 import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
 import { connectSse, type SseEvent } from '@/lib/sse';
+import { useLatest } from '@/lib/motion/hooks';
 
 // Realtime cache bridge (FR-NTF-001/002, docs/09 §1). Opens the org SSE stream
 // and applies *surgical* TanStack invalidations per event — e.g. a task.moved
@@ -19,8 +20,7 @@ export function Realtime() {
 
   // Keep the latest apply-fn in a ref so the stream connects once per org, not
   // on every render.
-  const applyRef = useRef<(e: SseEvent) => void>(() => {});
-  applyRef.current = (e) => applyEvent(qc, orgId, userId, e);
+  const applyRef = useLatest((e: SseEvent) => applyEvent(qc, orgId, userId, e));
 
   useEffect(() => {
     if (!orgId || !isAuthenticated) return;
@@ -32,7 +32,7 @@ export function Realtime() {
       },
     });
     return dispose;
-  }, [orgId, isAuthenticated, qc]);
+  }, [orgId, isAuthenticated, qc, applyRef]);
 
   return null;
 }
