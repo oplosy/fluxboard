@@ -306,7 +306,7 @@ func TestPushUsageSendsMeterEvents(t *testing.T) {
 
 func TestUpcomingInvoicePreviewsTheChange(t *testing.T) {
 	f := &fakeStripe{objects: map[string]string{
-		"GET /v1/subscriptions/sub_1":     subscriptionJSON("sub_1", "active", "price_pro_seat", 3, `{"org_id":"org-1"}`),
+		"GET /v1/subscriptions/sub_1":      subscriptionJSON("sub_1", "active", "price_pro_seat", 3, `{"org_id":"org-1"}`),
 		"POST /v1/invoices/create_preview": `{"object":"invoice","amount_due":11100,"currency":"usd"}`,
 	}}
 	g := newLiveAgainst(t, f)
