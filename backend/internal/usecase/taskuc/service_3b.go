@@ -88,7 +88,7 @@ func (s *Service) Search(ctx context.Context, orgID, userID string, f project.Se
 		f.Offset = 0
 	}
 	f.UserID = userID
-	f.SeeAll = orgRole.AtLeast(tenant.RoleAdmin)
+	f.SeeAll = project.SeesAllProjects(orgRole)
 	return s.tasks.Search(ctx, orgID, f)
 }
 
