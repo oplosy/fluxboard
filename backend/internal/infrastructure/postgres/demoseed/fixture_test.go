@@ -1,4 +1,4 @@
-package main
+package demoseed
 
 import (
 	"reflect"
@@ -154,7 +154,7 @@ func TestBuildAssigneesAndPrivateProject(t *testing.T) {
 			t.Fatalf("task %s assigned to a non-contributor (role %q)", tk.ID, r)
 		}
 	}
-	member := seedID("user", "member")
+	member := ID("user", "member")
 	for _, p := range f.Projects {
 		if p.Visibility == "private" && roles[p.ID+"|"+member] != "" {
 			t.Fatal("member@demo.dev must not be a member of the private project")
@@ -170,16 +170,23 @@ func TestDemoPasswordPassesPolicy(t *testing.T) {
 	}
 }
 
-func TestParseClock(t *testing.T) {
-	now := time.Date(2026, 10, 12, 15, 4, 5, 0, time.FixedZone("TRT", 3*3600))
-	got, err := parseClock("", now)
-	if err != nil || !got.Equal(time.Date(2026, 10, 12, 0, 0, 0, 0, time.UTC)) {
-		t.Fatalf("default clock = %v, %v", got, err)
+// The isolation suite's principals: outsider@ belongs to no org, and no acme
+// member belongs to beta-co (org B).
+func TestBuildIsolationPrincipals(t *testing.T) {
+	f := Build(testClock)
+	orgsOf := map[string][]string{}
+	for _, m := range f.Memberships {
+		orgsOf[m.UserID] = append(orgsOf[m.UserID], m.OrgID)
 	}
-	if got, err := parseClock("2026-01-15", now); err != nil || got.Format(time.DateOnly) != "2026-01-15" {
-		t.Fatalf("explicit clock = %v, %v", got, err)
+	if got := orgsOf[ID("user", "outsider")]; len(got) != 0 {
+		t.Fatalf("outsider@ must be in no org, is in %v", got)
 	}
-	if _, err := parseClock("15/01/2026", now); err == nil {
-		t.Fatal("bad clock format accepted")
+	beta := ID("org", "beta-co")
+	for _, key := range []string{"owner", "admin", "member", "guest"} {
+		for _, o := range orgsOf[ID("user", key)] {
+			if o == beta {
+				t.Fatalf("%s@ must not be a beta-co member", key)
+			}
+		}
 	}
 }

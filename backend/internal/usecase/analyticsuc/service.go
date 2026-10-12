@@ -13,6 +13,8 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/analytics"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 )
 
 // defaultWindow is the project-analytics range applied when the caller passes none.
@@ -20,20 +22,24 @@ const defaultWindow = 30 * 24 * time.Hour
 
 // Deps wires the analytics service.
 type Deps struct {
-	Stats analytics.StatsRepository
-	Usage analytics.UsageReader
-	Subs  billing.SubscriptionRepository
-	Plans billing.PlanRepository
-	Now   func() time.Time
+	Stats    analytics.StatsRepository
+	Projects project.ProjectRepository       // project-access check (private projects)
+	Members  project.ProjectMemberRepository // same policy as taskuc/aiuc
+	Usage    analytics.UsageReader
+	Subs     billing.SubscriptionRepository
+	Plans    billing.PlanRepository
+	Now      func() time.Time
 }
 
 // Service implements the analytics reads.
 type Service struct {
-	stats analytics.StatsRepository
-	usage analytics.UsageReader
-	subs  billing.SubscriptionRepository
-	plans billing.PlanRepository
-	now   func() time.Time
+	stats    analytics.StatsRepository
+	projects project.ProjectRepository
+	members  project.ProjectMemberRepository
+	usage    analytics.UsageReader
+	subs     billing.SubscriptionRepository
+	plans    billing.PlanRepository
+	now      func() time.Time
 }
 
 // New builds the service.
@@ -41,13 +47,18 @@ func New(d Deps) *Service {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	return &Service{stats: d.Stats, usage: d.Usage, subs: d.Subs, plans: d.Plans, now: d.Now}
+	return &Service{stats: d.Stats, projects: d.Projects, members: d.Members, usage: d.Usage, subs: d.Subs, plans: d.Plans, now: d.Now}
 }
 
 // ProjectAnalytics returns the daily series + window totals for a project. A zero
 // from/to defaults to the last 30 UTC days. Totals and the mean cycle time are
-// computed from the rollup rows (no live aggregation).
-func (s *Service) ProjectAnalytics(ctx context.Context, orgID, projectID string, from, to time.Time) (analytics.ProjectAnalytics, error) {
+// computed from the rollup rows (no live aggregation). The caller needs VIEWER
+// on the project: org RLS alone would let any member read a private project's
+// stats, and an unknown or foreign project must 404 rather than answer empty.
+func (s *Service) ProjectAnalytics(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string, from, to time.Time) (analytics.ProjectAnalytics, error) {
+	if err := s.requireViewer(ctx, orgID, userID, orgRole, projectID); err != nil {
+		return analytics.ProjectAnalytics{}, err
+	}
 	now := s.now().UTC()
 	if to.IsZero() {
 		to = now
@@ -141,4 +152,27 @@ func (s *Service) UsageDashboard(ctx context.Context, orgID string) (analytics.U
 		EstimatedTotal: estimate,
 		Plan:           string(planCode),
 	}, nil
+}
+
+// requireViewer mirrors taskuc/aiuc effectiveRole (kept local so the services
+// stay independent): org ADMIN+ is LEAD everywhere, a project member has their
+// project role, an org MEMBER+ is VIEWER on org-visible projects; anything else
+// is ErrNotFound so hidden projects are indistinguishable from missing ones.
+func (s *Service) requireViewer(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, projectID string) error {
+	p, err := s.projects.Get(ctx, orgID, projectID)
+	if err != nil {
+		return err
+	}
+	if orgRole.AtLeast(tenant.RoleAdmin) {
+		return nil
+	}
+	if _, err := s.members.Get(ctx, orgID, p.ID, userID); err == nil {
+		return nil
+	} else if !errors.Is(err, domain.ErrNotFound) {
+		return err
+	}
+	if p.Visibility == project.VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
+		return nil
+	}
+	return domain.ErrNotFound
 }

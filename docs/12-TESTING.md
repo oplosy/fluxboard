@@ -10,7 +10,7 @@ not be cited as coverage.
 |---|---|---|---|---|
 | Unit (Go) | stdlib `testing` (no assertion library) | domain logic, rank math, token gen, entitlement derivation, JWT/Argon2 params | usecase ≥ 85%, billing pkg ≥ 95% | In place (`go test ./...`); coverage targets not measured in CI |
 | Unit (web) | Vitest + Testing Library | API client, components | — | In place (`pnpm test`, 3 files) |
-| Integration (Go) | `//go:build integration` suites against real services: CI service containers (Postgres 16, Redis 7, RustFS S3 — ADR-027), the compose stack locally | repositories against real PG (RLS active!), object store, webhook consumer, jobs | all repos + consumer | Partial: webhook repo idempotency (`postgres/`) and object-store adapter (`minio/`) only |
+| Integration (Go) | `//go:build integration` suites against real services: CI service containers (Postgres 16, Redis 7, RustFS S3 — ADR-027), the compose stack locally | repositories against real PG (RLS active!), object store, webhook consumer, jobs | all repos + consumer | Partial: webhook repo idempotency (`postgres/`), object-store adapter (`minio/`), tenant-isolation suite (`cmd/api`, §6) |
 | API contract | Go httptest against wired router | every endpoint: happy + authz + validation + error envelope | every route ≥ 1 authz-negative test | Partial: handler tests exist for some routes; no per-route authz-negative gate |
 | E2E | Playwright | 6 golden journeys (below) | smoke in CI, full nightly | Planned — not in the repo; manual PowerShell smokes in `scripts/smoke/` |
 | Load/abuse | k6 | board under concurrency, rate-limit behavior, SSE fan-out | profiles recorded in README | Planned — not in the repo |
@@ -66,13 +66,14 @@ Deterministic fixture (fixed UUIDv5 IDs; every row derived from a clock that
 defaults to today, UTC midnight — pin it with `make seed SEED_ARGS="-clock
 2026-01-15"` for byte-identical data):
 - Users (all `email_verified`, password `Demo-Pass-2026!`): `owner@demo.dev`,
-  `admin@…`, `member@…`, `guest@…`, `outsider@…`, `user01…user16@…`,
-  `beta.member@…`, and `padmin@…` (platform admin). When `TOTP_ENC_KEY` is set,
+  `admin@…`, `member@…`, `guest@…`, `outsider@…` (in no org — §6's outsider),
+  `user01…user16@…`, `beta.owner@…`, `beta.member@…`, and `padmin@…`
+  (platform admin). When `TOTP_ENC_KEY` is set,
   padmin has 2FA enabled with the fixed dev secret `JBSWY3DPEHPK3PXP` (the admin
   console requires 2FA); without the key padmin is seeded without 2FA.
 - Orgs: `acme` (Business/active, 20 members, 6 projects, 400 tasks, 30 days of
-  usage history), `beta-co` (Free — no subscription row — 2 members, none of
-  them in acme), `pastdue-inc` (Pro/past_due, owned by `owner@`, so the org
+  usage history), `beta-co` (Free — no subscription row — `beta.owner@` and
+  `beta.member@`, none of them in acme), `pastdue-inc` (Pro/past_due, owned by `owner@`, so the org
   switcher has two orgs).
 - acme projects: `WEB`, `API`, `MOB`, `OPS` (active, org-visible), `OLD`
   (archived), `SEC` (private: `user01` LEAD, `user02` CONTRIBUTOR; `member@`
@@ -91,17 +92,44 @@ command fails and names it instead.
 
 ## 6. Tenant Isolation Suite (Phase-2 gate — must be exhaustive, generated)
 
-**Status: planned.** No generated suite exists yet. Isolation is currently
-backed by RLS plus per-usecase tests (e.g. the AI private-project tests in
-`aiuc`); the matrix below is the target.
+**Status: in place** — `backend/cmd/api/isolation_integration_test.go`
+(`integration` tag; part of the required `test-backend` CI job). It builds the
+real API wiring (`newApp`) in-process against Postgres (app role, RLS on),
+Redis and RustFS, loads the §5 fixture (org A = `acme`, org B = `beta-co`) plus
+one org-B row of every resource a route can name, and logs in through the real
+login endpoint.
 
 Test generator iterates **every tenant-scoped endpoint** (route table
-introspection) × principal in {member-of-A, admin-of-A, outsider} attempting
-org-B resources: expected 404/403 per matrix. Plus:
-- Raw repository call with GUC unset → 0 rows (fail-closed proof)
-- INSERT with mismatched org_id under RLS `WITH CHECK` → error
-- Search/FTS endpoint never returns foreign-org hits (seeded marker strings)
-- Presigned download for foreign-org attachment id → 404 before presign
+introspection via `chi.Walk`, currently 121 routes) × principal in
+{member-of-A, admin-of-A, outsider} attempting org-B resources:
+- **Via org B's path** (`/orgs/{B}/…`): every response must be 403/404 — the
+  tenant guard stops non-members before any handler runs.
+- **Via org A's path with org B's resource IDs** (76 routes carry resource
+  params): no 2xx/3xx, no 5xx, no 401 (an unauthenticated probe proves
+  nothing), and no org-B marker in any body.
+- **IDs in bodies and queries** (bulk actions, AI risk scan/dismiss/list,
+  search `project_id`) get the same treatment.
+- **Org B's rows are digested** in every table with an `org_id` before and after
+  the probes and must be identical.
+- A route parameter with no org-B resource **fails the suite** — adding a route
+  with a new parameter means adding that resource to `insertOrgBResources`.
+
+Plus:
+- Raw query as the app role with no `app.current_tenant` → no rows from any RLS
+  table (fail-closed proof: 0 rows on a fresh connection; on a pooled one the
+  leftover `''` makes the policy's `::uuid` cast error, also returning nothing).
+  Tenant A sees none of org B's rows; tenant B sees all of its own.
+- INSERT with mismatched org_id under RLS `WITH CHECK` → error (42501)
+- Search/FTS endpoint never returns foreign-org or hidden-private-project hits
+  (seeded marker strings), with positive controls proving the markers match
+- Presigned download for foreign-org attachment id → 404 before presign (the
+  rightful owner gets a `download_url`, proving the store is wired)
+
+Positive controls (A's member reads A, B's owner reads B's seeded IDs) run
+first, so a broken login or fixture cannot make the negative checks pass
+vacuously. The first run found `GET /projects/{id}/analytics` answering 200 for
+a foreign project (and exposing private-project stats inside a tenant); fixed in
+`analyticsuc`.
 
 ## 7. Billing Reliability Suite (Phase-4 gate)
 
@@ -138,6 +166,7 @@ maintainer can merge their own PR); the rules apply to admins too; force pushes
 and branch deletion are blocked. Branches do not have to be up to date with
 `main` before merging (AGENTS.md still asks for a rebase before opening the PR).
 
-Still target: add the tenant-isolation and billing suites as required checks
-once they exist; Playwright smoke (journeys 1–3) on PR, full set nightly. Flake
+The tenant-isolation suite runs inside the required `test-backend` job. Still
+target: the billing suite (§7) as a required check once it exists; Playwright
+smoke (journeys 1–3) on PR, full set nightly. Flake
 policy: quarantine label + issue, never retry-until-green as a merge strategy.

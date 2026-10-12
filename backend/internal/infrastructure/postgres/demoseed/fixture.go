@@ -1,4 +1,7 @@
-package main
+// Package demoseed holds the deterministic demo fixture of docs/12-TESTING.md
+// §5: Build derives every row from a clock with fixed IDs, Write loads it.
+// Used by `make seed` (cmd/seed) and by the tenant-isolation integration suite.
+package demoseed
 
 import (
 	"fmt"
@@ -26,7 +29,9 @@ const PlatformAdminTOTPSecret = "JBSWY3DPEHPK3PXP"
 // so every run produces identical rows (fixed UUIDs, §5).
 var seedNamespace = uuid.MustParse("5f1c0b7e-6a43-4f8e-9c1d-2b7a9e0d4c11")
 
-func seedID(parts ...string) string {
+// ID returns the fixed seed UUID for a name, e.g. ID("org", "acme") or
+// ID("user", "member").
+func ID(parts ...string) string {
 	return uuid.NewSHA1(seedNamespace, []byte(strings.Join(parts, "/"))).String()
 }
 
@@ -116,7 +121,7 @@ func Build(clock time.Time) Fixture {
 	day := 24 * time.Hour
 
 	user := func(key, email, name string, admin bool) string {
-		u := User{ID: seedID("user", key), Email: email, Name: name, PlatformAdmin: admin}
+		u := User{ID: ID("user", key), Email: email, Name: name, PlatformAdmin: admin}
 		f.Users = append(f.Users, u)
 		return u.ID
 	}
@@ -124,16 +129,17 @@ func Build(clock time.Time) Fixture {
 	admin := user("admin", "admin@demo.dev", "Adam Admin", false)
 	member := user("member", "member@demo.dev", "Mia Member", false)
 	guest := user("guest", "guest@demo.dev", "Gus Guest", false)
-	outsider := user("outsider", "outsider@demo.dev", "Otto Outsider", false)
+	user("outsider", "outsider@demo.dev", "Otto Outsider", false) // in no org: the isolation suite's outsider
 	user("padmin", "padmin@demo.dev", "Paula Platform", true)
 	var team []string
 	for i := 1; i <= 16; i++ {
 		team = append(team, user(fmt.Sprintf("user%02d", i), fmt.Sprintf("user%02d@demo.dev", i), fmt.Sprintf("Teammate %02d", i), false))
 	}
+	betaOwner := user("beta.owner", "beta.owner@demo.dev", "Bo Beta", false)
 	betaMember := user("beta.member", "beta.member@demo.dev", "Bea Beta", false)
 
 	org := func(slug, name, customer string, age time.Duration) string {
-		o := Org{ID: seedID("org", slug), Slug: slug, Name: name, StripeCustomerID: customer, CreatedAt: clock.Add(-age)}
+		o := Org{ID: ID("org", slug), Slug: slug, Name: name, StripeCustomerID: customer, CreatedAt: clock.Add(-age)}
 		f.Orgs = append(f.Orgs, o)
 		return o.ID
 	}
@@ -153,13 +159,13 @@ func Build(clock time.Time) Fixture {
 		grant(acme, u, "MEMBER")
 	}
 	// beta-co: 2 members, none of them in acme (the isolation suite's org B).
-	grant(beta, outsider, "OWNER")
+	grant(beta, betaOwner, "OWNER")
 	grant(beta, betaMember, "MEMBER")
 	grant(pastdue, owner, "OWNER")
 
 	labels := map[string][]string{}
 	label := func(orgID, name, color string) {
-		l := Label{ID: seedID("label", orgID, name), OrgID: orgID, Name: name, Color: color}
+		l := Label{ID: ID("label", orgID, name), OrgID: orgID, Name: name, Color: color}
 		f.Labels = append(f.Labels, l)
 		labels[orgID] = append(labels[orgID], l.ID)
 	}
@@ -193,17 +199,17 @@ func Build(clock time.Time) Fixture {
 		{acme, "OPS", "Operations", "org", nil, 60, owner, teamFor(3), nil, ""},
 		{acme, "OLD", "Legacy Portal", "org", &archivedAt, 40, owner, team[:4], nil, ""},
 		{acme, "SEC", "Security Audit", "private", nil, 30, team[0], []string{team[1]}, nil, "secaudit-private-marker"},
-		{beta, "BETA", "Beta Launch", "org", nil, 6, outsider, []string{betaMember}, nil, "betaco-marker"},
+		{beta, "BETA", "Beta Launch", "org", nil, 6, betaOwner, []string{betaMember}, nil, "betaco-marker"},
 		{pastdue, "PAY", "Payments", "org", nil, 4, owner, nil, nil, "pastdue-marker"},
 	}
 
 	for _, s := range specs {
 		p := Project{
-			ID: seedID("project", s.org, s.key), OrgID: s.org, Key: s.key, Name: s.name,
+			ID: ID("project", s.org, s.key), OrgID: s.org, Key: s.key, Name: s.name,
 			Visibility: s.visibility, CreatedBy: s.lead, ArchivedAt: s.archived, TaskCounter: s.tasks,
 			CreatedAt: clock.Add(-75 * day),
 		}
-		p.BoardID = seedID("board", p.ID)
+		p.BoardID = ID("board", p.ID)
 		f.Projects = append(f.Projects, p)
 
 		// Org OWNER/ADMIN are effective LEAD on every project without a row, so
@@ -223,7 +229,7 @@ func Build(clock time.Time) Fixture {
 		cols := make([]Column, len(project.DefaultColumns))
 		colRanks := rank.Initial(len(cols))
 		for i, name := range project.DefaultColumns {
-			cols[i] = Column{ID: seedID("column", p.ID, name), OrgID: p.OrgID, BoardID: p.BoardID, Name: name, Rank: colRanks[i]}
+			cols[i] = Column{ID: ID("column", p.ID, name), OrgID: p.OrgID, BoardID: p.BoardID, Name: name, Rank: colRanks[i]}
 		}
 		f.Columns = append(f.Columns, cols...)
 
@@ -247,8 +253,8 @@ func Build(clock time.Time) Fixture {
 	}
 
 	f.Subscriptions = []Subscription{
-		{seedID("subscription", acme), acme, "business", "active", "sub_seed_acme", "cus_seed_acme", clock.Add(18 * day)},
-		{seedID("subscription", pastdue), pastdue, "pro", "past_due", "sub_seed_pastdue", "cus_seed_pastdue", clock.Add(-3 * day)},
+		{ID("subscription", acme), acme, "business", "active", "sub_seed_acme", "cus_seed_acme", clock.Add(18 * day)},
+		{ID("subscription", pastdue), pastdue, "pro", "past_due", "sub_seed_pastdue", "cus_seed_pastdue", clock.Add(-3 * day)},
 	}
 
 	// 30 days of acme usage, ending today; days before today count as pushed
@@ -285,7 +291,7 @@ func buildTask(clock time.Time, p Project, n, total int, assignees []string, mar
 	h := hash(p.Key, fmt.Sprint(n))
 	created := clock.Add(-time.Duration(60*(total-n)/total)*day - time.Duration(h%20)*time.Hour - time.Hour)
 	t := Task{
-		ID: seedID("task", p.ID, fmt.Sprint(n)), OrgID: p.OrgID, ProjectID: p.ID, Number: n,
+		ID: ID("task", p.ID, fmt.Sprint(n)), OrgID: p.OrgID, ProjectID: p.ID, Number: n,
 		Title:     fmt.Sprintf("%s %s", verbs[h%uint32(len(verbs))], nouns[(h/7)%uint32(len(nouns))]),
 		Priority:  priorities[(h/13)%uint32(len(priorities))],
 		CreatedBy: p.CreatedBy, CreatedAt: created, UpdatedAt: created.Add(2 * time.Hour),

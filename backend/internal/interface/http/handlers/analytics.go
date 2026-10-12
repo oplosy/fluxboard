@@ -58,7 +58,7 @@ func (h *AnalyticsHandlers) ProjectAnalytics(w http.ResponseWriter, r *http.Requ
 	}
 	projectID := chi.URLParam(r, "projectId")
 	from, to := parseDay(r.URL.Query().Get("from")), parseDay(r.URL.Query().Get("to"))
-	a, err := h.svc.ProjectAnalytics(r.Context(), tc.OrgID, projectID, from, to)
+	a, err := h.svc.ProjectAnalytics(r.Context(), tc.OrgID, tc.UserID, tc.Role, projectID, from, to)
 	if err != nil {
 		response.Error(w, err)
 		return

@@ -94,6 +94,10 @@ jobs:
       - name: integration tests
         env:
           TEST_DATABASE_URL: postgres://fluxboard_app:app_pw@localhost:5432/fluxboard?sslmode=disable
+          # Owner DSN + Redis: the tenant-isolation suite loads the demo fixture
+          # and runs the full API wiring (cmd/api, docs/12-TESTING.md §6).
+          TEST_DATABASE_OWNER_URL: postgres://fluxboard_owner:owner_pw@localhost:5432/fluxboard?sslmode=disable
+          TEST_REDIS_ADDR: localhost:6379
           TEST_S3_ENDPOINT: localhost:9000
           TEST_S3_ACCESS_KEY: minioadmin
           TEST_S3_SECRET_KEY: minioadmin
