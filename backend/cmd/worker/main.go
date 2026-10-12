@@ -7,6 +7,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -51,6 +52,9 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := cfg.ValidateWorker(); err != nil {
+		return err
+	}
 	logger.Info("starting worker", "version", version, "config", cfg.String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -63,6 +67,10 @@ func run(logger *slog.Logger) error {
 	}
 	defer pool.Close()
 
+	objectStore, err := loadObjectStore(ctx, cfg, logger)
+	if err != nil {
+		return err
+	}
 	tenantPool := postgres.NewTenantPool(pool)
 	taskSvc := taskuc.New(taskuc.Deps{
 		Tasks:       postgres.NewTaskRepo(tenantPool),
@@ -75,7 +83,7 @@ func run(logger *slog.Logger) error {
 		Members:     postgres.NewProjectMemberRepo(tenantPool),
 		Boards:      postgres.NewBoardRepo(tenantPool),
 		Columns:     postgres.NewColumnRepo(tenantPool),
-		Store:       loadObjectStore(ctx, cfg, logger),
+		Store:       objectStore,
 		Logger:      logger,
 	})
 	maintenanceRepo := postgres.NewMaintenanceRepo(pool)
@@ -237,21 +245,25 @@ func run(logger *slog.Logger) error {
 }
 
 // loadObjectStore builds the MinIO store, or a nil interface when MINIO_ENDPOINT
-// is unset (attachment GC then no-ops). A dial error is logged, not fatal.
-func loadObjectStore(ctx context.Context, cfg *config.Config, logger *slog.Logger) project.ObjectStore {
+// is unset (attachment GC then no-ops). A dial error is logged in dev and
+// fatal in prod.
+func loadObjectStore(ctx context.Context, cfg *config.Config, logger *slog.Logger) (project.ObjectStore, error) {
 	if cfg.MinIOEndpoint == "" {
 		logger.Warn("MINIO_ENDPOINT not set; attachment GC disabled")
-		return nil
+		return nil, nil
 	}
 	store, err := miniox.New(ctx, miniox.Config{
 		Endpoint: cfg.MinIOEndpoint, AccessKey: cfg.MinIOAccessKey, SecretKey: cfg.MinIOSecretKey,
 		Bucket: cfg.MinIOBucket, UseSSL: cfg.MinIOUseSSL,
 	})
 	if err != nil {
+		if cfg.IsProd() {
+			return nil, fmt.Errorf("minio init: %w", err)
+		}
 		logger.Error("minio init failed; attachment GC disabled", "err", err)
-		return nil
+		return nil, nil
 	}
-	return store
+	return store, nil
 }
 
 func startMetrics(logger *slog.Logger, addr string) (*http.Server, *prometheus.Registry) {

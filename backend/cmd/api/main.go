@@ -104,6 +104,9 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	if err := cfg.ValidateAPI(); err != nil {
+		return err
+	}
 	logger.Info("starting api", "version", version, "config", cfg.String())
 
 	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
@@ -221,8 +224,11 @@ func run(logger *slog.Logger) error {
 	})
 
 	// Object store (MinIO/S3) for attachments, avatars and org logos
-	// (FR-TASK-006); nil disables those surfaces instead of failing boot.
-	objectStore := loadObjectStore(ctx, cfg, logger)
+	// (FR-TASK-006); in dev nil disables those surfaces instead of failing boot.
+	objectStore, err := loadObjectStore(ctx, cfg, logger)
+	if err != nil {
+		return err
+	}
 
 	tenantSvc := tenantuc.New(tenantuc.Deps{
 		Orgs:     orgRepo,
@@ -493,7 +499,8 @@ func run(logger *slog.Logger) error {
 }
 
 // loadSigner resolves the ES256 signing key: inline PEM, a file path, or (dev
-// only) a freshly generated ephemeral key with a loud warning.
+// only; ValidateAPI rejects an unset key in prod) a freshly generated
+// ephemeral key with a loud warning.
 func loadSigner(cfg *config.Config, logger *slog.Logger) (*jwtx.Signer, error) {
 	pemStr := cfg.JWTPrivateKeyPEM
 	switch {
@@ -548,22 +555,26 @@ func loadGoogleProvider(cfg *config.Config, logger *slog.Logger) auth.OAuthProvi
 }
 
 // loadObjectStore builds the MinIO object store, or a nil interface when
-// MINIO_ENDPOINT is unset (attachment routes then 403). A dial/bucket error is
-// logged and treated as disabled so the API still boots (FR-TASK-006).
-func loadObjectStore(ctx context.Context, cfg *config.Config, logger *slog.Logger) project.ObjectStore {
+// MINIO_ENDPOINT is unset (attachment routes then 403). In dev a dial/bucket
+// error is logged and treated as disabled so the API still boots
+// (FR-TASK-006); in prod it fails boot instead of silently dropping attachments.
+func loadObjectStore(ctx context.Context, cfg *config.Config, logger *slog.Logger) (project.ObjectStore, error) {
 	if cfg.MinIOEndpoint == "" {
 		logger.Warn("MINIO_ENDPOINT not set; attachment endpoints are disabled")
-		return nil
+		return nil, nil
 	}
 	store, err := miniox.New(ctx, miniox.Config{
 		Endpoint: cfg.MinIOEndpoint, AccessKey: cfg.MinIOAccessKey, SecretKey: cfg.MinIOSecretKey,
 		Bucket: cfg.MinIOBucket, UseSSL: cfg.MinIOUseSSL,
 	})
 	if err != nil {
+		if cfg.IsProd() {
+			return nil, fmt.Errorf("minio init: %w", err)
+		}
 		logger.Error("minio init failed; attachments disabled", "err", err)
-		return nil
+		return nil, nil
 	}
-	return store
+	return store, nil
 }
 
 // taskCreator adapts taskuc.Service to aiuc.TaskCreator: plan-apply items cross

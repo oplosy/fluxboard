@@ -4,6 +4,7 @@
 package config
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -66,6 +67,13 @@ type Config struct {
 	AIMonthlyCap int    `envconfig:"AI_MONTHLY_CAP" default:"200"`
 }
 
+// Recognised APP_ENV values. Anything else is rejected so a typo such as
+// "production" cannot silently boot with dev fallbacks.
+const (
+	EnvDev  = "dev"
+	EnvProd = "prod"
+)
+
 // Load reads configuration from the environment and returns it, or an error
 // naming the first missing/invalid key.
 func Load() (*Config, error) {
@@ -73,11 +81,70 @@ func Load() (*Config, error) {
 	if err := envconfig.Process("", &c); err != nil {
 		return nil, fmt.Errorf("config: %w", err)
 	}
+	if c.AppEnv != EnvDev && c.AppEnv != EnvProd {
+		return nil, fmt.Errorf("config: APP_ENV=%q, want %q or %q", c.AppEnv, EnvDev, EnvProd)
+	}
 	return &c, nil
 }
 
 // IsProd reports whether the process runs in a production-shaped environment.
-func (c *Config) IsProd() bool { return c.AppEnv == "prod" }
+func (c *Config) IsProd() bool { return c.AppEnv == EnvProd }
+
+// ValidateAPI rejects a prod config the API would otherwise boot with a dev
+// fallback: an ephemeral JWT key (sessions break on restart and across
+// replicas), 2FA silently off, mail bodies with one-time links logged instead
+// of sent, attachments off, or localhost links and redirects. No-op in dev.
+func (c *Config) ValidateAPI() error {
+	if !c.IsProd() {
+		return nil
+	}
+	errs := append(c.prodCommon(),
+		required("JWT_PRIVATE_KEY_PEM", c.JWTPrivateKeyPEM),
+		required("TOTP_ENC_KEY", c.TOTPEncKey),
+	)
+	if c.GoogleClientID != "" && !strings.HasPrefix(c.GoogleRedirectURL, "https://") {
+		errs = append(errs, fmt.Errorf("GOOGLE_REDIRECT_URL must be an https URL, got %q", c.GoogleRedirectURL))
+	}
+	return prodErr(errs)
+}
+
+// ValidateWorker is ValidateAPI for the worker, which sends mail, GCs objects
+// and renders links but never signs tokens. No-op in dev.
+func (c *Config) ValidateWorker() error {
+	if !c.IsProd() {
+		return nil
+	}
+	return prodErr(c.prodCommon())
+}
+
+// prodCommon checks the keys both processes need in prod.
+func (c *Config) prodCommon() []error {
+	errs := []error{
+		required("SMTP_HOST", c.SMTPHost),
+		required("MINIO_ENDPOINT", c.MinIOEndpoint),
+		required("MINIO_ACCESS_KEY", c.MinIOAccessKey),
+		required("MINIO_SECRET_KEY", c.MinIOSecretKey),
+	}
+	if !strings.HasPrefix(c.WebOrigin, "https://") {
+		errs = append(errs, fmt.Errorf("WEB_ORIGIN must be an https URL, got %q", c.WebOrigin))
+	}
+	return errs
+}
+
+func required(key, value string) error {
+	if value == "" {
+		return fmt.Errorf("%s is required", key)
+	}
+	return nil
+}
+
+// prodErr joins every failed check so one boot reports all missing keys.
+func prodErr(errs []error) error {
+	if err := errors.Join(errs...); err != nil {
+		return fmt.Errorf("config: APP_ENV=prod: %w", err)
+	}
+	return nil
+}
 
 // String renders the config with every secret masked, safe to log at startup.
 func (c *Config) String() string {
