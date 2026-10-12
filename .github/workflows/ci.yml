@@ -6,8 +6,8 @@ on:
   pull_request:
     branches: [main]
 
-# Jobs mirror docs/10-INFRA-DEVOPS.md §4. PRs to main require lint +
-# test-backend + build green (branch protection).
+# Jobs mirror docs/10-INFRA-DEVOPS.md §4. main has no branch protection yet,
+# so these checks are not required to merge (docs/12-TESTING.md §9).
 env:
   GO_VERSION: "1.26"
 
