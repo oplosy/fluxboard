@@ -3,6 +3,7 @@ package jobs
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -21,17 +22,22 @@ type fakeOrgs struct{ ids []string }
 
 func (f *fakeOrgs) ListActiveOrgIDs(context.Context) ([]string, error) { return f.ids, nil }
 
+// fakeOutbox mirrors OutboxRepo.Drain: items are the undrained rows; a row is
+// removed only when its handoff succeeds, and the first error stops the batch.
 type fakeOutbox struct {
-	items   []billing.OutboxItem
-	claimed bool
+	items []billing.OutboxItem
 }
 
-func (f *fakeOutbox) ClaimBatch(_ context.Context, _ string, _ int) ([]billing.OutboxItem, error) {
-	if f.claimed {
-		return nil, nil
+func (f *fakeOutbox) Drain(_ context.Context, _ string, limit int, handoff func(billing.OutboxItem) error) (int, error) {
+	n := 0
+	for len(f.items) > 0 && n < limit {
+		if err := handoff(f.items[0]); err != nil {
+			return n, err
+		}
+		f.items = f.items[1:]
+		n++
 	}
-	f.claimed = true
-	return f.items, nil
+	return n, nil
 }
 
 type enqueued struct {
@@ -202,6 +208,58 @@ func TestOutboxDrainTaskIDConflictIsSuccess(t *testing.T) {
 	})
 	if err := b.HandleOutboxDrain(context.Background(), nil); err != nil {
 		t.Fatalf("drain with dup TaskID should not error: %v", err)
+	}
+	if len(outbox.items) != 0 {
+		t.Fatalf("dup row left undrained: %+v", outbox.items)
+	}
+}
+
+func TestOutboxDrainEnqueueFailureKeepsRowsForRetry(t *testing.T) {
+	payload, _ := json.Marshal(map[string]string{"template": "billing.dunning", "org_id": "org1"})
+	outbox := &fakeOutbox{items: []billing.OutboxItem{
+		{ID: "a", OrgID: "org1", Kind: billing.OutboxEmailSend, Payload: payload},
+		{ID: "b", OrgID: "org1", Kind: billing.OutboxEmailSend, Payload: payload},
+	}}
+	client := &fakeEnqueuer{failWith: errors.New("redis down")}
+	b := NewBilling(BillingDeps{
+		Outbox: outbox, Client: client,
+		Orgs: &fakeOrgs{ids: []string{"org1"}}, Logger: discard(),
+	})
+	if err := b.HandleOutboxDrain(context.Background(), nil); err != nil {
+		t.Fatalf("drain: %v", err)
+	}
+	if len(outbox.items) != 2 {
+		t.Fatalf("undrained = %d, want 2 (failed enqueue must not drain)", len(outbox.items))
+	}
+
+	client.failWith = nil // Redis back: the next tick hands both rows off
+	if err := b.HandleOutboxDrain(context.Background(), nil); err != nil {
+		t.Fatalf("drain retry: %v", err)
+	}
+	if len(outbox.items) != 0 || len(client.tasks) != 2 {
+		t.Fatalf("after retry undrained=%d enqueued=%d, want 0/2", len(outbox.items), len(client.tasks))
+	}
+	if client.tasks[0].taskID != "outbox:a" || client.tasks[1].taskID != "outbox:b" {
+		t.Fatalf("retry order = %s,%s, want outbox:a,outbox:b", client.tasks[0].taskID, client.tasks[1].taskID)
+	}
+}
+
+func TestOutboxDrainDropsUnknownKind(t *testing.T) {
+	payload, _ := json.Marshal(map[string]string{"template": "billing.dunning", "org_id": "org1"})
+	outbox := &fakeOutbox{items: []billing.OutboxItem{
+		{ID: "bad", OrgID: "org1", Kind: billing.OutboxKind("nope"), Payload: payload},
+		{ID: "ok", OrgID: "org1", Kind: billing.OutboxEmailSend, Payload: payload},
+	}}
+	client := &fakeEnqueuer{}
+	b := NewBilling(BillingDeps{
+		Outbox: outbox, Client: client,
+		Orgs: &fakeOrgs{ids: []string{"org1"}}, Logger: discard(),
+	})
+	if err := b.HandleOutboxDrain(context.Background(), nil); err != nil {
+		t.Fatalf("drain: %v", err)
+	}
+	if len(outbox.items) != 0 || len(client.tasks) != 1 || client.tasks[0].taskID != "outbox:ok" {
+		t.Fatalf("undrained=%d tasks=%+v, want unknown kind dropped and outbox:ok enqueued", len(outbox.items), client.tasks)
 	}
 }
 

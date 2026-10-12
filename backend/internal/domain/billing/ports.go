@@ -62,10 +62,14 @@ type UsageRepository interface {
 // rows inside their own write transaction (the webhook does so via
 // WebhookRepository.Apply); the worker claims + drains them per-org.
 type OutboxRepository interface {
-	// ClaimBatch atomically marks up to limit undrained rows drained and returns
-	// them (UPDATE … WHERE drained_at IS NULL RETURNING). The caller enqueues each
-	// to Asynq with TaskID = row id (dedup).
-	ClaimBatch(ctx context.Context, orgID string, limit int) ([]OutboxItem, error)
+	// Drain locks up to limit undrained rows in one tenant transaction and passes
+	// each, oldest first, to handoff (the caller enqueues to Asynq with TaskID =
+	// row id). Only rows whose handoff returned nil are marked drained, in that
+	// same transaction; the first handoff error stops the batch and is returned
+	// after the drained rows commit. A failed handoff, crash or rollback leaves
+	// rows undrained for the next drain (at-least-once handoff, 09 §2), so
+	// handoff must be safe to repeat. Returns the number of rows drained.
+	Drain(ctx context.Context, orgID string, limit int, handoff func(OutboxItem) error) (int, error)
 }
 
 // WebhookMutation is the complete, atomic set of writes a single Stripe event

@@ -48,7 +48,7 @@ purges. Worker: `cmd/worker`, concurrency 10, Prometheus metrics exported.
 
 | Task type | Trigger | Idempotency mechanism |
 |---|---|---|
-| `outbox:drain` | every 5 s (scheduler) | rows claimed via `UPDATE … WHERE drained_at IS NULL RETURNING`; enqueued Asynq task carries outbox id as Asynq TaskID (dedup) |
+| `outbox:drain` | every 5 s (scheduler) | rows locked via `SELECT … WHERE drained_at IS NULL FOR UPDATE SKIP LOCKED`, marked drained in the same tx only after a successful enqueue (failure/crash ⇒ retried next tick); enqueued Asynq task carries outbox id as Asynq TaskID (dedup) |
 | `email:send` | outbox | Asynq TaskID = outbox row id → at-most-once enqueue; SMTP send retried ×5 exp backoff |
 | `usage:aggregate` | hourly cron | UPSERT ON CONFLICT (06 §5) — re-runnable |
 | `usage:push_stripe` | daily 02:00 UTC | Stripe `action=set` (absolute) — re-runnable |

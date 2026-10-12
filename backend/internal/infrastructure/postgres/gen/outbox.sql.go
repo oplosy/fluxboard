@@ -11,27 +11,51 @@ import (
 	"github.com/google/uuid"
 )
 
-const claimOutboxBatch = `-- name: ClaimOutboxBatch :many
-UPDATE outbox SET drained_at = now()
-WHERE id IN (
-  SELECT o.id FROM outbox o
-  WHERE o.org_id = $1 AND o.drained_at IS NULL
-  ORDER BY o.created_at
-  LIMIT $2
-  FOR UPDATE SKIP LOCKED
-)
-RETURNING id, org_id, kind, payload, created_at, drained_at
+const insertOutbox = `-- name: InsertOutbox :exec
+
+INSERT INTO outbox (id, org_id, kind, payload)
+VALUES ($1, $2, $3, $4)
 `
 
-type ClaimOutboxBatchParams struct {
+type InsertOutboxParams struct {
+	ID      uuid.UUID `json:"id"`
+	OrgID   uuid.UUID `json:"org_id"`
+	Kind    string    `json:"kind"`
+	Payload []byte    `json:"payload"`
+}
+
+// Transactional outbox — Phase 4 / 09 §2 --------------------------------------
+// outbox [T]: producers INSERT within their write tx (the webhook does so in
+// webhook_repo); the worker's outbox:drain claims undrained rows and enqueues to
+// Asynq with TaskID = outbox id (at-most-once enqueue).
+func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
+	_, err := q.db.Exec(ctx, insertOutbox,
+		arg.ID,
+		arg.OrgID,
+		arg.Kind,
+		arg.Payload,
+	)
+	return err
+}
+
+const lockOutboxBatch = `-- name: LockOutboxBatch :many
+SELECT id, org_id, kind, payload, created_at, drained_at FROM outbox
+WHERE org_id = $1 AND drained_at IS NULL
+ORDER BY created_at
+LIMIT $2
+FOR UPDATE SKIP LOCKED
+`
+
+type LockOutboxBatchParams struct {
 	OrgID uuid.UUID `json:"org_id"`
 	Lim   int32     `json:"lim"`
 }
 
-// Atomically mark up to @lim undrained rows drained and return them. FOR UPDATE
-// SKIP LOCKED lets concurrent drainers make progress without contending.
-func (q *Queries) ClaimOutboxBatch(ctx context.Context, arg ClaimOutboxBatchParams) ([]Outbox, error) {
-	rows, err := q.db.Query(ctx, claimOutboxBatch, arg.OrgID, arg.Lim)
+// Lock up to @lim undrained rows for the drain tx. FOR UPDATE SKIP LOCKED lets
+// concurrent drainers make progress without contending. The lock dies with the
+// tx, so a crash before MarkOutboxDrained leaves the rows undrained.
+func (q *Queries) LockOutboxBatch(ctx context.Context, arg LockOutboxBatchParams) ([]Outbox, error) {
+	rows, err := q.db.Query(ctx, lockOutboxBatch, arg.OrgID, arg.Lim)
 	if err != nil {
 		return nil, err
 	}
@@ -57,29 +81,19 @@ func (q *Queries) ClaimOutboxBatch(ctx context.Context, arg ClaimOutboxBatchPara
 	return items, nil
 }
 
-const insertOutbox = `-- name: InsertOutbox :exec
-
-INSERT INTO outbox (id, org_id, kind, payload)
-VALUES ($1, $2, $3, $4)
+const markOutboxDrained = `-- name: MarkOutboxDrained :exec
+UPDATE outbox SET drained_at = now()
+WHERE org_id = $1 AND id = ANY($2::uuid[])
 `
 
-type InsertOutboxParams struct {
-	ID      uuid.UUID `json:"id"`
-	OrgID   uuid.UUID `json:"org_id"`
-	Kind    string    `json:"kind"`
-	Payload []byte    `json:"payload"`
+type MarkOutboxDrainedParams struct {
+	OrgID uuid.UUID   `json:"org_id"`
+	Ids   []uuid.UUID `json:"ids"`
 }
 
-// Transactional outbox — Phase 4 / 09 §2 --------------------------------------
-// outbox [T]: producers INSERT within their write tx (the webhook does so in
-// webhook_repo); the worker's outbox:drain claims undrained rows and enqueues to
-// Asynq with TaskID = outbox id (at-most-once enqueue).
-func (q *Queries) InsertOutbox(ctx context.Context, arg InsertOutboxParams) error {
-	_, err := q.db.Exec(ctx, insertOutbox,
-		arg.ID,
-		arg.OrgID,
-		arg.Kind,
-		arg.Payload,
-	)
+// Stamp drained_at on rows already handed off to Asynq, in the same tx that
+// locked them.
+func (q *Queries) MarkOutboxDrained(ctx context.Context, arg MarkOutboxDrainedParams) error {
+	_, err := q.db.Exec(ctx, markOutboxDrained, arg.OrgID, arg.Ids)
 	return err
 }
