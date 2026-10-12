@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 
 import { LegalPage } from '@/components/marketing/legal-page';
+import { SubprocessorTable } from '@/components/marketing/subprocessor-table';
 
 export const metadata: Metadata = { title: 'Data Processing Addendum' };
 
 export default function DpaPage() {
   return (
-    <LegalPage title="Data Processing Addendum" updated="September 17, 2026">
+    <LegalPage title="Data Processing Addendum" updated="October 12, 2026">
       <p>
         This Data Processing Addendum forms part of the agreement between the customer and
         Fluxboard and governs the processing of personal data that the customer entrusts to the
@@ -55,14 +56,15 @@ export default function DpaPage() {
       </p>
       <h2>5. Sub-processors</h2>
       <p>
-        The customer authorizes the following categories of sub-processors: cloud
-        infrastructure for compute, database, cache, and object storage hosted in Türkiye;
-        Stripe for payment processing, which receives only the data required to complete
-        checkout and manage subscriptions; and the email delivery provider used for
-        transactional messages such as verification links and notifications. The current
-        sub-processor list with provider names, functions, and hosting regions is published in
-        the trust center and updated at least thirty days before any addition or replacement,
-        during which the customer may object on reasonable data-protection grounds.
+        The customer authorizes the following sub-processors. Stripe receives only the data
+        required to complete checkout and manage subscriptions; no personal data is sent to an
+        external AI model provider.
+      </p>
+      <SubprocessorTable />
+      <p>
+        This list is kept current on this page and updated at least thirty days before any
+        addition or replacement, during which the customer may object on reasonable
+        data-protection grounds.
       </p>
       <h2>6. Personal data breach</h2>
       <p>

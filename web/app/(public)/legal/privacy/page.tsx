@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 
 import { LegalPage } from '@/components/marketing/legal-page';
+import { SubprocessorTable } from '@/components/marketing/subprocessor-table';
+import { backupRetentionDays, hosting, operator } from '@/lib/legal/operator';
 
 export const metadata: Metadata = { title: 'Privacy Policy' };
 
 export default function PrivacyPage() {
   return (
-    <LegalPage title="Privacy Policy" updated="September 17, 2026">
+    <LegalPage title="Privacy Policy" updated="October 12, 2026">
       <p>
         This policy explains what personal data Fluxboard collects, why it is processed, how
         long it is kept, and which rights you have over it. It applies to visitors of our
@@ -17,13 +19,13 @@ export default function PrivacyPage() {
       </p>
       <h2>1. Data controller</h2>
       <p>
-        The data controller for account and service data is the Fluxboard operating entity
-        identified in your order confirmation. Customers that invite team members or otherwise
-        input personal data of third parties into the service act as separate data controllers
-        for that data; Fluxboard processes it as a data processor under the Data Processing
-        Addendum. For any privacy question, including requests under Article 11 of Law No.
-        6698, contact privacy@fluxboard.local. Requests are answered free of charge within
-        thirty days at the latest.
+        The data controller for account and service data is {operator.entity}, {operator.address}.
+        Customers that invite team members or otherwise input personal data of third parties
+        into the service act as separate data controllers for that data; Fluxboard processes it
+        as a data processor under the Data Processing Addendum. For any privacy question,
+        including requests under Article 11 of Law No. 6698, contact{' '}
+        <a href={`mailto:${operator.privacyEmail}`}>{operator.privacyEmail}</a>. Requests are
+        answered free of charge within thirty days at the latest.
       </p>
       <h2>2. Data we collect</h2>
       <p>
@@ -58,22 +60,27 @@ export default function PrivacyPage() {
       <h2>5. Sharing and sub-processors</h2>
       <p>
         Personal data is not sold and is not shared for third-party marketing. It is disclosed
-        only to sub-processors that are necessary to operate the service: cloud infrastructure
-        for hosting and storage, Stripe for payment processing, and the email delivery provider
-        used for transactional messages. Each sub-processor is bound by a written agreement
-        limiting processing to documented instructions. A current list of sub-processors,
-        including their function and hosting region, is maintained in the Data Processing
-        Addendum and updated before any change takes effect.
+        only to the sub-processors needed to operate the service, each bound by a written
+        agreement limiting processing to documented instructions:
+      </p>
+      <SubprocessorTable />
+      <p>
+        The AI features run on a built-in processor; no personal data is sent to an external AI
+        model provider. If one is ever enabled, it will be added to this list and announced
+        before it receives any data. Changes to the list are announced as described in the Data
+        Processing Addendum.
       </p>
       <h2>6. International transfers</h2>
       <p>
-        Service data is hosted within Türkiye by default. Where a sub-processor transfer
-        outside Türkiye is unavoidable, for example for payment processing, the transfer takes
-        place only with a lawful mechanism: an adequacy decision where available, otherwise
-        standard contractual clauses supplemented by technical measures such as encryption in
-        transit and at rest, or your explicit consent obtained in advance with clear
-        information about the destination country and the associated risks, in line with
-        Article 9 of Law No. 6698.
+        Service data is hosted by {hosting.provider} in {hosting.region}. For users in Türkiye
+        this is a transfer abroad under Article 9 of Law No. 6698; payment data processed by
+        Stripe may also leave Türkiye and the European Economic Area. These transfers rely on a
+        lawful mechanism: an adequacy decision where one exists, otherwise standard contracts
+        under Article 9 of Law No. 6698 (and the European Commission’s standard contractual
+        clauses for transfers out of the EEA), supplemented by encryption in transit and at
+        rest. Where no such mechanism is available for an occasional transfer, it takes place
+        only with your explicit consent after you have been told the destination country and
+        the associated risks.
       </p>
       <h2>7. Retention and deletion</h2>
       <p>
@@ -83,7 +90,12 @@ export default function PrivacyPage() {
         wind-down window for operational recovery, after which personal data is deleted or
         anonymized. Billing records, invoices, and audit events that the law requires us to
         keep, for example under tax legislation, are retained for the statutory period, up to
-        ten years, with access restricted to authorized personnel only.
+        ten years, with access restricted to authorized personnel only. Backups keep deleted
+        data for a limited time so the service can recover from incidents: point-in-time
+        database recovery covers fourteen days, earlier versions of files thirty days, and
+        daily backup copies {backupRetentionDays} days. Deleted data therefore disappears from
+        every backup within {backupRetentionDays} days, and backups are never used to restore
+        data you deleted except to recover from an incident affecting the whole service.
       </p>
       <h2>8. Security measures</h2>
       <p>
@@ -91,8 +103,9 @@ export default function PrivacyPage() {
         additional application-layer checks. Passwords are stored as Argon2id hashes, never in
         plain text. Connections are encrypted in transit, secrets are encrypted at rest, and
         sessions can be revoked individually from the account page. Administrative access is
-        limited, logged, and reviewed. Suspected vulnerabilities can be reported to
-        privacy@fluxboard.local and are triaged promptly.
+        limited, logged, and reviewed. Suspected vulnerabilities can be reported to{' '}
+        <a href={`mailto:${operator.securityEmail}`}>{operator.securityEmail}</a> and are triaged
+        promptly.
       </p>
       <h2>9. Your rights</h2>
       <p>
@@ -102,11 +115,14 @@ export default function PrivacyPage() {
         whom it is transferred domestically or abroad, to request correction of incomplete or
         inaccurate data, to request deletion or destruction under the statutory conditions, to
         object to automated analysis that produces an adverse result, and to claim compensation
-        for unlawful processing. You can update your profile, rotate credentials, review
-        sessions, and export the audit log of your organization directly in the application at
-        any time. Formal requests can be sent to privacy@fluxboard.local from your registered
-        email address; identity may be verified before disclosure. You also have the right to
-        lodge a complaint with the Personal Data Protection Authority.
+        for unlawful processing. In the application you can at any time update your profile,
+        rotate credentials, review and revoke sessions, download a copy of your personal data
+        (account, sign-in identities, organization memberships, and sessions) from the account
+        page, and delete your account. Content you created inside an organization is controlled
+        by that organization; its owners and admins can export or delete it. Other requests can
+        be sent to <a href={`mailto:${operator.privacyEmail}`}>{operator.privacyEmail}</a> from
+        your registered email address; identity may be verified before disclosure. You also
+        have the right to lodge a complaint with the Personal Data Protection Authority.
       </p>
       <h2>10. Children</h2>
       <p>

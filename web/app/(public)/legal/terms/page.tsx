@@ -1,12 +1,13 @@
 import type { Metadata } from 'next';
 
 import { LegalPage } from '@/components/marketing/legal-page';
+import { operator } from '@/lib/legal/operator';
 
 export const metadata: Metadata = { title: 'Terms of Service' };
 
 export default function TermsPage() {
   return (
-    <LegalPage title="Terms of Service" updated="September 17, 2026">
+    <LegalPage title="Terms of Service" updated="October 12, 2026">
       <p>
         These Terms of Service form a binding agreement between you and Fluxboard for the use
         of the hosted project-management service, including all web applications, APIs, and
@@ -105,10 +106,12 @@ export default function TermsPage() {
       </p>
       <h2>10. Governing law and contact</h2>
       <p>
-        These terms are governed by the laws of the Republic of Türkiye, without regard to
-        conflict-of-law rules. Disputes that cannot be resolved amicably fall under the
-        jurisdiction of the competent courts and enforcement offices. For questions about these
-        terms, including data-protection matters, contact privacy@fluxboard.local. Notices sent
+        The service is provided by {operator.entity}, {operator.address}. These terms are
+        governed by the laws of {operator.governingLaw}, without regard to conflict-of-law
+        rules. Disputes that cannot be resolved amicably fall under the jurisdiction of the
+        competent courts and enforcement offices. For questions about these terms, including
+        data-protection matters, contact{' '}
+        <a href={`mailto:${operator.privacyEmail}`}>{operator.privacyEmail}</a>. Notices sent
         to your registered email address are deemed received within a reasonable time after
         dispatch.
       </p>

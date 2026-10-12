@@ -26,6 +26,11 @@ export function deleteMe(): Promise<void> {
   return apiFetch('/me', { method: 'DELETE' });
 }
 
+/** The caller's personal data export (GET /me/export, report B09) as JSON. */
+export function exportMyData(): Promise<unknown> {
+  return apiFetch('/me/export');
+}
+
 /** Upload the avatar bytes directly to MinIO via the presigned PUT URL. */
 export async function putToPresignedUrl(url: string, file: File): Promise<void> {
   const res = await fetch(url, {

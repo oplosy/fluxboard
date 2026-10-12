@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/auth/field';
 import { useToast } from '@/components/ui/toast';
-import { getMe, updateMe, avatarUploadURL, avatarConfirm, putToPresignedUrl } from '@/lib/api/user';
+import { getMe, updateMe, avatarUploadURL, avatarConfirm, putToPresignedUrl, exportMyData } from '@/lib/api/user';
 
 export default function ProfilePage() {
   const queryClient = useQueryClient();
@@ -127,6 +127,44 @@ export default function ProfilePage() {
           </Button>
         </CardContent>
       </Card>
+
+      <DataExportCard />
     </div>
+  );
+}
+
+// Self-service copy of the caller's personal data (KVKK art. 11, GDPR art. 15/20).
+function DataExportCard() {
+  const { toast } = useToast();
+  const download = useMutation({
+    mutationFn: exportMyData,
+    onSuccess: (data) => {
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `fluxboard-personal-data-${new Date().toISOString().slice(0, 10)}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+    },
+    onError: () => toast({ title: 'Could not prepare your data export', variant: 'error' }),
+  });
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Your data</CardTitle>
+      </CardHeader>
+      <CardContent className="space-y-3 text-sm text-muted-foreground">
+        <p>
+          Download a copy of your account data, sign-in identities, organization memberships,
+          and sessions as JSON. Content you created inside an organization is controlled by
+          that organization; ask an owner or admin to export it.
+        </p>
+        <Button variant="outline" size="sm" onClick={() => download.mutate()} disabled={download.isPending}>
+          {download.isPending ? 'Preparing…' : 'Download my data'}
+        </Button>
+      </CardContent>
+    </Card>
   );
 }
