@@ -2,6 +2,10 @@
 .env
 *.pem
 
+# Database dumps (docs/runbooks/restore.md) hold every tenant's data
+backups/
+*.dump
+
 # Go build output
 backend/tmp/
 backend/bin/
