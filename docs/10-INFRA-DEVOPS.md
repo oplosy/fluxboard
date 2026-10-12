@@ -8,10 +8,10 @@
 |---|---|---|---|
 | postgres | postgres:16-alpine | 5432 | volume `pgdata`; init script creates roles `fluxboard_owner/app/admin_ro`; healthcheck `pg_isready` |
 | redis | redis:7-alpine | 6379 | `--appendonly yes` |
-| minio | minio/minio | 9000/9001 | volume; `minio-init` one-shot creates bucket `fluxboard` + access policy |
+| rustfs | rustfs/rustfs:1.0.1 | 9000/9001 | S3-compatible store (ADR-027), network alias `minio`; volume `rustfsdata`; console at `:9001/rustfs/console/`; `storage-init` (amazon/aws-cli) one-shot creates private bucket `fluxboard` + CORS for `STORAGE_CORS_ORIGINS` |
 | stripe-cli | stripe/stripe-cli | — | `listen --forward-to api:8080/api/v1/webhooks/stripe`; webhook secret injected via env |
 | mailpit | axllent/mailpit | 8025 (UI) / 1025 (SMTP) | local email capture |
-| api | build backend (target api) | 8080 | depends_on healthy pg/redis/minio; hot reload via `air` in dev override |
+| api | build backend (target api) | 8080 | depends_on healthy pg/redis/rustfs; hot reload via `air` in dev override |
 | worker | build backend (target worker) | — | shares image with api |
 | web | build web / `next dev` | 3000 | |
 | prometheus | prom/prometheus | 9090 | scrape api:8080/metrics, worker:8081/metrics |

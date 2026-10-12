@@ -50,7 +50,7 @@ Next.js 16 + React 19 (App Router, TypeScript strict) · TanStack Query · Tailw
 
 ```bash
 cp .env.example .env      # local dev defaults; edit secrets as needed
-make up                   # docker compose: postgres, redis, minio, mailpit,
+make up                   # docker compose: postgres, redis, rustfs (S3), mailpit,
                           #   prometheus, grafana, asynqmon, api, worker
 make migrate              # apply migrations (owner role)
 make api                  # (or run in-stack) API with hot reload via air
