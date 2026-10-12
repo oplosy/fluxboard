@@ -29,6 +29,8 @@ components:
   config:         { in: internal/config }
   # cmd/* is the only place wiring may import across every layer (DI container).
   cmd:            { in: cmd/** }
+  # Embedded migration files (schema version for /readyz); a leaf like config.
+  migrations:     { in: migrations }
   # sqlc output: imported by every repository, so it is shared, not layered.
   gen:            { in: internal/infrastructure/postgres/gen }
 
@@ -51,4 +53,4 @@ deps:
   interface:
     mayDependOn: [domain, usecase, pkg, config, interface]
   cmd:
-    mayDependOn: [domain, usecase, infrastructure, interface, pkg, config]
+    mayDependOn: [domain, usecase, infrastructure, interface, pkg, config, migrations]

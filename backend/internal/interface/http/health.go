@@ -14,10 +14,12 @@ type Pinger interface {
 
 // Health serves liveness and readiness probes (docs/10-INFRA-DEVOPS.md §6).
 // Liveness (/healthz) says only "process is up" so a dependency blip never
-// triggers a restart loop. Readiness (/readyz) gates traffic on DB + Redis.
+// triggers a restart loop. Readiness (/readyz) gates traffic on DB + Redis and
+// on the schema being migrated to at least this binary's version.
 type Health struct {
-	DB    Pinger
-	Redis Pinger
+	DB         Pinger
+	Redis      Pinger
+	Migrations Pinger
 }
 
 // Live handles /healthz: always 200 if the process can serve.
@@ -33,7 +35,7 @@ func (h Health) Ready(w http.ResponseWriter, r *http.Request) {
 
 	checks := map[string]string{}
 	ok := true
-	for name, dep := range map[string]Pinger{"database": h.DB, "redis": h.Redis} {
+	for name, dep := range map[string]Pinger{"database": h.DB, "redis": h.Redis, "migrations": h.Migrations} {
 		if dep == nil {
 			checks[name] = "unconfigured"
 			ok = false
