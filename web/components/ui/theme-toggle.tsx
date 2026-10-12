@@ -39,12 +39,17 @@ function useAnimatedSetTheme() {
     const vt = doc.startViewTransition(() => {
       flushSync(() => setTheme(next));
     });
-    void vt.ready.then(() => {
-      document.documentElement.animate(
-        { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
-        { duration: 650, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', pseudoElement: '::view-transition-new(root)' },
-      );
-    });
+    void vt.ready
+      .then(() => {
+        document.documentElement.animate(
+          { clipPath: [`circle(0px at ${x}px ${y}px)`, `circle(${r}px at ${x}px ${y}px)`] },
+          { duration: 650, easing: 'cubic-bezier(0.76, 0, 0.24, 1)', pseudoElement: '::view-transition-new(root)' },
+        );
+      })
+      // `ready` rejects when the browser skips the transition (hidden tab, a
+      // newer transition, invalid state). The theme is already applied by the
+      // update callback, so there is just no wipe to play.
+      .catch(() => {});
   };
 }
 

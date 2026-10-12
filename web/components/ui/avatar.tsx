@@ -34,7 +34,10 @@ export function Avatar({ name, src, size = 'md', className }: AvatarProps) {
   const hue = nameToHue(displayName);
 
   if (src) {
+    // `src` is a short-lived presigned object-store URL (useruc), so it must not
+    // go through next/image: its optimizer would proxy and cache an expiring URL.
     return (
+      // eslint-disable-next-line @next/next/no-img-element
       <img
         src={src}
         alt={displayName}
