@@ -394,10 +394,12 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 			Logger: logger,
 		})
 		analyticsSvc := analyticsuc.New(analyticsuc.Deps{
-			Stats: analyticsRepo,
-			Usage: analyticsRepo,
-			Subs:  postgres.NewSubscriptionRepo(tenantPool),
-			Plans: postgres.NewPlanRepo(pool),
+			Stats:    analyticsRepo,
+			Projects: projectRepo,
+			Members:  projectMemberRepo,
+			Usage:    analyticsRepo,
+			Subs:     postgres.NewSubscriptionRepo(tenantPool),
+			Plans:    postgres.NewPlanRepo(pool),
 		})
 		auditSvc := audituc.New(audituc.Deps{Reader: postgres.NewAuditReadRepo(pool)})
 		adminSvc := adminuc.New(adminuc.Deps{
