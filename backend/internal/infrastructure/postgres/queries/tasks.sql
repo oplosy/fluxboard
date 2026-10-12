@@ -74,7 +74,8 @@ WHERE org_id = @org_id AND deleted_at IS NOT NULL AND deleted_at < @cutoff;
 -- Full-text search (FR-TASK-007) --------------------------------------------
 
 -- name: SearchTasks :many
--- Org-wide task search over title+description with optional facet filters.
+-- Org-wide task search over title+description with optional facet filters. An
+-- empty @query skips the text match (facet-only listing, newest first).
 -- Visibility is enforced in-DB: a caller sees a task only if the caller is an
 -- org admin (@see_all), or a member of the project, or the project is 'org'-
 -- visible and the caller may see those (@see_org_visible: org MEMBER+, never
@@ -91,7 +92,7 @@ LEFT JOIN task_labels tl ON tl.task_id = t.id AND tl.org_id = t.org_id
 WHERE t.org_id = @org_id
   AND t.deleted_at IS NULL
   AND p.archived_at IS NULL
-  AND t.search_vector @@ websearch_to_tsquery('simple', @query)
+  AND (@query::text = '' OR t.search_vector @@ websearch_to_tsquery('simple', @query))
   AND (@see_all::bool OR (@see_org_visible::bool AND p.visibility = 'org') OR EXISTS (
         SELECT 1 FROM project_members pm
         WHERE pm.project_id = p.id AND pm.user_id = @user_id))
@@ -100,7 +101,8 @@ WHERE t.org_id = @org_id
   AND (sqlc.narg('column_id')::uuid IS NULL OR t.column_id = sqlc.narg('column_id'))
   AND (sqlc.narg('priority')::text IS NULL OR t.priority = sqlc.narg('priority'))
   AND (sqlc.narg('label_id')::uuid IS NULL OR tl.label_id = sqlc.narg('label_id'))
-ORDER BY ts_rank(t.search_vector, websearch_to_tsquery('simple', @query)) DESC,
+ORDER BY CASE WHEN @query::text = '' THEN 0
+              ELSE ts_rank(t.search_vector, websearch_to_tsquery('simple', @query)) END DESC,
          t.created_at DESC
 LIMIT @lim OFFSET @off;
 

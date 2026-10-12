@@ -298,7 +298,8 @@ type Querier interface {
 	// caller, so one user cannot revoke another's session. Returns rows affected.
 	RevokeUserSessionByID(ctx context.Context, arg RevokeUserSessionByIDParams) (int64, error)
 	// Full-text search (FR-TASK-007) --------------------------------------------
-	// Org-wide task search over title+description with optional facet filters.
+	// Org-wide task search over title+description with optional facet filters. An
+	// empty @query skips the text match (facet-only listing, newest first).
 	// Visibility is enforced in-DB: a caller sees a task only if the caller is an
 	// org admin (@see_all), or a member of the project, or the project is 'org'-
 	// visible and the caller may see those (@see_org_visible: org MEMBER+, never

@@ -697,6 +697,14 @@ func (e *isoEnv) testGuestVisibility(t *testing.T) {
 	if rec := e.as("guest@demo.dev", http.MethodGet, apiSearch, ""); rec.Code != http.StatusOK || searchTotal(rec) != 0 {
 		t.Errorf("guest search in API = %d %s, want 0 hits", rec.Code, snippet(rec.Body.Bytes()))
 	}
+	// Facet-only listing (no text query) takes the same visibility filter.
+	apiList := org + "/tasks/search?project_id=" + api
+	if rec := e.as("member@demo.dev", http.MethodGet, apiList, ""); rec.Code != http.StatusOK || searchTotal(rec) == 0 {
+		t.Errorf("control: member facet-only list in API = %d %s, want hits", rec.Code, snippet(rec.Body.Bytes()))
+	}
+	if rec := e.as("guest@demo.dev", http.MethodGet, apiList, ""); rec.Code != http.StatusOK || searchTotal(rec) != 0 {
+		t.Errorf("guest facet-only list in API = %d %s, want 0 hits", rec.Code, snippet(rec.Body.Bytes()))
+	}
 
 	if rec := e.as("guest@demo.dev", http.MethodGet, org+"/projects/"+api, ""); rec.Code != http.StatusNotFound {
 		t.Errorf("guest GET API project = %d, want 404", rec.Code)
