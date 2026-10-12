@@ -6,8 +6,9 @@ on:
   pull_request:
     branches: [main]
 
-# Jobs mirror docs/10-INFRA-DEVOPS.md §4. main has no branch protection yet,
-# so these checks are not required to merge (docs/12-TESTING.md §9).
+# Jobs mirror docs/10-INFRA-DEVOPS.md §4. All five are required status checks
+# on main's branch protection; renaming a job breaks merging until the
+# protection rule is updated (docs/12-TESTING.md §9).
 env:
   GO_VERSION: "1.26"
 
