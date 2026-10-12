@@ -232,8 +232,7 @@ func (s *Service) CreateProject(ctx context.Context, orgID, userID string, in Cr
 
 // ListProjects returns the projects visible to the caller (FR-PROJ-002).
 func (s *Service) ListProjects(ctx context.Context, orgID, userID string, orgRole tenant.OrgRole, includeArchived bool) ([]project.Project, error) {
-	seeAll := project.SeesAllProjects(orgRole)
-	return s.projects.List(ctx, orgID, userID, seeAll, includeArchived)
+	return s.projects.List(ctx, orgID, userID, project.ScopeFor(orgRole), includeArchived)
 }
 
 // GetProject returns a single project the caller may view.

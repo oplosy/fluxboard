@@ -122,6 +122,9 @@ Plus:
 - INSERT with mismatched org_id under RLS `WITH CHECK` → error (42501)
 - Search/FTS endpoint never returns foreign-org or hidden-private-project hits
   (seeded marker strings), with positive controls proving the markers match
+- An org GUEST (`guest@`, VIEWER on `WEB` only) lists only `WEB`, gets search
+  hits only from `WEB` (none when filtering to org-visible `API`) and 404 on
+  `API` itself (FR-TEN-010); `member@` seeing `API` is the control
 - Presigned download for foreign-org attachment id → 404 before presign (the
   rightful owner gets a `download_url`, proving the store is wired)
 
@@ -129,7 +132,8 @@ Positive controls (A's member reads A, B's owner reads B's seeded IDs) run
 first, so a broken login or fixture cannot make the negative checks pass
 vacuously. The first run found `GET /projects/{id}/analytics` answering 200 for
 a foreign project (and exposing private-project stats inside a tenant); fixed in
-`analyticsuc`.
+`analyticsuc`. Guests also used to see every org-visible project in the project
+list and task search; both queries now take the role's project scope.
 
 ## 7. Billing Reliability Suite (Phase-4 gate)
 

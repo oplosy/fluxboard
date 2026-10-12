@@ -18,7 +18,8 @@ import (
 //   - anyone else cannot see the project: domain.ErrNotFound, so a hidden
 //     project is indistinguishable from a missing one.
 func EffectiveRole(ctx context.Context, members ProjectMemberRepository, orgID string, p *Project, userID string, orgRole tenant.OrgRole) (ProjectRole, error) {
-	if SeesAllProjects(orgRole) {
+	scope := ScopeFor(orgRole)
+	if scope.All {
 		return RoleLead, nil
 	}
 	m, err := members.Get(ctx, orgID, p.ID, userID)
@@ -28,15 +29,23 @@ func EffectiveRole(ctx context.Context, members ProjectMemberRepository, orgID s
 	if !errors.Is(err, domain.ErrNotFound) {
 		return "", err
 	}
-	if p.Visibility == VisibilityOrg && orgRole.AtLeast(tenant.RoleMember) {
+	if p.Visibility == VisibilityOrg && scope.OrgVisible {
 		return RoleViewer, nil
 	}
 	return "", domain.ErrNotFound
 }
 
-// SeesAllProjects reports whether the org role sees every project in the org
-// (org ADMIN/OWNER). List and search queries use it as their see-all switch.
-func SeesAllProjects(orgRole tenant.OrgRole) bool { return orgRole.AtLeast(tenant.RoleAdmin) }
+// Scope is which projects an org role sees without a membership row — the
+// list/search side of EffectiveRole. Membership rows are always visible on top.
+type Scope struct {
+	All        bool // every project (org ADMIN/OWNER)
+	OrgVisible bool // 'org'-visible projects (org MEMBER+; never GUEST, FR-TEN-010)
+}
+
+// ScopeFor returns the project scope of an org role.
+func ScopeFor(orgRole tenant.OrgRole) Scope {
+	return Scope{All: orgRole.AtLeast(tenant.RoleAdmin), OrgVisible: orgRole.AtLeast(tenant.RoleMember)}
+}
 
 // Access loads a project and requires at least min on it, returning the project
 // and the caller's effective role. Not visible (or missing) → domain.ErrNotFound;

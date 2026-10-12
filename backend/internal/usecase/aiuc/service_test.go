@@ -177,7 +177,7 @@ func (f *fakeProjects) Get(_ context.Context, _, id string) (*project.Project, e
 }
 
 func (f *fakeProjects) Create(_ context.Context, _ string, _ *project.Project) error { return nil }
-func (f *fakeProjects) List(_ context.Context, _, _ string, _, _ bool) ([]project.Project, error) {
+func (f *fakeProjects) List(_ context.Context, _, _ string, _ project.Scope, _ bool) ([]project.Project, error) {
 	return nil, nil
 }
 func (f *fakeProjects) Update(_ context.Context, _ string, _ *project.Project) error { return nil }

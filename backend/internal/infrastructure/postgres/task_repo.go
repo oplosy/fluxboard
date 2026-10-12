@@ -353,8 +353,8 @@ func (r *TaskRepo) Search(ctx context.Context, orgID string, f project.SearchFil
 	out := &project.SearchResult{}
 	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
 		rows, err := q.SearchTasks(ctx, gen.SearchTasksParams{
-			OrgID: oid, Query: f.Query, SeeAll: f.SeeAll, UserID: userID,
-			ProjectID: proj, AssigneeID: assignee, ColumnID: col,
+			OrgID: oid, Query: f.Query, SeeAll: f.Scope.All, SeeOrgVisible: f.Scope.OrgVisible,
+			UserID: userID, ProjectID: proj, AssigneeID: assignee, ColumnID: col,
 			Priority: ptrOrNil(f.Priority), LabelID: label,
 			Off: int32(f.Offset), Lim: int32(f.Limit),
 		})

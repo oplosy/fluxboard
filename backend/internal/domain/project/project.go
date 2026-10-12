@@ -367,7 +367,7 @@ type Attachment struct {
 type SearchFilter struct {
 	Query      string
 	UserID     string // the caller (for private-project visibility)
-	SeeAll     bool   // caller is org ADMIN+ (sees every project)
+	Scope      Scope  // projects the caller sees beyond their memberships
 	ProjectID  string
 	AssigneeID string
 	ColumnID   string

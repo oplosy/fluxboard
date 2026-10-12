@@ -17,10 +17,11 @@ type ProjectRepository interface {
 	Create(ctx context.Context, orgID string, p *Project) error
 	// Get returns a project by id, or domain.ErrNotFound.
 	Get(ctx context.Context, orgID, id string) (*Project, error)
-	// List returns projects visible to userID. seeAll (org ADMIN+) returns every
-	// project; otherwise 'org'-visible projects plus 'private' ones the user is a
-	// member of. includeArchived toggles archived projects (FR-PROJ-002/006).
-	List(ctx context.Context, orgID, userID string, seeAll, includeArchived bool) ([]Project, error)
+	// List returns projects visible to userID: every project when scope.All,
+	// otherwise the projects userID is a member of plus, when scope.OrgVisible,
+	// the 'org'-visible ones. includeArchived toggles archived projects
+	// (FR-PROJ-002/006, FR-TEN-010).
+	List(ctx context.Context, orgID, userID string, scope Scope, includeArchived bool) ([]Project, error)
 	// Update sets name, description, color and visibility.
 	Update(ctx context.Context, orgID string, p *Project) error
 	// SetArchived sets or clears archived_at (FR-PROJ-006).

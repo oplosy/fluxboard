@@ -110,10 +110,10 @@ WHERE p.org_id = $1
   AND ($2::bool OR p.archived_at IS NULL)
   AND (
         $3::bool
-        OR p.visibility = 'org'
+        OR ($4::bool AND p.visibility = 'org')
         OR EXISTS (
           SELECT 1 FROM project_members pm
-          WHERE pm.project_id = p.id AND pm.user_id = $4
+          WHERE pm.project_id = p.id AND pm.user_id = $5
         )
       )
 ORDER BY p.created_at DESC
@@ -123,6 +123,7 @@ type ListProjectsParams struct {
 	OrgID           uuid.UUID `json:"org_id"`
 	IncludeArchived bool      `json:"include_archived"`
 	SeeAll          bool      `json:"see_all"`
+	SeeOrgVisible   bool      `json:"see_org_visible"`
 	UserID          uuid.UUID `json:"user_id"`
 }
 
@@ -140,13 +141,15 @@ type ListProjectsRow struct {
 	UpdatedAt   time.Time          `json:"updated_at"`
 }
 
-// Visibility filter (FR-PROJ-002/003): see_all (org ADMIN+) returns every
-// project; otherwise 'org'-visible plus 'private' ones the user is a member of.
+// Visibility filter (FR-PROJ-002/003, FR-TEN-010): see_all (org ADMIN+) returns
+// every project; otherwise the user's memberships plus, with see_org_visible
+// (org MEMBER+, never GUEST), the 'org'-visible ones.
 func (q *Queries) ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error) {
 	rows, err := q.db.Query(ctx, listProjects,
 		arg.OrgID,
 		arg.IncludeArchived,
 		arg.SeeAll,
+		arg.SeeOrgVisible,
 		arg.UserID,
 	)
 	if err != nil {
