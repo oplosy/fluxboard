@@ -110,8 +110,12 @@ against the service containers. `make test` = unit; `make test-integration` =
 the same integration suites against the local compose stack (`make up` +
 `make migrate` first).
 
-**Not yet true:** `main` has no branch protection, so no check is *required*
-— a red PR can still be merged. Target: make all five jobs required checks
-(plus the tenant-isolation and billing suites once they exist); Playwright smoke
-(journeys 1–3) on PR, full set nightly. Flake policy: quarantine label +
-issue, never retry-until-green as a merge strategy.
+**Branch protection on `main`** (since 2026-10-12): all five jobs are required
+status checks; changes land only through a PR (no approval count, so a solo
+maintainer can merge their own PR); the rules apply to admins too; force pushes
+and branch deletion are blocked. Branches do not have to be up to date with
+`main` before merging (AGENTS.md still asks for a rebase before opening the PR).
+
+Still target: add the tenant-isolation and billing suites as required checks
+once they exist; Playwright smoke (journeys 1–3) on PR, full set nightly. Flake
+policy: quarantine label + issue, never retry-until-green as a merge strategy.
