@@ -2,16 +2,26 @@
 
 ## 1. Test Pyramid & Targets
 
-| Layer | Tooling | Scope | Coverage target |
-|---|---|---|---|
-| Unit (Go) | stdlib testing + testify | domain logic, rank math, token gen, entitlement derivation, JWT/Argon2 params | usecase ≥ 85%, billing pkg ≥ 95% |
-| Integration (Go) | testcontainers-go (pg, redis, minio) | repositories against real PG (RLS active!), webhook consumer, jobs | all repos + consumer |
-| API contract | Go httptest against wired router | every endpoint: happy + authz + validation + error envelope | every route ≥ 1 authz-negative test |
-| E2E | Playwright | 6 golden journeys (below) | smoke in CI, full nightly |
-| Load/abuse | k6 | board under concurrency, rate-limit behavior, SSE fan-out | profiles recorded in README |
+This document is the **target** strategy. The Status column records what
+exists today (checked 2026-10-12); "planned" rows are not implemented and must
+not be cited as coverage.
+
+| Layer | Tooling | Scope | Coverage target | Status |
+|---|---|---|---|---|
+| Unit (Go) | stdlib `testing` (no assertion library) | domain logic, rank math, token gen, entitlement derivation, JWT/Argon2 params | usecase ≥ 85%, billing pkg ≥ 95% | In place (`go test ./...`); coverage targets not measured in CI |
+| Unit (web) | Vitest + Testing Library | API client, components | — | In place (`pnpm test`, 3 files) |
+| Integration (Go) | `//go:build integration` suites against real services: CI service containers (Postgres 16, Redis 7, RustFS S3 — ADR-027), the compose stack locally | repositories against real PG (RLS active!), object store, webhook consumer, jobs | all repos + consumer | Partial: webhook repo idempotency (`postgres/`) and object-store adapter (`minio/`) only |
+| API contract | Go httptest against wired router | every endpoint: happy + authz + validation + error envelope | every route ≥ 1 authz-negative test | Partial: handler tests exist for some routes; no per-route authz-negative gate |
+| E2E | Playwright | 6 golden journeys (below) | smoke in CI, full nightly | Planned — not in the repo; manual PowerShell smokes in `scripts/smoke/` |
+| Load/abuse | k6 | board under concurrency, rate-limit behavior, SSE fan-out | profiles recorded in README | Planned — not in the repo |
 
 Integration tests run against **RLS-enabled** schema with the `fluxboard_app`
 role — testing with a superuser would silently bypass the exact layer under test.
+The Postgres suite enforces this: it fails if the DSN role is a superuser or
+`BYPASSRLS`. Every integration suite **fails rather than skips** when its
+connection setting (`TEST_DATABASE_URL`, `TEST_S3_ENDPOINT`) is missing, so a
+green run means the suite actually ran. testcontainers-go was the original plan;
+CI uses service containers instead, and suites take their endpoints from env.
 
 ## 2. Golden E2E Journeys (Playwright)
 
@@ -47,12 +57,21 @@ role — testing with a superuser would silently bypass the exact layer under te
 
 ## 5. Seed Data (`make seed`)
 
+**Status: planned.** `make seed` is currently a stub that only prints a
+message; the fixture below is the target. Until it exists, a fresh database has
+no `plans` rows, so entitlement-gated writes (e.g. project create) fail with
+`load free plan: not found`.
+
 Deterministic fixture (fixed UUIDs, fixed clock):
 - Users: `owner@demo.dev`, `admin@…`, `member@…`, `guest@…`, `outsider@…` (all password `Demo-Pass-2026!`), `padmin@…` (platform admin, TOTP seeded)
 - Orgs: `acme` (Business, active, 20 members, 6 projects, 400 tasks, usage history 30d), `beta-co` (Free, 2 members), `pastdue-inc` (Pro, past_due)
 - One project per state: active/archived/private; tasks distributed across columns with realistic timestamps (feeds analytics rollup verification)
 
 ## 6. Tenant Isolation Suite (Phase-2 gate — must be exhaustive, generated)
+
+**Status: planned.** No generated suite exists yet. Isolation is currently
+backed by RLS plus per-usecase tests (e.g. the AI private-project tests in
+`aiuc`); the matrix below is the target.
 
 Test generator iterates **every tenant-scoped endpoint** (route table
 introspection) × principal in {member-of-A, admin-of-A, outsider} attempting
@@ -84,7 +103,15 @@ correctness; `resync` on over-aged cursor; 500-connection fan-out k6 profile.
 
 ## 9. CI Wiring
 
-`make test` = unit; `make test-integration` = testcontainers suites (tenant
-isolation + billing suites are REQUIRED status checks); Playwright smoke
+Today (`.github/workflows/ci.yml`): jobs `lint`, `test-backend`, `build`, `web`,
+`security` on every PR to `main`. `test-backend` runs `go test ./...`, then
+bootstraps the roles and migrations and runs `go test -tags=integration ./...`
+against the service containers. `make test` = unit; `make test-integration` =
+the same integration suites against the local compose stack (`make up` +
+`make migrate` first).
+
+**Not yet true:** `main` has no branch protection, so no check is *required*
+— a red PR can still be merged. Target: make all five jobs required checks
+(plus the tenant-isolation and billing suites once they exist); Playwright smoke
 (journeys 1–3) on PR, full set nightly. Flake policy: quarantine label +
 issue, never retry-until-green as a merge strategy.
