@@ -51,7 +51,7 @@ Plan limits are enforced server-side by the **entitlement middleware**
 ## 4. Tech Stack Summary
 
 Backend Go 1.25 (chi, sqlc, pgx, Casbin, Asynq, stripe-go), PostgreSQL 16
-(RLS), Redis 7, MinIO, Next.js 14 App Router + TypeScript strict + TanStack
+(RLS), Redis 7, MinIO, Next.js 16 App Router + TypeScript strict + TanStack
 Query + Tailwind/shadcn, Prometheus + Grafana, Docker Compose. Full rationale
 and rejected alternatives in 03-ARCHITECTURE.md §ADR.
 

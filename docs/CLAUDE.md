@@ -32,7 +32,7 @@ project demonstrating senior-level backend engineering.
 - **Cache/Queue:** Redis 7 (go-redis/v9), Asynq for background jobs
 - **Payments:** Stripe (stripe-go/v78), Stripe CLI for local webhook forwarding
 - **Object storage:** MinIO (S3-compatible), presigned URLs
-- **Frontend:** Next.js 14 App Router, TypeScript strict, TanStack Query v5, Tailwind, shadcn/ui, dnd-kit (kanban), Recharts
+- **Frontend:** Next.js 16 App Router (React 19, ADR-026), TypeScript strict, TanStack Query v5, Tailwind, shadcn/ui, dnd-kit (kanban), Recharts
 - **Observability:** Prometheus + Grafana, structured logging with slog (JSON)
 - **Local dev:** Docker Compose (single `make up` brings everything up)
 

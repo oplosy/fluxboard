@@ -32,7 +32,7 @@ Local operation procedures are collected in [`docs/runbooks/`](docs/runbooks/).
 - **6 — Admin + observability** — platform-admin surface, audit-log viewer, org
   API keys, project analytics, Prometheus + Grafana.
 - **7 — Frontend** — every page in `docs/02-SITEMAP.md` wired to the API
-  (Next.js 14 App Router, TypeScript strict, 55 `page.tsx` route files).
+  (Next.js 16 App Router, TypeScript strict).
 
 Per-phase scope and the resumable build checklist are in
 [`docs/build/`](docs/build/). Deferred, non-blocking follow-ups: dockerized
@@ -44,7 +44,7 @@ deep-linking (ADR-018).
 
 Go 1.25 · chi · sqlc + pgx/v5 · golang-migrate · PostgreSQL 16 (RLS) ·
 Redis 7 · Asynq · MinIO · Stripe · Prometheus + Grafana · slog (JSON) ·
-Next.js 14 (App Router, TypeScript strict) · TanStack Query · Tailwind + shadcn/ui.
+Next.js 16 + React 19 (App Router, TypeScript strict) · TanStack Query · Tailwind + shadcn/ui.
 
 ## Quickstart
 
@@ -71,7 +71,7 @@ Run `make help` for all targets.
 
 ```
 backend/     Go module: cmd/{api,worker}, internal/{domain,usecase,infrastructure,interface,pkg}
-web/         Next.js 14 App Router frontend (pnpm)
+web/         Next.js 16 App Router frontend (pnpm)
 deploy/      docker-compose (+dev override), postgres init, prometheus, grafana
 docs/        full specification (source of truth)
 scripts/     smoke tests + tooling
