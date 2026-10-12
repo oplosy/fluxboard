@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { useOrg } from '@/lib/org/context';
@@ -10,7 +10,8 @@ import { ProjectHeader } from '@/components/board/project-header';
 import { TaskCalendar } from '@/components/board/calendar';
 import { Button } from '@/components/ui/button';
 
-export default function ProjectCalendarPage({ params }: { params: { projectKey: string } }) {
+export default function ProjectCalendarPage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { orgId, slug } = useOrg();
   const queryClient = useQueryClient();
   const { project, isLoading, isError } = useProjectByKey(params.projectKey);

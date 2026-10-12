@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Play, CheckCircle2, Trash2, Plus } from 'lucide-react';
 
@@ -32,7 +32,8 @@ function statusBadge(s: Sprint['status']): string {
       : 'bg-sky-500/15 text-sky-700 dark:text-sky-400';
 }
 
-export default function ProjectSprintsPage({ params }: { params: { projectKey: string } }) {
+export default function ProjectSprintsPage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { orgId, slug } = useOrg();
   const queryClient = useQueryClient();
   const { toast } = useToast();

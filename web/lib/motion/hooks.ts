@@ -25,7 +25,7 @@ export function prefersReducedMotion(): boolean {
  * itself is fully clipped (clip-path reveals never intersect).
  */
 export function useInView<T extends Element>(
-  ref: RefObject<T>,
+  ref: RefObject<T | null>,
   { once = true, rootMargin = '0px 0px -12% 0px', threshold = 0.1, observeParent = false } = {},
 ): boolean {
   const [inView, setInView] = useState(false);
@@ -79,7 +79,7 @@ export function usePresence(open: boolean, duration = 200): { mounted: boolean; 
 }
 
 /** Scroll progress (0..1) of an element travelling through the viewport. */
-export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T>): number {
+export function useScrollProgress<T extends HTMLElement>(ref: RefObject<T | null>): number {
   const [progress, setProgress] = useState(0);
   useEffect(() => {
     let raf = 0;

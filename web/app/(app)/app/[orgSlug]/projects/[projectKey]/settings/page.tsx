@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
@@ -26,7 +26,8 @@ import { FormsManager } from '@/components/board/forms-manager';
 import type { BoardColumn, Project, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
-export default function ProjectSettingsPage({ params }: { params: { projectKey: string } }) {
+export default function ProjectSettingsPage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { slug, isAdmin } = useOrg();
   const { project, isLoading, isError } = useProjectByKey(params.projectKey);
 

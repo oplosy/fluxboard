@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -13,11 +14,10 @@ import { TaskDetail } from '@/components/task/task-detail';
 // links here). The modal-over-board interception is deferred (ADR-018) — a
 // parallel/intercepting route over the client board adds fragility for little
 // gain now, and the full page is the source of truth either way.
-export default function TaskDetailPage({
-  params,
-}: {
-  params: { projectKey: string; taskNumber: string };
+export default function TaskDetailPage(props: {
+  params: Promise<{ projectKey: string; taskNumber: string }>;
 }) {
+  const params = use(props.params);
   const { slug } = useOrg();
   const number = Number(params.taskNumber);
   const { project, isLoading: projectLoading, isError: projectError } = useProjectByKey(params.projectKey);

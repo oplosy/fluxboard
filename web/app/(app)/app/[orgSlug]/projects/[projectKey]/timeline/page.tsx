@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo } from 'react';
+import { use, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 
 import { useOrg } from '@/lib/org/context';
@@ -9,7 +9,8 @@ import { getBoard } from '@/lib/api/board';
 import { ProjectHeader } from '@/components/board/project-header';
 import { Timeline } from '@/components/board/timeline';
 
-export default function ProjectTimelinePage({ params }: { params: { projectKey: string } }) {
+export default function ProjectTimelinePage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { orgId, slug } = useOrg();
   const { project, isLoading, isError } = useProjectByKey(params.projectKey);
 

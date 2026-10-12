@@ -1,5 +1,6 @@
 'use client';
 
+import { use } from 'react';
 import Link from 'next/link';
 
 import { useOrg } from '@/lib/org/context';
@@ -7,7 +8,8 @@ import { useProjectByKey } from '@/lib/board/use-project';
 import { ProjectHeader } from '@/components/board/project-header';
 import { Board } from '@/components/board/board';
 
-export default function ProjectBoardPage({ params }: { params: { projectKey: string } }) {
+export default function ProjectBoardPage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { slug } = useOrg();
   const { project, isLoading, isError } = useProjectByKey(params.projectKey);
 

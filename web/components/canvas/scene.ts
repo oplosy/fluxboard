@@ -62,7 +62,7 @@ export interface Scene {
  * number of frames once and then frozen.
  */
 export function useScene(
-  ref: RefObject<HTMLCanvasElement>,
+  ref: RefObject<HTMLCanvasElement | null>,
   create: () => Scene,
   { pointerTarget = 'canvas', deps = [] as unknown[] }: { pointerTarget?: 'canvas' | 'window'; deps?: unknown[] } = {},
 ) {

@@ -1,7 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { use, useCallback, useEffect, useRef, useState } from 'react';
 import { X } from 'lucide-react';
 
 import { useProjectByKey } from '@/lib/board/use-project';
@@ -15,11 +15,10 @@ const EXIT_MS = 260;
 // Intercepted task route (ADR-018): clicking a card opens the task detail in a
 // modal over the board instead of navigating away. Refresh/direct load still
 // serves the full page at .../tasks/[taskNumber].
-export default function InterceptedTaskModal({
-  params,
-}: {
-  params: { projectKey: string; taskNumber: string };
+export default function InterceptedTaskModal(props: {
+  params: Promise<{ projectKey: string; taskNumber: string }>;
 }) {
+  const params = use(props.params);
   const router = useRouter();
   const number = Number(params.taskNumber);
   const { project } = useProjectByKey(params.projectKey);
