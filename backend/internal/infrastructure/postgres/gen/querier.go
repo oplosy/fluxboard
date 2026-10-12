@@ -304,8 +304,9 @@ type Querier interface {
 	// org admin (@see_all), or a member of the project, or the project is 'org'-
 	// visible and the caller may see those (@see_org_visible: org MEMBER+, never
 	// GUEST — FR-TEN-010). Archived projects are excluded. count(*) OVER() yields
-	// the unpaged total for pagination; the label filter pins one label_id per row so
-	// DISTINCT is unnecessary.
+	// the unpaged total for pagination. The label filter is an EXISTS, not a join:
+	// joining task_labels returned a task once per label (duplicate hits, inflated
+	// total).
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
 	SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)

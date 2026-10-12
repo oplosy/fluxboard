@@ -475,7 +475,6 @@ SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.descripti
        count(*) OVER() AS total_count
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
-LEFT JOIN task_labels tl ON tl.task_id = t.id AND tl.org_id = t.org_id
 WHERE t.org_id = $1
   AND t.deleted_at IS NULL
   AND p.archived_at IS NULL
@@ -487,7 +486,9 @@ WHERE t.org_id = $1
   AND ($7::uuid IS NULL OR t.assignee_id = $7)
   AND ($8::uuid IS NULL OR t.column_id = $8)
   AND ($9::text IS NULL OR t.priority = $9)
-  AND ($10::uuid IS NULL OR tl.label_id = $10)
+  AND ($10::uuid IS NULL OR EXISTS (
+        SELECT 1 FROM task_labels tl
+        WHERE tl.task_id = t.id AND tl.org_id = t.org_id AND tl.label_id = $10))
 ORDER BY CASE WHEN $2::text = '' THEN 0
               ELSE ts_rank(t.search_vector, websearch_to_tsquery('simple', $2)) END DESC,
          t.created_at DESC
@@ -536,8 +537,9 @@ type SearchTasksRow struct {
 // org admin (@see_all), or a member of the project, or the project is 'org'-
 // visible and the caller may see those (@see_org_visible: org MEMBER+, never
 // GUEST — FR-TEN-010). Archived projects are excluded. count(*) OVER() yields
-// the unpaged total for pagination; the label filter pins one label_id per row so
-// DISTINCT is unnecessary.
+// the unpaged total for pagination. The label filter is an EXISTS, not a join:
+// joining task_labels returned a task once per label (duplicate hits, inflated
+// total).
 func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error) {
 	rows, err := q.db.Query(ctx, searchTasks,
 		arg.OrgID,
