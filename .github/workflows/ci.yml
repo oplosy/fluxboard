@@ -11,6 +11,9 @@ on:
 # protection rule is updated (docs/12-TESTING.md §9).
 env:
   GO_VERSION: "1.26"
+  # Pinned: "latest" resolves at run time, so a new release could fail lint on
+  # an unchanged tree. Bump deliberately (and fix what it flags) in its own PR.
+  GOLANGCI_LINT_VERSION: v2.14.0
 
 jobs:
   lint:
@@ -27,6 +30,7 @@ jobs:
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v8
         with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
           working-directory: backend
       - name: go-arch-lint (dependency rule)
         run: |
