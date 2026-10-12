@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  # The release workflow re-runs this gate on the tagged commit.
+  workflow_call:
 
 # Jobs mirror docs/10-INFRA-DEVOPS.md §4. All five are required status checks
 # on main's branch protection; renaming a job breaks merging until the
@@ -96,11 +98,18 @@ jobs:
         env:
           PGPASSWORD: postgres
         run: psql -h localhost -U postgres -d fluxboard -v ON_ERROR_STOP=1 -f ../deploy/postgres/init/01-roles.sql
-      - name: migrate
+      # Up, a full down (every .down.sql must run: the rollback path), then up
+      # again so the suites below see the complete schema.
+      - name: migrate (with a full down/up round trip)
         run: |
-          docker run --rm --network host -v "$PWD/migrations":/migrations migrate/migrate:v4.18.3 \
-            -path=/migrations \
-            -database "postgres://fluxboard_owner:owner_pw@localhost:5432/fluxboard?sslmode=disable" up
+          migrate() {
+            docker run --rm --network host -v "$PWD/migrations":/migrations migrate/migrate:v4.18.3 \
+              -path=/migrations \
+              -database "postgres://fluxboard_owner:owner_pw@localhost:5432/fluxboard?sslmode=disable" "$@"
+          }
+          migrate up
+          migrate down -all
+          migrate up
       - name: integration tests
         env:
           TEST_DATABASE_URL: postgres://fluxboard_app:app_pw@localhost:5432/fluxboard?sslmode=disable
@@ -134,6 +143,23 @@ jobs:
           tags: fluxboard-worker:sha-${{ github.sha }}
           push: false
           build-args: GIT_SHA=${{ github.sha }}
+      # The release workflow pushes these two as well; build them here so a
+      # broken Dockerfile shows up on the PR, not on the tag.
+      - name: build migrations image
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          target: migrations
+          tags: fluxboard-migrations:sha-${{ github.sha }}
+          push: false
+      - name: build web image
+        uses: docker/build-push-action@v6
+        with:
+          context: web
+          target: run
+          tags: fluxboard-web:sha-${{ github.sha }}
+          push: false
+          build-args: NEXT_PUBLIC_API_BASE=https://api.example.invalid/api/v1
 
   web:
     runs-on: ubuntu-latest

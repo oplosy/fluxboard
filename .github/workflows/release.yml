@@ -1,0 +1,107 @@
+name: release
+
+# Versioned release artefacts (report B07, docs/runbooks/release.md). A
+# vMAJOR.MINOR.PATCH tag re-runs the full CI gate on the tagged commit, then
+# builds and pushes the api, worker, migrations and web images to GHCR with
+# SBOM + provenance attestations, and opens a GitHub Release that lists the
+# image digests to deploy.
+on:
+  push:
+    tags: ["v[0-9]+.[0-9]+.[0-9]+"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  ci:
+    uses: ./.github/workflows/ci.yml
+
+  images:
+    needs: ci
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: api, context: backend, target: api }
+          - { name: worker, context: backend, target: worker }
+          - { name: migrations, context: backend, target: migrations }
+          - { name: web, context: web, target: run }
+    steps:
+      - uses: actions/checkout@v4
+      # The browser calls the API directly, so its base URL is baked into the
+      # web image at build time; a release must never ship the localhost default.
+      - name: require the production API base (web)
+        if: matrix.name == 'web'
+        env:
+          API_BASE: ${{ vars.NEXT_PUBLIC_API_BASE }}
+        run: |
+          case "$API_BASE" in
+            https://*) ;;
+            *) echo "::error::Set the repository variable NEXT_PUBLIC_API_BASE to the https API base (e.g. https://api.example.com/api/v1)"; exit 1 ;;
+          esac
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/fluxboard-${{ matrix.name }}
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=sha,format=long
+      - uses: docker/build-push-action@v6
+        with:
+          context: ${{ matrix.context }}
+          target: ${{ matrix.target }}
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          provenance: mode=max
+          sbom: true
+          build-args: |
+            GIT_SHA=${{ github.sha }}
+            NEXT_PUBLIC_API_BASE=${{ vars.NEXT_PUBLIC_API_BASE }}
+
+  release:
+    needs: images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      packages: read
+    steps:
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - name: create the GitHub Release with image digests
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          OWNER: ${{ github.repository_owner }}
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          {
+            echo "## Images"
+            echo
+            echo "Deploy by digest; order and rollback: docs/runbooks/release.md."
+            echo
+            for name in migrations api worker web; do
+              ref="ghcr.io/${OWNER,,}/fluxboard-${name}:${version}"
+              digest=$(docker buildx imagetools inspect "$ref" --format '{{json .Manifest.Digest}}' | tr -d '"')
+              echo "- \`${ref}@${digest}\`"
+            done
+          } > notes.md
+          gh release create "$GITHUB_REF_NAME" --repo "$GITHUB_REPOSITORY" --verify-tag \
+            --title "$GITHUB_REF_NAME" --notes-file notes.md --generate-notes
