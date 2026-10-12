@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { use, useEffect, useState } from 'react';
 
 import { ApiError } from '@/lib/api/client';
 import { getPublicForm, submitPublicForm } from '@/lib/api/forms';
@@ -18,7 +18,8 @@ const PRIORITIES = [
 
 // Public intake form (ADR-023). No auth — the token in the URL is the only
 // credential. Unknown/disabled forms render the same "unavailable" state.
-export default function PublicFormPage({ params }: { params: { token: string } }) {
+export default function PublicFormPage(props: { params: Promise<{ token: string }> }) {
+  const params = use(props.params);
   const [form, setForm] = useState<{ name: string; description: string } | null>(null);
   const [missing, setMissing] = useState(false);
 

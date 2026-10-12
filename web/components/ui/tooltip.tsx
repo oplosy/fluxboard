@@ -16,7 +16,7 @@ interface TooltipProps {
 /** Hover/focus tooltip with a short intent delay and an exit fade. */
 export function Tooltip({ content, children, side = 'top', className, wrapperClassName }: TooltipProps) {
   const [open, setOpen] = useState(false);
-  const timer = useRef<number>();
+  const timer = useRef<number | undefined>(undefined);
   const { mounted, state } = usePresence(open, 150);
 
   const show = () => {

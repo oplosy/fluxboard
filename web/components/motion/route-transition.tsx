@@ -220,7 +220,7 @@ export function RouteTransition({ children }: { children: ReactNode }) {
  * without remounting the subtree (so board state, scroll and queries survive).
  * Paths matching `skip` (e.g. intercepted modal routes) don't animate.
  */
-export function useRouteEnter(ref: RefObject<HTMLElement>, skip?: RegExp) {
+export function useRouteEnter(ref: RefObject<HTMLElement | null>, skip?: RegExp) {
   const pathname = usePathname();
   const prev = useRef(pathname);
   useEffect(() => {

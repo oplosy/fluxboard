@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { use, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
@@ -25,7 +25,8 @@ type SortKey = 'number' | 'title' | 'column' | 'priority';
 
 const PRIORITY_ORDER = new Map(PRIORITIES.map((p, i) => [p, i]));
 
-export default function ProjectListPage({ params }: { params: { projectKey: string } }) {
+export default function ProjectListPage(props: { params: Promise<{ projectKey: string }> }) {
+  const params = use(props.params);
   const { orgId, slug } = useOrg();
   const { project, isLoading, isError } = useProjectByKey(params.projectKey);
 
