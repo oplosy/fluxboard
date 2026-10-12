@@ -2,6 +2,7 @@ package billinguc
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 	"time"
@@ -87,8 +88,16 @@ func (f *fakeWebhooks) Apply(_ context.Context, _ string, m billing.WebhookMutat
 type fakeGateway struct {
 	checkoutParams billing.CheckoutParams
 	updatedPlan    billing.Plan
+	updatedSeats   int64
 	updateIdem     string
+	previewSeats   int64
+	setSeats       []int64
 }
+
+// fakeSeats counts billable members per org.
+type fakeSeats map[string]int64
+
+func (f fakeSeats) CountMembers(_ context.Context, orgID string) (int64, error) { return f[orgID], nil }
 
 func (f *fakeGateway) EnsureCustomer(_ context.Context, _, existing string) (string, error) {
 	if existing != "" {
@@ -100,11 +109,16 @@ func (f *fakeGateway) CreateCheckout(_ context.Context, p billing.CheckoutParams
 	f.checkoutParams = p
 	return billing.CheckoutSession{URL: "https://checkout/" + p.IdempotencyKey, CustomerID: p.CustomerID}, nil
 }
-func (f *fakeGateway) UpcomingInvoice(context.Context, string, billing.Plan, int64) (int64, string, error) {
+func (f *fakeGateway) UpcomingInvoice(_ context.Context, _ string, _ billing.Plan, seats int64) (int64, string, error) {
+	f.previewSeats = seats
 	return 1234, "usd", nil
 }
-func (f *fakeGateway) UpdateSubscription(_ context.Context, _ string, p billing.Plan, _ int64, idem string) error {
-	f.updatedPlan, f.updateIdem = p, idem
+func (f *fakeGateway) UpdateSubscription(_ context.Context, _ string, p billing.Plan, seats int64, idem string) error {
+	f.updatedPlan, f.updatedSeats, f.updateIdem = p, seats, idem
+	return nil
+}
+func (f *fakeGateway) SetSeats(_ context.Context, _ string, seats int64, _ string) error {
+	f.setSeats = append(f.setSeats, seats)
 	return nil
 }
 func (f *fakeGateway) CancelSubscription(context.Context, string, bool) error { return nil }
@@ -153,6 +167,7 @@ type harness struct {
 	webhooks *fakeWebhooks
 	gateway  *fakeGateway
 	cache    *fakeCache
+	seats    fakeSeats
 }
 
 func newHarness() *harness {
@@ -164,11 +179,12 @@ func newHarness() *harness {
 		webhooks: &fakeWebhooks{},
 		gateway:  &fakeGateway{},
 		cache:    &fakeCache{m: map[string]billing.Entitlements{}},
+		seats:    fakeSeats{"org1": 3},
 	}
 	fixed := time.Date(2026, 7, 6, 12, 0, 0, 0, time.UTC)
 	h.svc = New(Deps{
 		Plans: h.plans, Subs: h.subs, Invoices: h.invoices, Events: h.events,
-		Webhooks: h.webhooks, Gateway: h.gateway, Cache: h.cache,
+		Webhooks: h.webhooks, Gateway: h.gateway, Cache: h.cache, Seats: h.seats,
 		Now: func() time.Time { return fixed }, BaseURL: "https://app.test",
 	})
 	return h
@@ -214,7 +230,7 @@ func TestResolveMissDerivesAndCaches(t *testing.T) {
 
 func TestCheckoutIdempotencyKeyAndCustomer(t *testing.T) {
 	h := newHarness()
-	sess, err := h.svc.Checkout(context.Background(), "org1", billing.PlanPro, 3)
+	sess, err := h.svc.Checkout(context.Background(), "org1", billing.PlanPro)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -232,8 +248,55 @@ func TestCheckoutIdempotencyKeyAndCustomer(t *testing.T) {
 
 func TestCheckoutRejectsFreePlan(t *testing.T) {
 	h := newHarness()
-	if _, err := h.svc.Checkout(context.Background(), "org1", billing.PlanFree, 1); err != domain.ErrValidation {
+	if _, err := h.svc.Checkout(context.Background(), "org1", billing.PlanFree); err != domain.ErrValidation {
 		t.Fatalf("free plan checkout = %v, want ErrValidation", err)
+	}
+}
+
+// Report B02: checkout bills the org's billable members (1/5/25 fit Pro's 25
+// seats; 26 do not), counted server-side — a client cannot pick fewer seats.
+func TestCheckoutSeatsAreTheBillableMembers(t *testing.T) {
+	for members, wantErr := range map[int64]bool{0: false, 1: false, 5: false, 25: false, 26: true} {
+		h := newHarness()
+		h.seats["org1"] = members
+		_, err := h.svc.Checkout(context.Background(), "org1", billing.PlanPro)
+		if wantErr {
+			if !errors.Is(err, domain.ErrValidation) {
+				t.Errorf("%d members on Pro (max 25): err = %v, want ErrValidation", members, err)
+			}
+			continue
+		}
+		if err != nil {
+			t.Fatalf("%d members: %v", members, err)
+		}
+		want := members
+		if want < 1 {
+			want = 1 // the owner's seat
+		}
+		if h.gateway.checkoutParams.Seats != want {
+			t.Errorf("%d members: checkout seats = %d, want %d", members, h.gateway.checkoutParams.Seats, want)
+		}
+	}
+}
+
+func TestSyncSeats(t *testing.T) {
+	ctx := context.Background()
+	h := newHarness()
+	if err := h.svc.SyncSeats(ctx, "org1"); err != nil || len(h.gateway.setSeats) != 0 {
+		t.Fatalf("no subscription: err %v, set %v; want a no-op", err, h.gateway.setSeats)
+	}
+	subID := "sub_1"
+	h.subs.m["org1"] = &billing.Subscription{OrgID: "org1", PlanCode: billing.PlanPro, Status: billing.StatusCanceled, StripeSubscriptionID: &subID}
+	if err := h.svc.SyncSeats(ctx, "org1"); err != nil || len(h.gateway.setSeats) != 0 {
+		t.Fatalf("canceled subscription: err %v, set %v; want a no-op", err, h.gateway.setSeats)
+	}
+	h.subs.m["org1"].Status = billing.StatusActive
+	h.seats["org1"] = 7
+	if err := h.svc.SyncSeats(ctx, "org1"); err != nil {
+		t.Fatal(err)
+	}
+	if len(h.gateway.setSeats) != 1 || h.gateway.setSeats[0] != 7 {
+		t.Fatalf("set seats = %v, want [7]", h.gateway.setSeats)
 	}
 }
 
@@ -248,6 +311,9 @@ func TestApplyChangeBustsCache(t *testing.T) {
 	}
 	if h.gateway.updatedPlan.Code != billing.PlanPro || !strings.HasPrefix(h.gateway.updateIdem, "chg:org1:pro:") {
 		t.Fatalf("update not called correctly: plan=%s idem=%s", h.gateway.updatedPlan.Code, h.gateway.updateIdem)
+	}
+	if h.gateway.updatedSeats != 0 {
+		t.Fatalf("plan change sent seats=%d; want 0 (keep the subscription's count)", h.gateway.updatedSeats)
 	}
 	if h.cache.busts != 1 {
 		t.Fatalf("apply should bust cache once, got %d", h.cache.busts)

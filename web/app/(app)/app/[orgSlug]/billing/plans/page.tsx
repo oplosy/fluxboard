@@ -15,7 +15,7 @@ import {
   previewChange,
   startCheckout,
 } from '@/lib/api/billing';
-import { PLANS, planByCode, limitLabel, type PlanRef } from '@/lib/billing/plans';
+import { billableSeats, limitLabel, toPlanViews, usePlanCatalog, type PlanView } from '@/lib/billing/plans';
 import { formatMoney, formatBytes } from '@/lib/billing/format';
 import type { PlanCode } from '@/lib/api/types';
 
@@ -30,13 +30,16 @@ export default function PlansPage() {
     queryFn: () => getBillingSummary(orgId),
   });
 
-  // Target plan for the proration confirm dialog (paid→paid switch only).
-  const [switchTo, setSwitchTo] = useState<PlanRef | null>(null);
+  const catalog = usePlanCatalog();
 
-  const seats = Math.max(1, members.length);
+  // Target plan for the proration confirm dialog (paid→paid switch only).
+  const [switchTo, setSwitchTo] = useState<PlanView | null>(null);
+
+  // Billed seats = non-guest members; the server counts them for checkout too.
+  const seats = Math.max(1, billableSeats(members));
 
   const checkout = useMutation({
-    mutationFn: (plan: PlanCode) => startCheckout(orgId, { plan, seats }),
+    mutationFn: (plan: PlanCode) => startCheckout(orgId, { plan }),
     onSuccess: (url) => {
       window.location.href = url;
     },
@@ -52,27 +55,30 @@ export default function PlansPage() {
     onError: () => toast({ title: 'Couldn’t schedule the downgrade', variant: 'error' }),
   });
 
-  if (summary.isLoading) {
+  if (summary.isLoading || catalog.isLoading) {
     return <p className="text-sm text-muted-foreground">Loading plans…</p>;
   }
-  if (summary.isError || !summary.data) {
-    return <p className="text-sm text-destructive">Couldn’t load your current plan.</p>;
+  if (summary.isError || !summary.data || catalog.isError || !catalog.data) {
+    return <p className="text-sm text-destructive">Couldn’t load the plans.</p>;
   }
 
   const s = summary.data;
-  const current = planByCode(s.plan);
+  const plans = toPlanViews(catalog.data);
+  const currency = catalog.data.currency;
+  const current = plans.find((p) => p.code === s.plan);
   const currentTier = current?.tier ?? 0;
 
   return (
     <div className="space-y-6">
       <p className="text-sm text-muted-foreground">
         You’re on the <span className="font-medium text-foreground">{current?.name ?? s.plan}</span>{' '}
-        plan. Prices are billed per seat through Stripe; switching an active subscription shows the
-        exact prorated amount before you confirm.
+        plan. Paid plans bill per seat — every member except guests ({seats} now) — and the
+        seat count follows your members automatically. Switching an active subscription shows
+        the exact prorated amount before you confirm.
       </p>
 
       <div className="grid gap-4 md:grid-cols-3">
-        {PLANS.map((p) => {
+        {plans.map((p) => {
           const isCurrent = p.code === s.plan;
           const isUpgrade = p.tier > currentTier;
 
@@ -86,14 +92,23 @@ export default function PlansPage() {
               <div className="mb-3">
                 <h3 className="text-lg font-semibold">{p.name}</h3>
                 <p className="mt-1 text-sm text-muted-foreground">{p.tagline}</p>
+                <p className="mt-3 text-sm">
+                  <span className="text-xl font-semibold">{formatMoney(p.seat_price, currency)}</span>
+                  <span className="text-muted-foreground"> / seat / month</span>
+                  {p.seat_price > 0 ? (
+                    <span className="block text-xs text-muted-foreground">
+                      {seats} {seats === 1 ? 'seat' : 'seats'} → {formatMoney(p.seat_price * seats, currency)} / month
+                    </span>
+                  ) : null}
+                </p>
               </div>
               <ul className="mb-5 flex-1 space-y-2 text-sm">
-                <Feat>{limitLabel(p.maxMembers)} members</Feat>
-                <Feat>{limitLabel(p.maxProjects)} projects</Feat>
-                <Feat>{formatBytes(p.maxStorageBytes)} storage</Feat>
-                <Feat>{p.apiRatePerMin}/min API rate</Feat>
-                <Feat>{p.auditRetentionDays}-day audit retention</Feat>
-                {p.metered ? <Feat>Usage-based metered billing</Feat> : null}
+                <Feat>{limitLabel(p.max_members)} members</Feat>
+                <Feat>{limitLabel(p.max_projects)} projects</Feat>
+                <Feat>{formatBytes(p.max_storage_bytes)} storage</Feat>
+                <Feat>{p.api_rate_per_min}/min API rate</Feat>
+                <Feat>{p.audit_retention_days}-day audit retention</Feat>
+                {p.metered ? <Feat>Storage and API usage metered</Feat> : null}
               </ul>
 
               {isCurrent ? (
@@ -159,7 +174,7 @@ function ProrationDialog({
   onApplied,
 }: {
   orgId: string;
-  plan: PlanRef;
+  plan: PlanView;
   onClose: () => void;
   onApplied: () => void;
 }) {

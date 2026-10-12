@@ -27,14 +27,13 @@ type Config struct {
 	BaseURL       string // stub only: base of the fake Checkout/Portal URLs
 }
 
-// New builds the StripeGateway for cfg.Mode. plans is read by the live adapter
-// to map Stripe prices back to plan codes.
-func New(cfg Config, plans billing.PlanRepository) (billing.StripeGateway, error) {
+// New builds the StripeGateway for cfg.Mode.
+func New(cfg Config) (billing.StripeGateway, error) {
 	switch cfg.Mode {
 	case "stub", "":
 		return &StubGateway{webhookSecret: cfg.WebhookSecret, baseURL: cfg.BaseURL}, nil
 	case "live":
-		return NewLive(cfg.SecretKey, cfg.WebhookSecret, plans)
+		return NewLive(cfg.SecretKey, cfg.WebhookSecret)
 	default:
 		return nil, fmt.Errorf("stripex: unknown STRIPE_MODE %q", cfg.Mode)
 	}
@@ -82,6 +81,7 @@ func (g *StubGateway) UpcomingInvoice(_ context.Context, _ string, _ billing.Pla
 func (g *StubGateway) UpdateSubscription(context.Context, string, billing.Plan, int64, string) error {
 	return nil
 }
+func (g *StubGateway) SetSeats(context.Context, string, int64, string) error  { return nil }
 func (g *StubGateway) CancelSubscription(context.Context, string, bool) error { return nil }
 func (g *StubGateway) Resume(context.Context, string) error                   { return nil }
 

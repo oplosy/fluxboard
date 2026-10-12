@@ -30,10 +30,11 @@ func (q *Queries) ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
 }
 
 const countMembers = `-- name: CountMembers :one
-SELECT count(*) FROM memberships WHERE org_id = $1
+SELECT count(*) FROM memberships WHERE org_id = $1 AND role <> 'GUEST'
 `
 
-// Total member (seat) count for the plan-limit gate (FR-BILL-009).
+// Billable seats: members other than GUEST (FR-TEN-010). The same number gates
+// max_members (FR-BILL-009) and is the paid subscription's seat quantity (B02).
 func (q *Queries) CountMembers(ctx context.Context, orgID uuid.UUID) (int64, error) {
 	row := q.db.QueryRow(ctx, countMembers, orgID)
 	var count int64

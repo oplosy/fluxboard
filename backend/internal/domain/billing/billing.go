@@ -27,6 +27,17 @@ const (
 	PlanBusiness PlanCode = "business"
 )
 
+// The plan catalog contract (report B02, ADR-030): one versioned catalog,
+// priced per billable seat per month. The plans table is its source; GET /plans
+// serves it to the marketing site and the app. Changing a price means bumping
+// CatalogVersion: new Stripe prices are created next to the old ones, and
+// existing subscriptions keep theirs until they change plan.
+const (
+	CatalogVersion  = "v1"
+	CatalogCurrency = "usd"
+	CatalogInterval = "month"
+)
+
 // Valid reports whether c is a known plan code.
 func (c PlanCode) Valid() bool {
 	switch c {

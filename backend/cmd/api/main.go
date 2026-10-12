@@ -298,6 +298,36 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		return nil, err
 	}
 
+	// Phase 4 — billing wiring (docs/06). Built before taskSvc so the storage
+	// quota check can resolve the org's plan ceiling. The gateway selects stub vs
+	// live from STRIPE_MODE; stub needs no keys (the webhook secret is the HMAC
+	// key). Plan + processed-event tables are global (plain pool);
+	// subscription/invoice/usage/outbox/webhook are [T] over the RLS-enforcing
+	// TenantPool. BaseURL is the public app origin for Checkout/Portal returns.
+	planRepo := postgres.NewPlanRepo(pool)
+	stripeGW, err := stripex.New(stripex.Config{
+		Mode: cfg.StripeMode, SecretKey: cfg.StripeSecretKey,
+		WebhookSecret: cfg.StripeWebhookSecret, BaseURL: cfg.WebOrigin,
+	})
+	if err != nil {
+		return nil, err
+	}
+	entitlementCache := redisx.NewEntitlementCache(rdb)
+	billingSvc := billinguc.New(billinguc.Deps{
+		Plans:    planRepo,
+		Subs:     postgres.NewSubscriptionRepo(tenantPool),
+		Invoices: postgres.NewInvoiceRepo(tenantPool),
+		Events:   postgres.NewProcessedEventRepo(pool),
+		Webhooks: postgres.NewWebhookRepo(tenantPool),
+		Usage:    postgres.NewUsageRepo(tenantPool),
+		Gateway:  stripeGW,
+		Cache:    entitlementCache,
+		Seats:    membershipRepo,
+		Bus:      eventBus,
+		Logger:   logger,
+		BaseURL:  cfg.WebOrigin,
+	})
+
 	tenantSvc := tenantuc.New(tenantuc.Deps{
 		Orgs:     orgRepo,
 		Members:  membershipRepo,
@@ -310,6 +340,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Events:   eventBus,
 		Notifier: notifySvc,
 		Logos:    objectStore,
+		Seats:    billingSvc,
 		Logger:   logger,
 	})
 	orgHandlers := handlers.NewOrgHandlers(tenantSvc, logger)
@@ -338,35 +369,6 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	formRepo := postgres.NewFormRepo(pool, tenantPool)
 	linkRepo := postgres.NewTaskLinkRepo(tenantPool)
 	timeEntryRepo := postgres.NewTimeEntryRepo(tenantPool)
-
-	// Phase 4 — billing wiring (docs/06). Built before taskSvc so the storage
-	// quota check can resolve the org's plan ceiling. The gateway selects stub vs
-	// live from STRIPE_MODE; stub needs no keys (the webhook secret is the HMAC
-	// key). Plan + processed-event tables are global (plain pool);
-	// subscription/invoice/usage/outbox/webhook are [T] over the RLS-enforcing
-	// TenantPool. BaseURL is the public app origin for Checkout/Portal returns.
-	planRepo := postgres.NewPlanRepo(pool)
-	stripeGW, err := stripex.New(stripex.Config{
-		Mode: cfg.StripeMode, SecretKey: cfg.StripeSecretKey,
-		WebhookSecret: cfg.StripeWebhookSecret, BaseURL: cfg.WebOrigin,
-	}, planRepo)
-	if err != nil {
-		return nil, err
-	}
-	entitlementCache := redisx.NewEntitlementCache(rdb)
-	billingSvc := billinguc.New(billinguc.Deps{
-		Plans:    planRepo,
-		Subs:     postgres.NewSubscriptionRepo(tenantPool),
-		Invoices: postgres.NewInvoiceRepo(tenantPool),
-		Events:   postgres.NewProcessedEventRepo(pool),
-		Webhooks: postgres.NewWebhookRepo(tenantPool),
-		Usage:    postgres.NewUsageRepo(tenantPool),
-		Gateway:  stripeGW,
-		Cache:    entitlementCache,
-		Bus:      eventBus,
-		Logger:   logger,
-		BaseURL:  cfg.WebOrigin,
-	})
 
 	// Phase 6 — platform admin, org API keys, analytics, audit viewer
 	// (docs/build/PHASE-6). Cross-org admin reads + API-key by-hash auth run on the

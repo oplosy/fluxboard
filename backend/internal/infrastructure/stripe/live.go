@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"strconv"
 	"strings"
-	"sync"
 	"time"
 
 	stripe "github.com/stripe/stripe-go/v86"
@@ -40,9 +39,22 @@ func meterFor(m billing.UsageMetric) string {
 // webhookTolerance is the maximum signature age accepted (06 §4).
 const webhookTolerance = 5 * time.Minute
 
-// planCacheTTL bounds how long the price→plan map is reused before the plans
-// table is read again (a re-seed takes effect within this window).
-const planCacheTTL = 5 * time.Minute
+// productPrefix + plan code is each paid plan's fixed Stripe product id. A
+// subscription's plan is read from its seat price's product, so prices of an
+// older catalog version (kept by existing customers) still map to their plan.
+const productPrefix = "fluxboard_"
+
+// ProductID returns the fixed Stripe product id of a plan.
+func ProductID(code string) string { return productPrefix + code }
+
+// planFromProduct maps a product id back to its plan ("" if not one of ours).
+func planFromProduct(id string) billing.PlanCode {
+	code := billing.PlanCode(strings.TrimPrefix(id, productPrefix))
+	if !strings.HasPrefix(id, productPrefix) || !code.Valid() || code == billing.PlanFree {
+		return ""
+	}
+	return code
+}
 
 // LiveGateway is the MODE=live adapter over stripe-go (pinned API version:
 // stripe.APIVersion). Webhook payloads are only trusted for the event id, type,
@@ -52,33 +64,22 @@ const planCacheTTL = 5 * time.Minute
 type LiveGateway struct {
 	sc            *stripe.Client
 	webhookSecret string
-	plans         billing.PlanRepository
-	now           func() time.Time
-
-	mu       sync.Mutex
-	planByID map[string]billing.PlanCode // seat price id → plan
-	plansAt  time.Time
 }
 
 var _ billing.StripeGateway = (*LiveGateway)(nil)
 
 // NewLive builds the live gateway. secretKey must be a Stripe secret or
 // restricted key; webhookSecret the endpoint's signing secret (whsec_…).
-func NewLive(secretKey, webhookSecret string, plans billing.PlanRepository, opts ...stripe.ClientOption) (*LiveGateway, error) {
+func NewLive(secretKey, webhookSecret string, opts ...stripe.ClientOption) (*LiveGateway, error) {
 	if !validSecretKey(secretKey) {
 		return nil, errors.New("stripex: STRIPE_SECRET_KEY must be a Stripe secret (sk_…) or restricted (rk_…) key in MODE=live")
 	}
 	if !strings.HasPrefix(webhookSecret, "whsec_") {
 		return nil, errors.New("stripex: STRIPE_WEBHOOK_SECRET must be the endpoint signing secret (whsec_…) in MODE=live")
 	}
-	if plans == nil {
-		return nil, errors.New("stripex: a plan repository is required in MODE=live")
-	}
 	return &LiveGateway{
 		sc:            stripe.NewClient(secretKey, opts...),
 		webhookSecret: webhookSecret,
-		plans:         plans,
-		now:           time.Now,
 	}, nil
 }
 
@@ -198,6 +199,35 @@ func (g *LiveGateway) UpdateSubscription(ctx context.Context, subscriptionID str
 	return nil
 }
 
+// SetSeats sets the licensed seat item's quantity with prorations.
+func (g *LiveGateway) SetSeats(ctx context.Context, subscriptionID string, seats int64, idemKey string) error {
+	if seats < 1 {
+		return fmt.Errorf("stripe: seat count must be at least 1, got %d", seats)
+	}
+	sub, err := g.retrieveSubscription(ctx, subscriptionID)
+	if err != nil {
+		return err
+	}
+	seat := seatItem(sub)
+	if seat == nil {
+		return fmt.Errorf("stripe: subscription %s has no licensed seat item", subscriptionID)
+	}
+	if seat.Quantity == seats {
+		return nil
+	}
+	params := &stripe.SubscriptionUpdateParams{
+		Items: []*stripe.SubscriptionUpdateItemParams{
+			{ID: stripe.String(seat.ID), Quantity: stripe.Int64(seats)},
+		},
+		ProrationBehavior: stripe.String("create_prorations"),
+	}
+	params.SetIdempotencyKey(idemKey)
+	if _, err := g.sc.V1Subscriptions.Update(ctx, subscriptionID, params); err != nil {
+		return fmt.Errorf("stripe: set seats: %w", err)
+	}
+	return nil
+}
+
 // CancelSubscription cancels at period end (reversible with Resume) or now.
 func (g *LiveGateway) CancelSubscription(ctx context.Context, subscriptionID string, atPeriodEnd bool) error {
 	if atPeriodEnd {
@@ -268,7 +298,7 @@ func (g *LiveGateway) FetchSubscription(ctx context.Context, subscriptionID stri
 	if err != nil {
 		return nil, err
 	}
-	return g.normalizeSubscription(ctx, sub)
+	return normalizeSubscription(sub)
 }
 
 func (g *LiveGateway) retrieveSubscription(ctx context.Context, id string) (*stripe.Subscription, error) {
@@ -343,7 +373,7 @@ func (g *LiveGateway) withSubscription(ctx context.Context, out billing.StripeEv
 	if err != nil {
 		return billing.StripeEvent{}, err
 	}
-	ss, err := g.normalizeSubscription(ctx, sub)
+	ss, err := normalizeSubscription(sub)
 	if err != nil {
 		return billing.StripeEvent{}, err
 	}
@@ -392,21 +422,25 @@ func (g *LiveGateway) customerOrg(ctx context.Context, customerID string) (strin
 }
 
 // normalizeSubscription maps a Stripe subscription to the domain view; the plan
-// is resolved from the seat item's price id via the plans table.
-func (g *LiveGateway) normalizeSubscription(ctx context.Context, sub *stripe.Subscription) (*billing.StripeSubscription, error) {
-	byPrice, err := g.planIndex(ctx)
-	if err != nil {
-		return nil, err
-	}
-	seat := seatItem(sub, byPrice)
+// comes from the seat price's product (fixed per plan, any catalog version).
+func normalizeSubscription(sub *stripe.Subscription) (*billing.StripeSubscription, error) {
+	seat := seatItem(sub)
 	if seat == nil {
-		return nil, fmt.Errorf("stripe: subscription %s has no item with a known seat price (plans table out of sync with Stripe?)", sub.ID)
+		return nil, fmt.Errorf("stripe: subscription %s has no licensed seat item", sub.ID)
+	}
+	var plan billing.PlanCode
+	if seat.Price.Product != nil {
+		plan = planFromProduct(seat.Price.Product.ID)
+	}
+	if plan == "" {
+		return nil, fmt.Errorf("stripe: subscription %s seat price %s is not on a Fluxboard plan product", sub.ID, seat.Price.ID)
 	}
 	out := &billing.StripeSubscription{
 		SubscriptionID:    sub.ID,
 		Status:            mapStatus(sub.Status),
-		PlanCode:          byPrice[seat.Price.ID],
+		PlanCode:          plan,
 		CancelAtPeriodEnd: sub.CancelAtPeriodEnd,
+		Seats:             seat.Quantity,
 	}
 	if sub.Customer != nil {
 		out.CustomerID = sub.Customer.ID
@@ -494,37 +528,19 @@ func objectMetadataOrg(ev stripe.Event) string {
 
 // ---- plan mapping ----------------------------------------------------------
 
-// planIndex returns seat price id → plan code, refreshed every planCacheTTL.
-func (g *LiveGateway) planIndex(ctx context.Context) (map[string]billing.PlanCode, error) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	if g.planByID != nil && g.now().Sub(g.plansAt) < planCacheTTL {
-		return g.planByID, nil
-	}
-	plans, err := g.plans.List(ctx)
-	if err != nil {
-		return nil, fmt.Errorf("stripe: load plans: %w", err)
-	}
-	idx := make(map[string]billing.PlanCode, len(plans))
-	for _, p := range plans {
-		if p.SeatPriceID != "" {
-			idx[p.SeatPriceID] = p.Code
-		}
-	}
-	g.planByID, g.plansAt = idx, g.now()
-	return idx, nil
+// isMetered reports whether a subscription item is billed by usage.
+func isMetered(it *stripe.SubscriptionItem) bool {
+	return it.Price.Recurring != nil && it.Price.Recurring.UsageType == stripe.PriceRecurringUsageTypeMetered
 }
 
-// seatItem returns the subscription item whose price is a plan's seat price.
-func seatItem(sub *stripe.Subscription, byPrice map[string]billing.PlanCode) *stripe.SubscriptionItem {
+// seatItem returns the subscription's licensed (quantity-based) item: the seats.
+func seatItem(sub *stripe.Subscription) *stripe.SubscriptionItem {
 	if sub.Items == nil {
 		return nil
 	}
 	for _, it := range sub.Items.Data {
-		if it != nil && it.Price != nil {
-			if _, ok := byPrice[it.Price.ID]; ok {
-				return it
-			}
+		if it != nil && it.Price != nil && !isMetered(it) {
+			return it
 		}
 	}
 	return nil
@@ -576,7 +592,7 @@ func planChange(sub *stripe.Subscription, newPlan billing.Plan, seats int64) ([]
 			continue
 		}
 		// The licensed item (quantity-based) is the seat; usage-based items are metered.
-		if it.Price.Recurring != nil && it.Price.Recurring.UsageType == stripe.PriceRecurringUsageTypeMetered {
+		if isMetered(it) {
 			have[it.Price.ID] = true
 			if !want[it.Price.ID] {
 				changes = append(changes, itemChange{ID: stripe.String(it.ID), Deleted: stripe.Bool(true)})

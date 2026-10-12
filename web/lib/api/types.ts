@@ -141,9 +141,9 @@ export interface ChangePreview {
 }
 
 /** Payload for POST /orgs/{id}/billing/checkout. */
+/** The seat count is the org's billable members, counted server-side (B02). */
 export interface CheckoutInput {
   plan: PlanCode;
-  seats: number;
 }
 
 /** Org usage dashboard (GET /orgs/{id}/usage — ADMIN+). Money in minor units. */

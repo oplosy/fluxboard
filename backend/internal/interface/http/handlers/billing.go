@@ -126,11 +126,58 @@ func (h *BillingHandlers) ListInvoices(w http.ResponseWriter, r *http.Request) {
 	response.JSON(w, http.StatusOK, map[string]any{"invoices": out})
 }
 
+// ---- Plan catalog (public) -------------------------------------------------
+
+type catalogPlanResp struct {
+	Code               string `json:"code"`
+	Name               string `json:"name"`
+	SeatPrice          int64  `json:"seat_price"`  // minor units, per billable seat per interval
+	MaxMembers         int    `json:"max_members"` // -1 = unlimited
+	MaxProjects        int    `json:"max_projects"`
+	MaxStorageBytes    int64  `json:"max_storage_bytes"`
+	APIRatePerMin      int    `json:"api_rate_per_min"`
+	AuditRetentionDays int    `json:"audit_retention_days"`
+	Metered            bool   `json:"metered"` // storage + API calls are measured (usage prices: $0 for now)
+}
+
+type catalogResp struct {
+	Version  string            `json:"version"`
+	Currency string            `json:"currency"`
+	Interval string            `json:"interval"`
+	Pricing  string            `json:"pricing"` // "per_seat": billable (non-guest) members
+	Plans    []catalogPlanResp `json:"plans"`
+}
+
+// Catalog serves the plan catalog to the marketing site and the app (report
+// B02): public, no tenant. Prices and limits come from the plans table only.
+func (h *BillingHandlers) Catalog(w http.ResponseWriter, r *http.Request) {
+	plans, err := h.svc.Catalog(r.Context())
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	out := catalogResp{
+		Version: billing.CatalogVersion, Currency: billing.CatalogCurrency,
+		Interval: billing.CatalogInterval, Pricing: "per_seat",
+		Plans: make([]catalogPlanResp, 0, len(plans)),
+	}
+	for _, p := range plans {
+		out.Plans = append(out.Plans, catalogPlanResp{
+			Code: string(p.Code), Name: p.Name, SeatPrice: p.MonthlyPrice,
+			MaxMembers: p.MaxMembers, MaxProjects: p.MaxProjects, MaxStorageBytes: p.MaxStorageBytes,
+			APIRatePerMin: p.APIRatePerMin, AuditRetentionDays: p.AuditRetentionDays, Metered: p.Metered,
+		})
+	}
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	response.JSON(w, http.StatusOK, out)
+}
+
 // ---- Subscription lifecycle -----------------------------------------------
 
+// checkoutReq names the plan; the seat count is the org's billable members,
+// counted server-side (report B02).
 type checkoutReq struct {
-	Plan  string `json:"plan"`
-	Seats int64  `json:"seats"`
+	Plan string `json:"plan"`
 }
 
 type checkoutResp struct {
@@ -148,7 +195,7 @@ func (h *BillingHandlers) Checkout(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	sess, err := h.svc.Checkout(r.Context(), tc.OrgID, billing.PlanCode(req.Plan), req.Seats)
+	sess, err := h.svc.Checkout(r.Context(), tc.OrgID, billing.PlanCode(req.Plan))
 	if err != nil {
 		response.Error(w, err)
 		return

@@ -46,6 +46,12 @@ type Notifier interface {
 	NotifyTargets(ctx context.Context, orgID, actorID string, cat notify.Category, userIDs []string, title, body, entityType, entityID string)
 }
 
+// SeatSyncer keeps the paid subscription's seat quantity equal to the org's
+// billable members (report B02). Implemented by billinguc, wired in cmd/api.
+type SeatSyncer interface {
+	SyncSeats(ctx context.Context, orgID string) error
+}
+
 // IdempotencyStore backs the Idempotency-Key replay guard on invitation creation
 // (docs/08 §4). Get returns "" (no error) when the key is absent. Implemented in
 // infrastructure/redis; optional — when nil the guard is a no-op.
@@ -67,6 +73,7 @@ type Deps struct {
 	Events   notify.EventBus // realtime member.* events; nil ⇒ no publish
 	Notifier Notifier        // invite-accepted fan-out; nil ⇒ no fan-out
 	Logos    LogoStore       // org-logo presigned URLs; nil ⇒ logo surface disabled
+	Seats    SeatSyncer      // billing seat sync on membership changes; nil ⇒ none
 	Logger   *slog.Logger
 	Now      func() time.Time // injectable for tests; defaults to time.Now
 }
@@ -84,6 +91,7 @@ type Service struct {
 	events   notify.EventBus
 	notifier Notifier
 	logos    LogoStore
+	seats    SeatSyncer
 	logger   *slog.Logger
 	now      func() time.Time
 }
@@ -105,7 +113,18 @@ func New(d Deps) *Service {
 	return &Service{
 		orgs: d.Orgs, members: d.Members, invites: d.Invites, users: d.Users,
 		cache: d.Cache, mailer: d.mailerOrNoop(), auditor: auditor, idem: d.Idem,
-		events: d.Events, notifier: d.Notifier, logos: d.Logos, logger: logger, now: now,
+		events: d.Events, notifier: d.Notifier, logos: d.Logos, seats: d.Seats, logger: logger, now: now,
+	}
+}
+
+// syncSeats updates the paid seat count after a membership change, best-effort:
+// the change itself has happened, and the nightly reconcile heals a missed sync.
+func (s *Service) syncSeats(ctx context.Context, orgID string) {
+	if s.seats == nil {
+		return
+	}
+	if err := s.seats.SyncSeats(ctx, orgID); err != nil {
+		s.logger.WarnContext(ctx, "seat sync failed; reconcile will retry", "org", orgID, "err", err)
 	}
 }
 
@@ -427,6 +446,9 @@ func (s *Service) ChangeMemberRole(ctx context.Context, orgID string, actingRole
 		return err
 	}
 	_ = s.cache.Invalidate(ctx, orgID, targetUserID)
+	if (target.Role == tenant.RoleGuest) != (newRole == tenant.RoleGuest) {
+		s.syncSeats(ctx, orgID) // a guest became a seat, or a seat became a guest
+	}
 	s.writeAudit(ctx, audit.Entry{
 		OrgID:      orgID,
 		Action:     audit.ActionMemberRoleChange,
@@ -460,6 +482,9 @@ func (s *Service) RemoveMember(ctx context.Context, orgID string, actingRole ten
 		return err
 	}
 	_ = s.cache.Invalidate(ctx, orgID, targetUserID)
+	if target.Role != tenant.RoleGuest {
+		s.syncSeats(ctx, orgID)
+	}
 	s.writeAudit(ctx, audit.Entry{
 		OrgID:      orgID,
 		Action:     audit.ActionMemberRemove,
@@ -490,6 +515,9 @@ func (s *Service) Leave(ctx context.Context, orgID, userID string) error {
 		return err
 	}
 	_ = s.cache.Invalidate(ctx, orgID, userID)
+	if m.Role != tenant.RoleGuest {
+		s.syncSeats(ctx, orgID)
+	}
 	s.writeAudit(ctx, audit.Entry{
 		OrgID:       orgID,
 		ActorUserID: userID,

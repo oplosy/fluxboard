@@ -338,6 +338,15 @@ type harness struct {
 	invites *fakeInvites
 	users   *fakeUsers
 	mailer  *fakeMailer
+	seats   *fakeSeatSync
+}
+
+// fakeSeatSync records the orgs whose billing seats were re-synced.
+type fakeSeatSync struct{ orgs []string }
+
+func (f *fakeSeatSync) SyncSeats(_ context.Context, orgID string) error {
+	f.orgs = append(f.orgs, orgID)
+	return nil
 }
 
 func newHarness() *harness {
@@ -346,11 +355,12 @@ func newHarness() *harness {
 	orgs := &fakeOrgs{orgs: map[string]*tenant.Organization{}, members: members}
 	users := &fakeUsers{byEmail: map[string]*auth.User{}}
 	mailer := &fakeMailer{}
+	seats := &fakeSeatSync{}
 	svc := New(Deps{
 		Orgs: orgs, Members: members, Invites: invites, Users: users,
-		Cache: fakeCache{}, Mailer: mailer, Now: func() time.Time { return testNow },
+		Cache: fakeCache{}, Mailer: mailer, Seats: seats, Now: func() time.Time { return testNow },
 	})
-	return &harness{svc: svc, orgs: orgs, members: members, invites: invites, users: users, mailer: mailer}
+	return &harness{svc: svc, orgs: orgs, members: members, invites: invites, users: users, mailer: mailer, seats: seats}
 }
 
 func ctx() context.Context { return context.Background() }
@@ -543,5 +553,61 @@ func TestAccept_UnknownToken(t *testing.T) {
 	h := newHarness()
 	if _, err := h.svc.AcceptInvitation(ctx(), "x", "nope"); !errors.Is(err, domain.ErrNotFound) {
 		t.Fatalf("unknown token must 404, got %v", err)
+	}
+}
+
+// Billing seats follow billable (non-guest) membership (report B02): every
+// change that adds or removes a seat re-syncs; guest-only changes do not.
+func TestMembershipChangesSyncSeats(t *testing.T) {
+	h := newHarness()
+	org, _ := h.svc.CreateOrg(ctx(), "owner-1", "Org", "org1")
+	h.members.add(org.ID, "member-1", tenant.RoleMember)
+	h.members.add(org.ID, "guest-1", tenant.RoleGuest)
+	h.members.add(org.ID, "member-2", tenant.RoleMember)
+
+	steps := []struct {
+		name string
+		run  func() error
+		sync bool
+	}{
+		{"member → guest", func() error {
+			return h.svc.ChangeMemberRole(ctx(), org.ID, tenant.RoleOwner, "member-1", tenant.RoleGuest)
+		}, true},
+		{"guest → admin", func() error {
+			return h.svc.ChangeMemberRole(ctx(), org.ID, tenant.RoleOwner, "guest-1", tenant.RoleAdmin)
+		}, true},
+		{"admin → member", func() error {
+			return h.svc.ChangeMemberRole(ctx(), org.ID, tenant.RoleOwner, "guest-1", tenant.RoleMember)
+		}, false},
+		{"remove a guest", func() error { return h.svc.RemoveMember(ctx(), org.ID, tenant.RoleOwner, "member-1") }, false},
+		{"remove a member", func() error { return h.svc.RemoveMember(ctx(), org.ID, tenant.RoleOwner, "guest-1") }, true},
+		{"member leaves", func() error { return h.svc.Leave(ctx(), org.ID, "member-2") }, true},
+	}
+	for _, st := range steps {
+		before := len(h.seats.orgs)
+		if err := st.run(); err != nil {
+			t.Fatalf("%s: %v", st.name, err)
+		}
+		if synced := len(h.seats.orgs) > before; synced != st.sync {
+			t.Errorf("%s: seat sync = %v, want %v", st.name, synced, st.sync)
+		}
+	}
+
+	for role, sync := range map[tenant.OrgRole]bool{tenant.RoleMember: true, tenant.RoleGuest: false} {
+		raw := "raw-" + string(role)
+		inv := &tenant.Invitation{
+			ID: "inv-" + string(role), OrgID: org.ID, Email: string(role) + "@x.com", Role: role,
+			TokenHash: token.Hash(raw), InvitedBy: "owner-1", ExpiresAt: testNow.Add(time.Hour),
+		}
+		if err := h.invites.Create(ctx(), inv); err != nil {
+			t.Fatal(err)
+		}
+		before := len(h.seats.orgs)
+		if _, err := h.svc.AcceptInvitation(ctx(), "user-"+string(role), raw); err != nil {
+			t.Fatalf("accept %s: %v", role, err)
+		}
+		if synced := len(h.seats.orgs) > before; synced != sync {
+			t.Errorf("accept as %s: seat sync = %v, want %v", role, synced, sync)
+		}
 	}
 }

@@ -38,7 +38,8 @@ type Querier interface {
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
 	CountColumnTasks(ctx context.Context, arg CountColumnTasksParams) (int64, error)
 	CountCommentsForProject(ctx context.Context, arg CountCommentsForProjectParams) ([]CountCommentsForProjectRow, error)
-	// Total member (seat) count for the plan-limit gate (FR-BILL-009).
+	// Billable seats: members other than GUEST (FR-TEN-010). The same number gates
+	// max_members (FR-BILL-009) and is the paid subscription's seat quantity (B02).
 	CountMembers(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountMembersByRole(ctx context.Context, arg CountMembersByRoleParams) (int64, error)
 	// Live (non-archived) project count for the plan-limit gate (FR-BILL-009).

@@ -6,6 +6,8 @@ import (
 	"fmt"
 
 	stripe "github.com/stripe/stripe-go/v86"
+
+	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 )
 
 // CatalogPlan is a paid plan as the Stripe catalog needs it (cmd/stripeseed).
@@ -24,10 +26,11 @@ type CatalogIDs struct {
 	APIPriceID     string // "" unless metered
 }
 
-// CatalogVersion is part of every price lookup key. Prices are immutable in
-// Stripe: changing an amount means bumping this and re-seeding, which creates
-// new prices next to the old ones (existing subscriptions keep theirs).
-const CatalogVersion = "v1"
+// CatalogVersion (billing.CatalogVersion) is part of every price lookup key.
+// Prices are immutable in Stripe: changing an amount means bumping it and
+// re-seeding, which creates new prices next to the old ones (existing
+// subscriptions keep theirs; their plan is still found by product id).
+const CatalogVersion = billing.CatalogVersion
 
 // Usage prices are $0 until the plan catalog (report B02) sets real amounts:
 // meters still record every customer's usage and invoices show the lines.
@@ -54,7 +57,7 @@ func SeedCatalog(ctx context.Context, sc *stripe.Client, currency string, plans 
 		if p.SeatUnitAmount <= 0 {
 			return nil, fmt.Errorf("stripe catalog: plan %s needs a positive seat price", p.Code)
 		}
-		productID, err := ensureProduct(ctx, sc, "fluxboard_"+p.Code, "Fluxboard "+p.Name)
+		productID, err := ensureProduct(ctx, sc, ProductID(p.Code), "Fluxboard "+p.Name)
 		if err != nil {
 			return nil, err
 		}

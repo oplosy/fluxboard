@@ -436,3 +436,36 @@ func TestReconcileStubModeSkips(t *testing.T) {
 		t.Fatalf("drift counter = %v, want 0 in stub mode", got)
 	}
 }
+
+// recordingSeats records which orgs the reconcile asked to re-sync seats for.
+type recordingSeats struct{ orgs []string }
+
+func (r *recordingSeats) SyncSeats(_ context.Context, orgID string) error {
+	r.orgs = append(r.orgs, orgID)
+	return nil
+}
+
+// Seats follow membership; the nightly reconcile re-syncs them for every org
+// with a Stripe subscription, even when status/plan did not drift (B02).
+func TestReconcileSyncsSeats(t *testing.T) {
+	end := time.Date(2026, 8, 1, 0, 0, 0, 0, time.UTC)
+	local := &billing.Subscription{
+		OrgID: "org1", PlanCode: billing.PlanPro, Status: billing.StatusActive,
+		StripeSubscriptionID: str("sub_1"), CurrentPeriodEnd: &end,
+	}
+	gw := &fakeGateway{remote: &billing.StripeSubscription{
+		SubscriptionID: "sub_1", Status: billing.StatusActive, PlanCode: billing.PlanPro, CurrentPeriodEnd: &end,
+	}}
+	seats := &recordingSeats{}
+	b := NewBilling(BillingDeps{
+		Subs: &fakeSubs{sub: local}, Gateway: gw, Cache: &fakeCache{},
+		Drift: prometheus.NewCounter(prometheus.CounterOpts{Name: "billing_reconciliation_drift_total"}),
+		Orgs:  &fakeOrgs{ids: []string{"org1"}}, Seats: seats, Logger: discard(),
+	})
+	if err := b.HandleReconcile(context.Background(), nil); err != nil {
+		t.Fatalf("reconcile: %v", err)
+	}
+	if len(seats.orgs) != 1 || seats.orgs[0] != "org1" {
+		t.Fatalf("seat sync orgs = %v, want [org1]", seats.orgs)
+	}
+}

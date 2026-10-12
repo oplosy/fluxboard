@@ -7,9 +7,52 @@ import { Button } from '@/components/ui/button';
 import { CountUp, Tilt } from '@/components/motion/effects';
 import { Reveal } from '@/components/motion/reveal';
 import { cn } from '@/lib/utils';
-import { plans } from '@/lib/marketing/plans';
+import { marketingCopy } from '@/lib/marketing/plans';
+import { limitLabel, usePlanCatalog } from '@/lib/billing/plans';
+import { formatBytes } from '@/lib/billing/format';
 
+// Prices and limits come from the server catalog (GET /plans, report B02); this
+// component only adds copy, so the public page shows exactly what is enforced.
 export function PricingTable() {
+  const catalog = usePlanCatalog();
+
+  if (catalog.isError) {
+    return (
+      <p className="rounded-lg border border-border p-6 text-sm text-muted-foreground">
+        Pricing is temporarily unavailable. Please try again in a moment.
+      </p>
+    );
+  }
+  if (!catalog.data) {
+    return (
+      <div className="grid gap-4 md:grid-cols-3" aria-busy="true">
+        {[0, 1, 2].map((i) => (
+          <div key={i} className="h-[30rem] animate-pulse rounded-lg border border-border bg-card" />
+        ))}
+      </div>
+    );
+  }
+
+  const plans = catalog.data.plans.map((p) => {
+    const copy = marketingCopy[p.code];
+    return {
+      key: p.code,
+      name: p.name,
+      seatPrice: p.seat_price,
+      tagline: copy?.tagline ?? '',
+      highlighted: copy?.highlighted ?? false,
+      features: [
+        `${limitLabel(p.max_projects)} ${p.max_projects === 1 ? 'project' : 'projects'}`,
+        `${limitLabel(p.max_members)} members`,
+        `${formatBytes(p.max_storage_bytes)} storage`,
+        `${p.api_rate_per_min.toLocaleString()} API requests / min`,
+        `${p.audit_retention_days}-day audit log`,
+        ...(p.metered ? ['Storage and API usage metering'] : []),
+        ...(copy?.extras ?? []),
+      ],
+    };
+  });
+
   return (
     <div className="grid gap-4 md:grid-cols-3">
       {plans.map((plan, i) => (
@@ -33,9 +76,11 @@ export function PricingTable() {
             <p className={cn('mt-1 text-sm', plan.highlighted ? 'text-background/60' : 'text-muted-foreground')}>{plan.tagline}</p>
             <p className="mt-8 flex items-baseline gap-1">
               <span className="font-display text-6xl font-semibold tracking-[-0.05em]">
-                <CountUp value={plan.priceCents / 100} prefix="$" duration={1200 + i * 200} />
+                <CountUp value={plan.seatPrice / 100} prefix="$" duration={1200 + i * 200} />
               </span>
-              <span className={cn('text-sm', plan.highlighted ? 'text-background/60' : 'text-muted-foreground')}>/ month</span>
+              <span className={cn('text-sm', plan.highlighted ? 'text-background/60' : 'text-muted-foreground')}>
+                {plan.seatPrice > 0 ? '/ seat / month' : '/ month'}
+              </span>
             </p>
             <ul className={cn('mt-8 flex-1 space-y-3 border-t pt-6', plan.highlighted ? 'border-background/15' : 'border-border')}>
               {plan.features.map((f, j) => (

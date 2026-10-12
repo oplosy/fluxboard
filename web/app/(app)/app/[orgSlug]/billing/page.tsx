@@ -15,7 +15,7 @@ import {
   getBillingSummary,
   resumeSubscription,
 } from '@/lib/api/billing';
-import { planByCode, limitLabel } from '@/lib/billing/plans';
+import { billableSeats, limitLabel, usePlanCatalog } from '@/lib/billing/plans';
 import type { SubStatus } from '@/lib/api/types';
 
 const STATUS_STYLE: Record<SubStatus, string> = {
@@ -42,6 +42,7 @@ export default function BillingOverviewPage() {
   const queryClient = useQueryClient();
   const { members } = useOrgMembers();
 
+  const catalog = usePlanCatalog();
   const summary = useQuery({
     queryKey: ['billing-summary', orgId],
     queryFn: () => getBillingSummary(orgId),
@@ -84,9 +85,9 @@ export default function BillingOverviewPage() {
   }
 
   const s = summary.data;
-  const plan = planByCode(s.plan);
+  const plan = catalog.data?.plans.find((p) => p.code === s.plan);
   const status = s.status;
-  const seatCount = members.length;
+  const seatCount = billableSeats(members);
   const maxMembers = s.entitlements.max_members;
 
   return (

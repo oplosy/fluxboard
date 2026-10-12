@@ -82,8 +82,15 @@ type BillingDeps struct {
 	Client      Enqueuer
 	Drift       prometheus.Counter // billing_reconciliation_drift_total
 	Orgs        OrgLister
+	Seats       SeatSyncer // nightly seat-count heal (report B02); nil ⇒ skipped
 	Logger      *slog.Logger
 	Now         func() time.Time // nil ⇒ time.Now (tests override)
+}
+
+// SeatSyncer sets a paid subscription's seats to the org's billable members
+// (billinguc.Service.SyncSeats).
+type SeatSyncer interface {
+	SyncSeats(ctx context.Context, orgID string) error
 }
 
 // Billing runs the Phase 4 billing jobs.
@@ -284,6 +291,12 @@ func (b *Billing) HandleReconcile(ctx context.Context, _ *asynq.Task) error {
 		}
 		if err != nil {
 			return 0, err
+		}
+		// Seats follow membership; a sync missed at change time is healed here.
+		if b.d.Seats != nil {
+			if err := b.d.Seats.SyncSeats(ctx, orgID); err != nil {
+				return 0, fmt.Errorf("seat sync: %w", err)
+			}
 		}
 		if !subDrifted(sub, remote) {
 			return 0, nil
