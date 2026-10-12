@@ -1,0 +1,77 @@
+# Prometheus alert rules (docs/10-INFRA-DEVOPS.md §5). Only metrics the api and
+# worker actually export are used; spec'd alerts with no metric yet (Asynq
+# dead-letter count, queue depth, readyz probe) are listed at the bottom.
+# No Alertmanager is configured: rules evaluate and show under /alerts in
+# Prometheus, but nothing is delivered until a receiver is chosen.
+groups:
+  - name: fluxboard-availability
+    rules:
+      - alert: APIDown
+        expr: up{job="api"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "API target {{ $labels.instance }} has not been scraped for 2m"
+
+      - alert: WorkerDown
+        expr: up{job="worker"} == 0
+        for: 2m
+        labels:
+          severity: page
+        annotations:
+          summary: "Worker target {{ $labels.instance }} has not been scraped for 2m"
+
+      - alert: APIHighErrorRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{status=~"5.."}[10m]))
+            / sum(rate(http_request_duration_seconds_count[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 5% of API requests returned 5xx over 10m"
+
+  - name: fluxboard-billing
+    rules:
+      - alert: StripeWebhookErrorRate
+        expr: |
+          sum(rate(http_request_duration_seconds_count{route="/api/v1/webhooks/stripe", status=~"5.."}[10m]))
+            / sum(rate(http_request_duration_seconds_count{route="/api/v1/webhooks/stripe"}[10m])) > 0.05
+        for: 10m
+        labels:
+          severity: page
+        annotations:
+          summary: "More than 5% of Stripe webhook deliveries failed over 10m (06 §4)"
+
+      - alert: BillingReconciliationDrift
+        expr: increase(billing_reconciliation_drift_total[1d]) > 0
+        labels:
+          severity: warning
+        annotations:
+          summary: "Nightly reconcile found subscriptions drifted from Stripe (06 §8)"
+
+  - name: fluxboard-jobs
+    rules:
+      - alert: JobFailureRate
+        expr: |
+          sum by (type) (rate(asynq_task_processed_total{status="error"}[15m]))
+            / sum by (type) (rate(asynq_task_processed_total[15m])) > 0.1
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: "More than 10% of {{ $labels.type }} jobs failed over 15m"
+
+  - name: fluxboard-security
+    rules:
+      - alert: RefreshTokenReuse
+        expr: increase(auth_refresh_reuse_total[10m]) > 0
+        labels:
+          severity: info
+        annotations:
+          summary: "Refresh-token reuse detected; a token family was revoked"
+
+# Not yet expressible (no metric exported):
+#   - Asynq dead-letter > 0 and queue depth > 1000 need an Asynq queue exporter.
+#   - "readyz failing 3x" needs a blackbox probe of /readyz.

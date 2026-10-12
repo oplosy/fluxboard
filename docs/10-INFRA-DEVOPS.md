@@ -115,6 +115,12 @@ DB + Redis (+ optional MinIO/Stripe); `/healthz` is liveness only. (6.7.5)
 **Alert rules (prometheus rules file, documented even if only local):**
 webhook error-rate > 5%/10 m, dead-letter > 0, readyz failing 3×,
 refresh_reuse > 0 (info-level security alert), queue depth > 1000.
+Implemented in `deploy/prometheus/alerts.yml` (unit-tested by
+`alerts_test.yml` via `promtool test rules`): api/worker down, API 5xx > 5%,
+webhook error-rate, reconcile drift, job failure rate, refresh reuse.
+Dead-letter, queue depth and readyz need an Asynq exporter / blackbox probe
+first. No Alertmanager receiver is configured yet, so alerts are visible in
+Prometheus but not delivered.
 
 ## 6. Operational Behaviors
 
