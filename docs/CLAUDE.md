@@ -31,7 +31,7 @@ project demonstrating senior-level backend engineering.
 - **Database:** PostgreSQL 16 with Row-Level Security
 - **Cache/Queue:** Redis 7 (go-redis/v9), Asynq for background jobs
 - **Payments:** Stripe (stripe-go/v78), Stripe CLI for local webhook forwarding
-- **Object storage:** MinIO (S3-compatible), presigned URLs
+- **Object storage:** S3-compatible via minio-go, presigned URLs; RustFS in local compose (ADR-027)
 - **Frontend:** Next.js 16 App Router (React 19, ADR-026), TypeScript strict, TanStack Query v5, Tailwind, shadcn/ui, dnd-kit (kanban), Recharts
 - **Observability:** Prometheus + Grafana, structured logging with slog (JSON)
 - **Local dev:** Docker Compose (single `make up` brings everything up)
@@ -103,7 +103,7 @@ as an ADR entry in `03-ARCHITECTURE.md` §ADR before implementing.
 ## Local Development Quickstart
 
 ```bash
-make up          # docker compose: postgres, redis, minio, stripe-cli, mailpit
+make up          # docker compose: postgres, redis, rustfs (S3), stripe-cli, mailpit
 make migrate     # run all migrations
 make seed        # seed demo tenant + users (see 12-TESTING.md §5)
 make api         # run Go API with hot reload (air)

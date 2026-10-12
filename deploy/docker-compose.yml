@@ -39,36 +39,56 @@ services:
       timeout: 3s
       retries: 10
 
-  minio:
-    image: minio/minio
-    command: ["server", "/data", "--console-address", ":9001"]
+  # S3-compatible object store (ADR-027). MinIO's images are no longer
+  # published; RustFS is a MinIO-compatible drop-in, so the app keeps its
+  # MINIO_* settings and minio-go client. The `minio` alias keeps existing
+  # .env files (MINIO_ENDPOINT=minio:9000) working.
+  rustfs:
+    image: rustfs/rustfs:1.0.1
     environment:
-      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
-      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      RUSTFS_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      RUSTFS_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      RUSTFS_ADDRESS: ":9000"
+      RUSTFS_CONSOLE_ENABLE: "true"
+      RUSTFS_CONSOLE_ADDRESS: ":9001"
     ports:
       - "${MINIO_HOST_PORT:-9000}:9000"
       - "${MINIO_CONSOLE_PORT:-9001}:9001"
     volumes:
-      - miniodata:/data
+      - rustfsdata:/data
+    networks:
+      default:
+        aliases: [minio]
     healthcheck:
-      test: ["CMD", "mc", "ready", "local"]
+      test: ["CMD", "curl", "-fsS", "http://localhost:9000/health"]
       interval: 5s
       timeout: 3s
       retries: 10
 
-  minio-init:
-    image: minio/mc
+  # One-shot: create the private bucket and its CORS rules. Browsers PUT/GET
+  # attachments straight to presigned URLs, so the web origins must be allowed
+  # (real S3 needs the same bucket CORS in production).
+  storage-init:
+    image: amazon/aws-cli:2.27.50
     depends_on:
-      minio:
+      rustfs:
         condition: service_healthy
+    environment:
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      AWS_DEFAULT_REGION: us-east-1
+      BUCKET: ${MINIO_BUCKET:-fluxboard}
+      CORS_ORIGINS: ${STORAGE_CORS_ORIGINS:-http://localhost:3000,http://localhost:3100}
     entrypoint:
       - /bin/sh
       - -c
       - |
-        mc alias set local http://minio:9000 "${MINIO_ROOT_USER:-minioadmin}" "${MINIO_ROOT_PASSWORD:-minioadmin}" &&
-        mc mb --ignore-existing local/${MINIO_BUCKET:-fluxboard} &&
-        mc anonymous set none local/${MINIO_BUCKET:-fluxboard} &&
-        echo "minio bucket ready" && exit 0
+        set -e
+        s3="aws --endpoint-url http://rustfs:9000 s3api"
+        $$s3 head-bucket --bucket "$$BUCKET" 2>/dev/null || $$s3 create-bucket --bucket "$$BUCKET"
+        origins=$$(printf '%s' "$$CORS_ORIGINS" | sed 's/,/","/g')
+        $$s3 put-bucket-cors --bucket "$$BUCKET" --cors-configuration "{\"CORSRules\":[{\"AllowedOrigins\":[\"$$origins\"],\"AllowedMethods\":[\"GET\",\"PUT\",\"HEAD\"],\"AllowedHeaders\":[\"*\"],\"ExposeHeaders\":[\"ETag\"],\"MaxAgeSeconds\":3000}]}"
+        echo "bucket $$BUCKET ready (CORS: $$CORS_ORIGINS)"
     restart: "no"
 
   mailpit:
@@ -97,7 +117,7 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
-      minio:
+      rustfs:
         condition: service_healthy
 
   worker:
@@ -176,5 +196,5 @@ services:
 volumes:
   pgdata:
   redisdata:
-  miniodata:
+  rustfsdata:
   grafanadata:
