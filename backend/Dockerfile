@@ -28,3 +28,9 @@ COPY --from=build /out/worker /worker
 EXPOSE 8081
 USER nonroot:nonroot
 ENTRYPOINT ["/worker"]
+
+# --- migrations target: this release's exact SQL with golang-migrate ---
+# docker run <image> -database "$DATABASE_URL_MIGRATE" up   (docs/runbooks/release.md)
+FROM migrate/migrate:v4.18.3 AS migrations
+COPY migrations/*.sql /migrations/
+ENTRYPOINT ["migrate", "-path=/migrations"]

@@ -65,16 +65,26 @@ Jobs (parallel where independent):
 1. **lint:** golangci-lint, go-arch-lint (dependency rule 03 §3), and `sqlc diff`
    (generated code current).
 2. **test-backend:** unit and integration-tag tests with PostgreSQL, Redis, and
-   RustFS (S3, ADR-027) service containers. The integration suites fail rather
-   than skip when `TEST_DATABASE_URL` / `TEST_S3_ENDPOINT` are missing.
-3. **build:** Docker-build both backend images with the commit SHA tag.
+   RustFS (S3, ADR-027) service containers. Migrations run up, fully down (every
+   `.down.sql`) and up again before the suites. The integration suites fail
+   rather than skip when `TEST_DATABASE_URL` / `TEST_S3_ENDPOINT` are missing.
+3. **build:** Docker-build the api, worker, migrations and web images with the
+   commit SHA tag (no push).
 4. **web:** frozen pnpm install, TypeScript check, ESLint, Vitest, and Next.js
    production build.
 5. **security:** govulncheck and gitleaks. npm audit and Playwright smoke are
    not currently workflow steps; the dockerized UI smoke remains a deferred
    follow-up tracked in `docs/build/README.md`.
 
-Branch protection: PRs to main require jobs 1–3 green.
+Branch protection: PRs to main require all five jobs green.
+
+**Releases (`.github/workflows/release.yml`):** a `vX.Y.Z` tag re-runs this
+gate on the tagged commit, pushes the four images to GHCR
+(`ghcr.io/<owner>/fluxboard-{migrations,api,worker,web}`, tags `X.Y.Z`, `X.Y`,
+`sha-<commit>`, SBOM + provenance) and opens a GitHub Release listing the image
+digests. The web image needs the repository variable `NEXT_PUBLIC_API_BASE`
+(https). Deploy order, the expand/contract migration rule and rollback:
+`docs/runbooks/release.md`.
 
 ## 5. Observability
 
@@ -132,8 +142,10 @@ Prometheus but not delivered.
 - **Readiness vs liveness:** `/readyz` gates traffic (DB+Redis+migration
   version check); `/healthz` only process-up — restart loops never caused by
   dependency blips.
-- **Migrations:** run as a separate step/job (never on api boot in prod
-  shape); `migrate-down` tested in CI for the last 3 migrations.
+- **Migrations:** run as a separate step/job from the release's
+  `fluxboard-migrations` image (never on api boot in prod shape); expand-only
+  per release so the previous binaries survive a rollback; CI runs every down
+  migration on each PR (`docs/runbooks/release.md`).
 - **Backups (documented posture):** automated nightly `pg_dump` to the MinIO
   `backups/` bucket is planned but is not currently provisioned by Compose.
   The manual validation procedure is in `docs/runbooks/restore.md`; it must be
