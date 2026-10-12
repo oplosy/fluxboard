@@ -128,6 +128,14 @@ func (c *Config) prodCommon() []error {
 	if !strings.HasPrefix(c.WebOrigin, "https://") {
 		errs = append(errs, fmt.Errorf("WEB_ORIGIN must be an https URL, got %q", c.WebOrigin))
 	}
+	// The stub gateway fakes checkout and accepts HMAC-signed fake webhooks.
+	if c.StripeMode != "live" {
+		errs = append(errs, fmt.Errorf("STRIPE_MODE must be live, got %q", c.StripeMode))
+	}
+	errs = append(errs,
+		required("STRIPE_SECRET_KEY", c.StripeSecretKey),
+		required("STRIPE_WEBHOOK_SECRET", c.StripeWebhookSecret),
+	)
 	return errs
 }
 

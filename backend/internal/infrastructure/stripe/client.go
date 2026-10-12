@@ -2,8 +2,8 @@
 // MODE=stub (docs/build/PHASE-4-BILLING.md §4.0.1) it is a dev fake with no
 // external calls: mutations are no-ops and ConstructEvent verifies a crafted
 // payload with an HMAC-SHA256 of the body keyed by STRIPE_WEBHOOK_SECRET (the
-// shared "stub signature"). The real stripe-go/v78 adapter lands behind the same
-// interface later (MODE=live); New returns an error for it until then.
+// shared "stub signature"). MODE=live is the stripe-go adapter (live.go,
+// ADR-029); it works with test-mode and live-mode keys alike.
 package stripex
 
 import (
@@ -19,16 +19,24 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 )
 
-// New builds the StripeGateway for the given mode. "stub" returns the dev fake;
-// "live" is not implemented yet (the stripe-go adapter is deferred, §4.0.2).
-func New(mode, webhookSecret, baseURL string) (billing.StripeGateway, error) {
-	switch mode {
+// Config selects and configures the gateway (STRIPE_* env).
+type Config struct {
+	Mode          string // "stub" (default) | "live"
+	SecretKey     string // live only
+	WebhookSecret string // live: endpoint signing secret; stub: HMAC key
+	BaseURL       string // stub only: base of the fake Checkout/Portal URLs
+}
+
+// New builds the StripeGateway for cfg.Mode. plans is read by the live adapter
+// to map Stripe prices back to plan codes.
+func New(cfg Config, plans billing.PlanRepository) (billing.StripeGateway, error) {
+	switch cfg.Mode {
 	case "stub", "":
-		return &StubGateway{webhookSecret: webhookSecret, baseURL: baseURL}, nil
+		return &StubGateway{webhookSecret: cfg.WebhookSecret, baseURL: cfg.BaseURL}, nil
 	case "live":
-		return nil, fmt.Errorf("stripex: MODE=live not implemented yet (stub only); wire stripe-go/v78 here")
+		return NewLive(cfg.SecretKey, cfg.WebhookSecret, plans)
 	default:
-		return nil, fmt.Errorf("stripex: unknown STRIPE_MODE %q", mode)
+		return nil, fmt.Errorf("stripex: unknown STRIPE_MODE %q", cfg.Mode)
 	}
 }
 
@@ -62,8 +70,12 @@ func (g *StubGateway) CreateCheckout(_ context.Context, p billing.CheckoutParams
 	}, nil
 }
 
-// UpcomingInvoice returns a deterministic stub proration (seat count × $10).
+// UpcomingInvoice returns a deterministic stub proration (seat count × $10; the
+// stub has no current count, so "keep current" (seats <= 0) counts as 1).
 func (g *StubGateway) UpcomingInvoice(_ context.Context, _ string, _ billing.Plan, seats int64) (int64, string, error) {
+	if seats <= 0 {
+		seats = 1
+	}
 	return seats * 1000, "usd", nil
 }
 
