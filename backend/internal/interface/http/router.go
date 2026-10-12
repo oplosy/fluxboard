@@ -163,6 +163,7 @@ func NewRouter(d Deps) http.Handler {
 				sec.Get("/me", d.User.Me)
 				sec.Patch("/me", d.User.UpdateMe)
 				sec.Delete("/me", d.User.DeleteMe)
+				sec.Get("/me/export", d.User.ExportMe) // personal data export (B09)
 				sec.Post("/me/avatar/upload-url", d.User.AvatarUploadURL)
 				sec.Post("/me/avatar/confirm", d.User.AvatarConfirm)
 			}

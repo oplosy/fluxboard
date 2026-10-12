@@ -212,6 +212,8 @@ type Querier interface {
 	ListNotificationPrefs(ctx context.Context, arg ListNotificationPrefsParams) ([]NotificationPref, error)
 	// only_unread=false returns all; before nil ⇒ newest page.
 	ListNotifications(ctx context.Context, arg ListNotificationsParams) ([]Notification, error)
+	// The caller's linked sign-in identities, for the personal data export (B09).
+	ListOAuthIdentitiesByUser(ctx context.Context, userID uuid.UUID) ([]OauthIdentity, error)
 	// OWNER addresses for billing notifications (dunning/cancel emails, 06 §4).
 	ListOrgOwnerEmails(ctx context.Context, orgID uuid.UUID) ([]string, error)
 	// Pending rows older than the cutoff (never PUT or never confirmed) — the nightly

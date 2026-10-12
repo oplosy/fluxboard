@@ -439,13 +439,15 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	// Account self-service (docs/08 §3). Avatars reuse the MinIO object store; the
 	// sole-owner guard needs the owner pool (nil ⇒ DELETE /me returns 403).
 	userSvc := useruc.New(useruc.Deps{
-		Users:     userRepo,
-		Avatars:   objectStore,
-		Sessions:  sessionRepo,
-		SoleOwner: userSoleOwner,
-		Logger:    logger,
+		Users:      userRepo,
+		Avatars:    objectStore,
+		Sessions:   sessionRepo,
+		SoleOwner:  userSoleOwner,
+		Identities: oauthRepo,
+		Logger:     logger,
 	})
 	userHandlers := handlers.NewUserHandlers(userSvc, logger)
+	userHandlers.Export = handlers.ExportSources{Sessions: authSvc.ListSessions, Orgs: tenantSvc.ListMyOrgs}
 
 	automationSvc := automationuc.New(automationuc.Deps{
 		Rules: automationRepo, Tasks: taskRepo, Labels: labelRepo,

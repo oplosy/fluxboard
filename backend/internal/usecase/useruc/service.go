@@ -45,6 +45,11 @@ type AvatarStore interface {
 	PresignGet(ctx context.Context, key, filename string, ttl time.Duration) (string, error)
 }
 
+// IdentityLister lists the caller's linked sign-in identities (export, B09).
+type IdentityLister interface {
+	ListByUser(ctx context.Context, userID string) ([]*auth.OAuthIdentity, error)
+}
+
 // Sessions revokes the caller's sessions on account deletion.
 type Sessions interface {
 	RevokeAllForUser(ctx context.Context, userID, reason string) error
@@ -87,20 +92,22 @@ type Profile struct {
 
 // Deps are the useruc collaborators.
 type Deps struct {
-	Users     UserStore
-	Avatars   AvatarStore
-	Sessions  Sessions
-	SoleOwner SoleOwnerReader // nil ⇒ account deletion disabled (owner pool absent)
-	Logger    *slog.Logger
+	Users      UserStore
+	Avatars    AvatarStore
+	Sessions   Sessions
+	SoleOwner  SoleOwnerReader // nil ⇒ account deletion disabled (owner pool absent)
+	Identities IdentityLister  // nil ⇒ export lists no linked identities
+	Logger     *slog.Logger
 }
 
 // Service implements the account usecase.
 type Service struct {
-	users     UserStore
-	avatars   AvatarStore
-	sessions  Sessions
-	soleOwner SoleOwnerReader
-	logger    *slog.Logger
+	users      UserStore
+	avatars    AvatarStore
+	sessions   Sessions
+	soleOwner  SoleOwnerReader
+	identities IdentityLister
+	logger     *slog.Logger
 }
 
 // New builds the Service.
@@ -109,11 +116,12 @@ func New(d Deps) *Service {
 		d.Logger = slog.Default()
 	}
 	return &Service{
-		users:     d.Users,
-		avatars:   d.Avatars,
-		sessions:  d.Sessions,
-		soleOwner: d.SoleOwner,
-		logger:    d.Logger,
+		users:      d.Users,
+		avatars:    d.Avatars,
+		sessions:   d.Sessions,
+		soleOwner:  d.SoleOwner,
+		identities: d.Identities,
+		logger:     d.Logger,
 	}
 }
 
@@ -203,4 +211,40 @@ func (s *Service) Delete(ctx context.Context, userID string) error {
 		return err
 	}
 	return s.users.Delete(ctx, userID)
+}
+
+// AccountExport is the account part of the personal data export (report B09):
+// the user row (minus secrets) and the linked sign-in identities.
+type AccountExport struct {
+	ID            string
+	Email         string
+	Name          string
+	EmailVerified bool
+	PlatformRole  string
+	TOTPEnabled   bool
+	HasAvatar     bool
+	CreatedAt     time.Time
+	Identities    []*auth.OAuthIdentity
+}
+
+// Export returns the caller's account data for the self-service export.
+// Password verifier, TOTP secret and recovery codes are never included.
+func (s *Service) Export(ctx context.Context, userID string) (*AccountExport, error) {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+	out := &AccountExport{
+		ID: u.ID, Email: u.Email, Name: u.Name, EmailVerified: u.EmailVerified,
+		PlatformRole: string(u.PlatformRole), TOTPEnabled: u.TOTPEnabled,
+		HasAvatar: u.AvatarKey != "", CreatedAt: u.CreatedAt,
+	}
+	if s.identities != nil {
+		ids, err := s.identities.ListByUser(ctx, userID)
+		if err != nil {
+			return nil, fmt.Errorf("list identities: %w", err)
+		}
+		out.Identities = ids
+	}
+	return out, nil
 }

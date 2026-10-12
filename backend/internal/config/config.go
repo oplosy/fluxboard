@@ -128,6 +128,10 @@ func (c *Config) prodCommon() []error {
 	if !strings.HasPrefix(c.WebOrigin, "https://") {
 		errs = append(errs, fmt.Errorf("WEB_ORIGIN must be an https URL, got %q", c.WebOrigin))
 	}
+	// Mail goes out from the operator's real domain (report B09), never the dev default.
+	if strings.HasSuffix(strings.ToLower(strings.TrimSpace(c.SMTPFrom)), ".local") || strings.TrimSpace(c.SMTPFrom) == "" {
+		errs = append(errs, fmt.Errorf("SMTP_FROM must be an address on the operator's domain, got %q", c.SMTPFrom))
+	}
 	// The stub gateway fakes checkout and accepts HMAC-signed fake webhooks.
 	if c.StripeMode != "live" {
 		errs = append(errs, fmt.Errorf("STRIPE_MODE must be live, got %q", c.StripeMode))
