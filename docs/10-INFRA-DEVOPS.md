@@ -50,8 +50,8 @@ make logs                      tail all service logs
 make migrate / migrate-down    golang-migrate against DATABASE_URL_MIGRATE
 make sqlc                      regenerate query code
 make gen-client                print the current client-generation guidance
-make seed                      print the not-yet-implemented seed notice
-make stripe-seed                print the not-yet-implemented Stripe seed notice
+make seed                      load the demo fixture (12-TESTING §5); runs stripe-seed first
+make stripe-seed                upsert the plan catalog into `plans` (stub mode, no Stripe calls)
 make api / worker / web        dev processes
 make test / test-integration   Go unit / integration-tag suites
 make lint                      golangci-lint + go-arch-lint

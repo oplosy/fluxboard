@@ -57,15 +57,37 @@ CI uses service containers instead, and suites take their endpoints from env.
 
 ## 5. Seed Data (`make seed`)
 
-**Status: planned.** `make seed` is currently a stub that only prints a
-message; the fixture below is the target. Until it exists, a fresh database has
-no `plans` rows, so entitlement-gated writes (e.g. project create) fail with
-`load free plan: not found`.
+**Status: in place** (`backend/cmd/seed`). `make seed` first runs
+`make stripe-seed` (upserts the free/pro/business `plans` rows; without them
+entitlement-gated writes fail with `load free plan: not found`), then loads the
+fixture on the owner pool. It refuses `APP_ENV=prod`.
 
-Deterministic fixture (fixed UUIDs, fixed clock):
-- Users: `owner@demo.dev`, `admin@…`, `member@…`, `guest@…`, `outsider@…` (all password `Demo-Pass-2026!`), `padmin@…` (platform admin, TOTP seeded)
-- Orgs: `acme` (Business, active, 20 members, 6 projects, 400 tasks, usage history 30d), `beta-co` (Free, 2 members), `pastdue-inc` (Pro, past_due)
-- One project per state: active/archived/private; tasks distributed across columns with realistic timestamps (feeds analytics rollup verification)
+Deterministic fixture (fixed UUIDv5 IDs; every row derived from a clock that
+defaults to today, UTC midnight — pin it with `make seed SEED_ARGS="-clock
+2026-01-15"` for byte-identical data):
+- Users (all `email_verified`, password `Demo-Pass-2026!`): `owner@demo.dev`,
+  `admin@…`, `member@…`, `guest@…`, `outsider@…`, `user01…user16@…`,
+  `beta.member@…`, and `padmin@…` (platform admin). When `TOTP_ENC_KEY` is set,
+  padmin has 2FA enabled with the fixed dev secret `JBSWY3DPEHPK3PXP` (the admin
+  console requires 2FA); without the key padmin is seeded without 2FA.
+- Orgs: `acme` (Business/active, 20 members, 6 projects, 400 tasks, 30 days of
+  usage history), `beta-co` (Free — no subscription row — 2 members, none of
+  them in acme), `pastdue-inc` (Pro/past_due, owned by `owner@`, so the org
+  switcher has two orgs).
+- acme projects: `WEB`, `API`, `MOB`, `OPS` (active, org-visible), `OLD`
+  (archived), `SEC` (private: `user01` LEAD, `user02` CONTRIBUTOR; `member@`
+  is deliberately not a member). `guest@` is VIEWER on `WEB` only.
+- Tasks: created over the last 60 days, older ones mostly Done; ~80% assigned to
+  project contributors, ~60% with a due date (so some open tasks are overdue),
+  priorities and labels spread across the range.
+- Isolation markers: task descriptions contain `secaudit-private-marker`
+  (acme `SEC`), `betaco-marker` (beta-co) and `pastdue-marker` (pastdue-inc) for
+  the search/visibility checks of §6.
+
+Re-running resets the seed orgs: they are deleted (all their tenant rows
+cascade) and rebuilt; seed users are upserted by fixed ID. A user or org that
+only shares a seed email or slug under a different ID is never touched — the
+command fails and names it instead.
 
 ## 6. Tenant Isolation Suite (Phase-2 gate — must be exhaustive, generated)
 

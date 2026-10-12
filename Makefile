@@ -46,11 +46,17 @@ openapi: ## Regenerate the OpenAPI 3.1 spec from swaggo annotations (needs swag 
 gen-client: ## Generate the TS API client from the served openapi.json (Phase 7)
 	@echo "gen-client: point openapi-typescript at http://localhost:8080/api/v1/openapi.json (Phase 7 frontend)."
 
-seed: ## Seed demo tenant + users (Phase 2 stub)
-	@echo "seed: stub until seed data is defined (docs/12-TESTING.md §5)."
+# Go commands that need the compose DB run in a golang container on the compose
+# network with the repo .env (DSNs use the `postgres` service name).
+# MSYS_NO_PATHCONV stops Git Bash on Windows rewriting /src; no-op elsewhere.
+GO_RUN = MSYS_NO_PATHCONV=1 docker run --rm --network $(NETWORK) --env-file .env \
+	-v "$(CURDIR)/backend":/src -v fluxboard_gomod:/go/pkg/mod -w /src golang:1.26 go run
 
-stripe-seed: ## Bootstrap Stripe products/prices -> plans (Phase 4 stub)
-	@echo "stripe-seed: stub until billing exists (Phase 4)."
+seed: stripe-seed ## Load the demo fixture (docs/12-TESTING.md §5); re-run resets it. SEED_ARGS="-clock YYYY-MM-DD"
+	$(GO_RUN) ./cmd/seed $(SEED_ARGS)
+
+stripe-seed: ## Upsert the plan catalog into plans (stub mode, no Stripe calls)
+	$(GO_RUN) ./cmd/stripeseed
 
 api: ## Run the API with hot reload (in-stack)
 	$(COMPOSE) up api
