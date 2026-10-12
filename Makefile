@@ -73,13 +73,18 @@ test: ## Run unit tests
 # Integration DSN targets the app role on the HOST-exposed postgres port
 # (compose stack up + migrated). Override for CI.
 TEST_DATABASE_URL ?= postgres://fluxboard_app:app_pw@localhost:5432/fluxboard?sslmode=disable
+# The tenant-isolation suite also loads the demo fixture (owner role; resets
+# the demo orgs like `make seed`) and needs Redis for the full API wiring.
+TEST_DATABASE_OWNER_URL ?= postgres://fluxboard_owner:owner_pw@localhost:5432/fluxboard?sslmode=disable
+TEST_REDIS_ADDR ?= localhost:6379
 # Object-store suite targets the compose RustFS on its host port (ADR-027).
 TEST_S3_ENDPOINT ?= localhost:9000
 TEST_S3_ACCESS_KEY ?= minioadmin
 TEST_S3_SECRET_KEY ?= minioadmin
 
 test-integration: ## Run integration suites against the compose stack (make up + migrate first)
-	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_S3_ENDPOINT="$(TEST_S3_ENDPOINT)" \
+	cd backend && TEST_DATABASE_URL="$(TEST_DATABASE_URL)" TEST_DATABASE_OWNER_URL="$(TEST_DATABASE_OWNER_URL)" \
+		TEST_REDIS_ADDR="$(TEST_REDIS_ADDR)" TEST_S3_ENDPOINT="$(TEST_S3_ENDPOINT)" \
 		TEST_S3_ACCESS_KEY="$(TEST_S3_ACCESS_KEY)" TEST_S3_SECRET_KEY="$(TEST_S3_SECRET_KEY)" \
 		go test -tags=integration ./...
 

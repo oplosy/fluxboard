@@ -129,12 +129,13 @@ func Build(clock time.Time) Fixture {
 	admin := user("admin", "admin@demo.dev", "Adam Admin", false)
 	member := user("member", "member@demo.dev", "Mia Member", false)
 	guest := user("guest", "guest@demo.dev", "Gus Guest", false)
-	outsider := user("outsider", "outsider@demo.dev", "Otto Outsider", false)
+	user("outsider", "outsider@demo.dev", "Otto Outsider", false) // in no org: the isolation suite's outsider
 	user("padmin", "padmin@demo.dev", "Paula Platform", true)
 	var team []string
 	for i := 1; i <= 16; i++ {
 		team = append(team, user(fmt.Sprintf("user%02d", i), fmt.Sprintf("user%02d@demo.dev", i), fmt.Sprintf("Teammate %02d", i), false))
 	}
+	betaOwner := user("beta.owner", "beta.owner@demo.dev", "Bo Beta", false)
 	betaMember := user("beta.member", "beta.member@demo.dev", "Bea Beta", false)
 
 	org := func(slug, name, customer string, age time.Duration) string {
@@ -158,7 +159,7 @@ func Build(clock time.Time) Fixture {
 		grant(acme, u, "MEMBER")
 	}
 	// beta-co: 2 members, none of them in acme (the isolation suite's org B).
-	grant(beta, outsider, "OWNER")
+	grant(beta, betaOwner, "OWNER")
 	grant(beta, betaMember, "MEMBER")
 	grant(pastdue, owner, "OWNER")
 
@@ -198,7 +199,7 @@ func Build(clock time.Time) Fixture {
 		{acme, "OPS", "Operations", "org", nil, 60, owner, teamFor(3), nil, ""},
 		{acme, "OLD", "Legacy Portal", "org", &archivedAt, 40, owner, team[:4], nil, ""},
 		{acme, "SEC", "Security Audit", "private", nil, 30, team[0], []string{team[1]}, nil, "secaudit-private-marker"},
-		{beta, "BETA", "Beta Launch", "org", nil, 6, outsider, []string{betaMember}, nil, "betaco-marker"},
+		{beta, "BETA", "Beta Launch", "org", nil, 6, betaOwner, []string{betaMember}, nil, "betaco-marker"},
 		{pastdue, "PAY", "Payments", "org", nil, 4, owner, nil, nil, "pastdue-marker"},
 	}
 

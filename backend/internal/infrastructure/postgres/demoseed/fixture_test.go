@@ -169,3 +169,24 @@ func TestDemoPasswordPassesPolicy(t *testing.T) {
 		}
 	}
 }
+
+// The isolation suite's principals: outsider@ belongs to no org, and no acme
+// member belongs to beta-co (org B).
+func TestBuildIsolationPrincipals(t *testing.T) {
+	f := Build(testClock)
+	orgsOf := map[string][]string{}
+	for _, m := range f.Memberships {
+		orgsOf[m.UserID] = append(orgsOf[m.UserID], m.OrgID)
+	}
+	if got := orgsOf[ID("user", "outsider")]; len(got) != 0 {
+		t.Fatalf("outsider@ must be in no org, is in %v", got)
+	}
+	beta := ID("org", "beta-co")
+	for _, key := range []string{"owner", "admin", "member", "guest"} {
+		for _, o := range orgsOf[ID("user", key)] {
+			if o == beta {
+				t.Fatalf("%s@ must not be a beta-co member", key)
+			}
+		}
+	}
+}
