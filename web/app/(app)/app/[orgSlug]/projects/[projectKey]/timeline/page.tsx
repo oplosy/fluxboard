@@ -20,14 +20,15 @@ export default function ProjectTimelinePage(props: { params: Promise<{ projectKe
     enabled: Boolean(project),
   });
 
+  const data = board.data;
   const tasks = useMemo(() => {
-    if (!board.data) return [];
-    const out: { task: (typeof board.data.columns)[number]['tasks'][number]; columnName: string }[] = [];
-    for (const col of board.data.columns) {
+    if (!data) return [];
+    const out: { task: (typeof data.columns)[number]['tasks'][number]; columnName: string }[] = [];
+    for (const col of data.columns) {
       for (const t of col.tasks) out.push({ task: t, columnName: col.name });
     }
     return out;
-  }, [board.data]);
+  }, [data]);
 
   if (isLoading || board.isLoading) {
     return <p className="px-6 py-8 text-sm text-muted-foreground">Loading timeline…</p>;
