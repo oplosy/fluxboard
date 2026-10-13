@@ -27,6 +27,7 @@ type Deps struct {
 	PublicForms    *handlers.PublicFormHandlers // nil ⇒ public intake forms disabled
 	Automations    *handlers.AutomationHandlers // nil ⇒ automations disabled
 	AI             *handlers.AIHandlers         // nil ⇒ AI surface disabled
+	MCP            http.Handler                 // nil ⇒ /mcp disabled (ADR-034)
 	Billing        *handlers.BillingHandlers
 	Webhooks       *handlers.WebhookHandlers
 	Events         *handlers.EventHandlers        // nil ⇒ SSE disabled (tests)
@@ -150,6 +151,20 @@ func NewRouter(d Deps) http.Handler {
 				pr.Delete("/2fa", d.Auth.Disable2FA)
 			})
 		})
+
+		// MCP server (ADR-034, FR-AI-007): one org-less endpoint for agents. An
+		// org-bound API key is the only accepted credential; its org becomes the
+		// tenant, then the plan rate limiter/metering apply as on org routes.
+		if d.MCP != nil && d.APIKeyResolver != nil {
+			api.Group(func(m chi.Router) {
+				m.Use(mw.HybridAuth(d.Authenticator, d.APIKeyResolver))
+				m.Use(d.Tenant.ResolveFromAPIKey)
+				if d.RateLimit != nil {
+					m.Use(d.RateLimit.Limit)
+				}
+				m.Handle("/mcp", d.MCP)
+			})
+		}
 
 		// Secured resource surface (Phase 2+). Org-root routes run under auth
 		// only (no tenant context yet); org-scoped routes add TenantGuard
@@ -324,8 +339,8 @@ func NewRouter(d Deps) http.Handler {
 
 				// Governed AI (ADR-025, FR-AI-001..008). Member-level actions run
 				// under read:org; the usecase pipeline (surface gate, meter,
-				// BUSINESS+ risk gate) is the authorization. MCP POST needs a
-				// write-scoped key (scope guard, FR-AI-007 v1 note).
+				// BUSINESS+ risk gate) is the authorization. The MCP tools live
+				// on the org-less /mcp endpoint above (ADR-034).
 				if d.AI != nil {
 					o.With(read(tenant.ObjOrg)).Post("/ai/parse", d.AI.Parse)
 					o.With(read(tenant.ObjOrg)).Post("/ai/plan", d.AI.PlanDraft)
@@ -334,7 +349,6 @@ func NewRouter(d Deps) http.Handler {
 					o.With(read(tenant.ObjOrg)).Get("/ai/risks", d.AI.ListRisks)
 					o.With(read(tenant.ObjOrg)).Post("/ai/risks/scan", d.AI.ScanRisks)
 					o.With(read(tenant.ObjOrg)).Post("/ai/risks/dismiss", d.AI.DismissRisk)
-					o.With(read(tenant.ObjOrg)).Post("/mcp", d.AI.MCP)
 					o.With(read(tenant.ObjOrg)).Get("/projects/{projectId}/ai/digest", d.AI.Digest)
 				}
 

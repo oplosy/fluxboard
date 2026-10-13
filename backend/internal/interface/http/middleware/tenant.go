@@ -104,6 +104,28 @@ func (g *TenantGuard) Resolve(next http.Handler) http.Handler {
 	})
 }
 
+// ResolveFromAPIKey is Resolve for org-less routes reached with an API key (the
+// MCP endpoint, ADR-034): the key's org becomes the tenant, with the same
+// scope→role mapping as Resolve (write⇒ADMIN, read⇒MEMBER). Anything else —
+// a session token, or no credential — is 401: these routes are key-only.
+func (g *TenantGuard) ResolveFromAPIKey(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		p, ok := PrincipalFrom(r.Context())
+		info, isKey := APIKeyFrom(r.Context())
+		if !ok || !isKey || info.OrgID == "" {
+			response.Error(w, domain.ErrUnauthorized)
+			return
+		}
+		role := tenant.RoleMember
+		if info.HasWrite() {
+			role = tenant.RoleAdmin
+		}
+		ctx := context.WithValue(r.Context(), ctxKeyTenant,
+			TenantContext{OrgID: info.OrgID, UserID: p.UserID, Role: role})
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
+
 // resolveRole returns the caller's org role, or domain.ErrNotFound if they are
 // not a member.
 func (g *TenantGuard) resolveRole(ctx context.Context, orgID, userID string) (tenant.OrgRole, error) {
