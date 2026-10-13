@@ -33,6 +33,8 @@ Permission matrix (authoritative; Casbin policies mirror this):
 | billing: view/manage | ✓ | ✓ | – | – |
 | members: invite/remove/change role | ✓ | ✓* | – | – |
 | api-keys: manage | ✓ | ✓ | – | – |
+| agents: list | ✓ | ✓ | ✓ | – |
+| agents: create/pause/delete, keys | ✓ | ✓ | – | – |
 | audit log: view org | ✓ | ✓ | – | – |
 | project: create | ✓ | ✓ | ✓ | – |
 | project: settings/archive/delete | LEAD or ADMIN+ | | | – |

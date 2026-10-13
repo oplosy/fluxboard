@@ -166,6 +166,7 @@ Portal session (`POST /billing/portal` → redirect URL).
 ```go
 type Entitlements struct {
     MaxMembers, MaxProjects int  // -1 unlimited
+    MaxAgents               int  // agents are not seats (ADR-033)
     MaxStorageBytes         int64
     APIRatePerMin           int
     AuditRetentionDays      int
@@ -174,7 +175,9 @@ type Entitlements struct {
 ```
 
 Resolution: Redis `ent:{orgID}` (TTL 60 s) → miss: derive from subscription
-mirror → cache. Webhook consumer and plan-change usecase DEL the key
+mirror → apply platform-admin `entitlement_overrides` (FR-ADM-002; integer
+value, -1 = unlimited) → cache. An override change takes effect within the
+60 s TTL. Webhook consumer and plan-change usecase DEL the key
 (write-through invalidation), so the 60 s TTL is only a safety net.
 Write endpoints declare checks:
 

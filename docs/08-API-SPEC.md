@@ -155,6 +155,29 @@ bound to a different org than the path → 403), scope `write` required for all
 non-GET, rate limit headers per FR-API-002. Session-auth requests share the
 same limiter keyed `rl:api:{orgId}:{userId}`.
 
+## 8a. Agents (ADR-033, FR-AGT-002/003)
+
+```
+GET    /orgs/{orgId}/agents                         → {agents[], limit:{current,max}}   (MEMBER+)
+POST   /orgs/{orgId}/agents                         {name, role?} → {agent, key_id, secret ONCE}   (ADMIN+)
+PATCH  /orgs/{orgId}/agents/{agentId}               {name?, role?, status?: active|paused}
+DELETE /orgs/{orgId}/agents/{agentId}               204 (soft delete; revokes keys)
+POST   /orgs/{orgId}/agents/{agentId}/keys          → {agent, key_id, secret ONCE}
+DELETE /orgs/{orgId}/agents/{agentId}/keys/{keyId}  204
+```
+
+- `role` is `MEMBER` (default) or `GUEST`; anything else → 422
+  `agent_role_invalid`. Names: 1–40 letters, digits, space, `.`, `-`, `_`
+  (422 `agent_name_invalid`), unique per org case-insensitively (409
+  `agent_name_taken`). At most 3 active keys (409 `agent_key_limit`).
+- Create over the plan's `max_agents` → 402 `plan_limit_exceeded`
+  (`limit=max_agents`); paused agents count.
+- An agent key authenticates as the agent (its user id, its role) on org
+  routes and `/mcp`; a paused agent → 403 `agent_paused`. API keys are refused
+  (403) on user-scoped routes: `/me*`, `GET|POST /orgs`, `/orgs/by-slug`,
+  `/invitations/accept`.
+- Agent keys are not listed by `GET /api-keys`.
+
 ## 8b. Governed AI — `/orgs/{orgId}/ai/*` (ADR-025, FR-AI-001..009)
 
 ```
@@ -193,8 +216,8 @@ GET|DELETE /mcp    405 (no standalone stream, no sessions)
 - **Tools:** read — `projects.list`, `projects.board`, `tasks.search`,
   `tasks.get`, `ai.parse`, `ai.plan_draft`, `ai.digest`, `ai.chat`,
   `ai.risks_scan`, `ai.risks_list`; write (needs a write-scoped key; hidden
-  from read keys) — `ai.risks_dismiss`. `ai.plan_apply` returns with agent
-  principals (ADR-033). Business failures come back as `isError: true` tool
+  from read keys) — `ai.risks_dismiss`; agent-only (an agent's key, hidden
+  from org keys) — `ai.plan_apply`. Business failures come back as `isError: true` tool
   results; unknown tools / malformed arguments as `-32602`; internal errors as
   `-32603` with no detail.
 - **Client setup:** `claude mcp add --transport http fluxboard https://<host>/api/v1/mcp --header "Authorization: Bearer fbk_live_…"`.

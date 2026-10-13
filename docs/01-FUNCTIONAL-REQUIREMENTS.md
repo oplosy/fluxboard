@@ -148,7 +148,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | ID | P | Requirement |
 |----|---|-------------|
 | FR-AGT-001 | M | Agents connect with any MCP client to `POST /api/v1/mcp` using one URL and one API key; read tools (`projects.list`, `projects.board`, `tasks.search`, `tasks.get`) and the governed-AI tools are available. |
-| FR-AGT-002 | M | Agent principal: org-owned (team-shared), named, with its own key; assignable, @mentionable, shown as itself in activity/audit. Created/paused/deleted by ADMIN+. Default role CONTRIBUTOR, never OWNER/ADMIN. |
+| FR-AGT-002 | M | Agent principal: org-owned (team-shared), named, with its own key; assignable, @mentionable, shown as itself in activity/audit. Created/paused/deleted by ADMIN+; any member can list them. Org role MEMBER (default) or GUEST, never OWNER/ADMIN; project write access via project membership. |
 | FR-AGT-003 | M | `max_agents` per plan (Free 1, Pro 10, Business unlimited); agents are not seats. Creation over the cap → 402 `plan_limit_exceeded` (`limit=max_agents`). Paused agents count; per-org admin override. |
 | FR-AGT-004 | M | `tasks.claim` with a renewable lease (default 30 min, `tasks.heartbeat`); expired leases auto-release; a held task → 409 with the holder. |
 | FR-AGT-005 | M | Task `version` on every agent write; stale → 409 `version_conflict` with the current task. Write tools accept an idempotency key (24 h). |
