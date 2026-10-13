@@ -79,6 +79,17 @@ the browser always sends the newest cookie. The client refreshes ~60 s before
 access-token expiry (and on tab focus after sleep) instead of waiting for a
 401, and a refresh that fails on the network keeps the current token.
 
+Session marker: the web origin keeps a non-secret `fluxboard_session=1` cookie
+(SameSite=Lax, 7 d, renewed on refresh) while it holds an access token, and
+clears it when the token is dropped. At boot the client only calls
+`/auth/refresh` when the marker exists or the page needs a session (`/app`,
+`/account`, `/admin`, `/verify-email`, `/invite/…`), so signed-out visitors on
+public pages make no doomed refresh (no 401). Guards on protected pages still
+attempt one restore before redirecting to `/login`, so a browser with a valid
+refresh cookie but no marker is never signed out by mistake. Logout first
+settles any in-flight restore, so it always revokes the real session and a
+late refresh cannot sign the user back in.
+
 ## 4. Login Flows
 
 **Password login:** rate-limit gate (FR-AUTH-011, Redis key
