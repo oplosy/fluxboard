@@ -2,8 +2,8 @@
 // password policy (docs/04-AUTH.md §1). Parameters are pinned and guarded by a
 // unit test so they cannot be silently downgraded.
 //
-// Leaf package: no domain imports; policy errors surface as 400s at the usecase boundary.: it returns its own policy errors and never imports
-// domain; the usecase layer maps PolicyError to domain.ErrValidation.
+// Leaf package: it returns its own policy errors and never imports domain; the
+// usecase layer maps PolicyError to a domain validation error.
 package argon2x
 
 import (
@@ -11,6 +11,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"unicode/utf8"
 
 	"github.com/alexedwards/argon2id"
 )
@@ -30,9 +31,21 @@ const (
 	maxPasswordLen = 128
 )
 
+// Policy rejection codes. Stable: clients branch on them to show a specific
+// message next to the password field.
+const (
+	CodeTooShort     = "password_too_short"
+	CodeTooLong      = "password_too_long"
+	CodeBreached     = "password_breached"
+	CodeMatchesEmail = "password_matches_email"
+)
+
 // PolicyError describes why a password was rejected. The usecase maps it to a
-// validation error; the message is safe to show the user.
-type PolicyError struct{ Reason string }
+// validation error; Code is machine-readable and Reason is safe to show the user.
+type PolicyError struct {
+	Code   string
+	Reason string
+}
 
 func (e PolicyError) Error() string { return e.Reason }
 
@@ -87,20 +100,25 @@ func mustDummyHash() string {
 
 // CheckPolicy validates a candidate password against the registration/reset
 // policy (docs/04-AUTH.md §1): length bounds, not breached, not the email local
-// part. Returns a PolicyError on the first failure.
+// part. Length counts characters (runes), not bytes, so non-ASCII passwords are
+// measured the way the user typed them. Returns a PolicyError on the first failure.
 func CheckPolicy(password, email string) error {
-	if n := len(password); n < minPasswordLen || n > maxPasswordLen {
-		return PolicyError{Reason: fmt.Sprintf("password must be %d–%d characters", minPasswordLen, maxPasswordLen)}
+	n := utf8.RuneCountInString(password)
+	if n < minPasswordLen {
+		return PolicyError{Code: CodeTooShort, Reason: fmt.Sprintf("Password must be at least %d characters.", minPasswordLen)}
+	}
+	if n > maxPasswordLen {
+		return PolicyError{Code: CodeTooLong, Reason: fmt.Sprintf("Password must be at most %d characters.", maxPasswordLen)}
 	}
 	if _, bad := breachSet[strings.ToLower(password)]; bad {
-		return PolicyError{Reason: "password appears in a known breach list"}
+		return PolicyError{Code: CodeBreached, Reason: "This password appears in a known data breach. Choose a different one."}
 	}
 	local := email
 	if at := strings.IndexByte(email, '@'); at != -1 {
 		local = email[:at]
 	}
-	if local != "" && strings.EqualFold(password, local) {
-		return PolicyError{Reason: "password must not match your email"}
+	if (local != "" && strings.EqualFold(password, local)) || (email != "" && strings.EqualFold(password, email)) {
+		return PolicyError{Code: CodeMatchesEmail, Reason: "Password must not be the same as your email."}
 	}
 	return nil
 }

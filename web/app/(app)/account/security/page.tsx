@@ -8,43 +8,61 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PasswordInput } from '@/components/ui/password-input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field, FormError } from '@/components/auth/field';
+import { Field, FormError, keepFocus } from '@/components/auth/field';
 import { useToast } from '@/components/ui/toast';
-import { ApiError } from '@/lib/api/client';
+import { PasswordChecklist } from '@/components/auth/password-checklist';
+import { apiFieldErrors, authErrorMessage, isFieldError } from '@/lib/auth/errors';
+import { validateNewPassword } from '@/lib/auth/validation';
 import { useAuth } from '@/lib/auth/context';
 import {
   changePassword,
   enroll2FA,
   activate2FA,
   disable2FA,
+  getAuthAccount,
 } from '@/lib/api/auth';
 import { getMe } from '@/lib/api/user';
 import type { Enroll2FAResponse } from '@/lib/api/types';
 
-function PasswordCard() {
+function PasswordCard({ email, hasPassword }: { email: string; hasPassword: boolean }) {
   const router = useRouter();
   const { logout } = useAuth();
   const [current, setCurrent] = useState('');
   const [next, setNext] = useState('');
+  const [submitted, setSubmitted] = useState(false);
+  const [sent, setSent] = useState({ current: '', next: '' });
 
   const mutation = useMutation({
     mutationFn: () => changePassword({ current_password: current, new_password: next }),
     // Changing the password revokes every session server-side, so we must re-auth.
     onSuccess: async () => {
       await logout();
-      router.replace('/login');
+      router.replace('/login?notice=password_changed');
     },
   });
 
-  const err = mutation.error;
-  const message =
-    err instanceof ApiError
-      ? err.status === 401 || err.status === 422
-        ? 'Current password is incorrect or the new one is too weak.'
-        : err.message
-      : err
-        ? 'Something went wrong.'
-        : null;
+  const server = apiFieldErrors(mutation.error);
+  const currentError =
+    (current === sent.current ? server.current_password : undefined) ??
+    (submitted && !current ? 'Enter your current password.' : undefined);
+  const nextError =
+    (next === sent.next ? server.new_password : undefined) ??
+    (submitted ? validateNewPassword(next, email) : undefined);
+  const banner = mutation.error && !isFieldError(mutation.error) ? authErrorMessage(mutation.error) : null;
+
+  if (!hasPassword) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Password</CardTitle>
+          <CardDescription>
+            You sign in with Google or GitHub, so there&apos;s no password on this account yet. To add one, use
+            &ldquo;Forgot password&rdquo; on the sign-in page — we&apos;ll email you a link to set it.
+          </CardDescription>
+        </CardHeader>
+      </Card>
+    );
+  }
 
   return (
     <Card>
@@ -54,33 +72,39 @@ function PasswordCard() {
       </CardHeader>
       <CardContent>
         <form
+          noValidate
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            setSubmitted(true);
+            if (!current || validateNewPassword(next, email)) return;
+            setSent({ current, next });
             mutation.mutate();
           }}
         >
-          <FormError message={message} />
-          <Field id="current" label="Current password">
+          <FormError message={banner} />
+          <Field id="current" label="Current password" error={currentError}>
             <PasswordInput
               id="current"
               autoComplete="current-password"
-              required
               value={current}
               onChange={(e) => setCurrent(e.target.value)}
             />
           </Field>
-          <Field id="next" label="New password">
+          <Field
+            id="next"
+            label="New password"
+            error={nextError}
+            hint={<PasswordChecklist password={next} email={email} />}
+          >
             <PasswordInput
               id="next"
               autoComplete="new-password"
-              required
-              minLength={8}
               value={next}
               onChange={(e) => setNext(e.target.value)}
             />
           </Field>
-          <Button type="submit" disabled={mutation.isPending}>
+          <Button type="submit" isLoading={mutation.isPending} onMouseDown={keepFocus}>
             {mutation.isPending ? 'Updating…' : 'Change password'}
           </Button>
         </form>
@@ -110,7 +134,7 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
       setCode('');
       await queryClient.invalidateQueries({ queryKey: ['me'] });
     },
-    onError: () => toast({ title: 'Invalid code', variant: 'error' }),
+    onError: (err) => toast({ title: authErrorMessage(err) ?? 'Invalid code', variant: 'error' }),
   });
 
   const turnOff = useMutation({
@@ -120,7 +144,7 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
       toast({ title: 'Two-factor disabled', variant: 'success' });
       await queryClient.invalidateQueries({ queryKey: ['me'] });
     },
-    onError: () => toast({ title: 'Invalid code', variant: 'error' }),
+    onError: (err) => toast({ title: authErrorMessage(err) ?? 'Invalid code', variant: 'error' }),
   });
 
   return (
@@ -212,10 +236,11 @@ function TwoFactorCard({ enabled }: { enabled: boolean }) {
 
 export default function SecurityPage() {
   const { data: me } = useQuery({ queryKey: ['me'], queryFn: getMe });
+  const { data: account } = useQuery({ queryKey: ['auth', 'account'], queryFn: getAuthAccount });
 
   return (
     <div className="space-y-6">
-      <PasswordCard />
+      {account ? <PasswordCard email={account.email} hasPassword={account.has_password} /> : null}
       <TwoFactorCard enabled={Boolean(me?.totp_enabled)} />
     </div>
   );

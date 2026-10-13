@@ -71,14 +71,14 @@ func (s *Service) Activate2FA(ctx context.Context, userID, code string) ([]strin
 		return nil, domain.ErrConflict
 	}
 	if u.TOTPSecret == "" {
-		return nil, fmt.Errorf("not enrolled: %w", domain.ErrValidation)
+		return nil, domain.NewCodedError(domain.ErrValidation, "2fa_not_enrolled", "Start two-factor setup first.")
 	}
 	secret, err := s.cipher.Decrypt(u.TOTPSecret)
 	if err != nil {
 		return nil, err
 	}
-	if !totp.Validate(secret, code, s.clock.Now()) {
-		return nil, fmt.Errorf("invalid code: %w", domain.ErrValidation)
+	if !totp.Validate(secret, normalizeCode(code), s.clock.Now()) {
+		return nil, errInvalidCode
 	}
 	// Enable, keeping the same encrypted secret.
 	if err := s.users.SetTOTP(ctx, u.ID, u.TOTPSecret, true); err != nil {
@@ -109,7 +109,7 @@ func (s *Service) Disable2FA(ctx context.Context, userID, code string) error {
 		return nil // idempotent: already off
 	}
 	if !s.verifyTOTPOrRecovery(ctx, u.ID, u.TOTPSecret, code) {
-		return domain.ErrUnauthorized
+		return errInvalidCode
 	}
 	if err := s.users.SetTOTP(ctx, u.ID, "", false); err != nil {
 		return err
@@ -125,21 +125,21 @@ func (s *Service) Verify2FA(ctx context.Context, pendingToken, code, userAgent, 
 	}
 	userID, err := s.verifier.VerifyPending2FA(pendingToken)
 	if err != nil {
-		return Tokens{}, domain.ErrUnauthorized
+		return Tokens{}, errPending2FAExpired
 	}
 	u, err := s.users.GetByID(ctx, userID)
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return Tokens{}, domain.ErrUnauthorized
+			return Tokens{}, errPending2FAExpired
 		}
 		return Tokens{}, err
 	}
-	if !u.TOTPEnabled {
-		return Tokens{}, domain.ErrUnauthorized // token stale: 2FA turned off
+	if !u.TOTPEnabled || u.Locked() {
+		return Tokens{}, errPending2FAExpired // token stale: 2FA turned off / account locked
 	}
 	if !s.verifyTOTPOrRecovery(ctx, u.ID, u.TOTPSecret, code) {
 		s.observe(ctx).LoginAttempt(ctx, "invalid")
-		return Tokens{}, domain.ErrUnauthorized
+		return Tokens{}, errInvalidCode2FA
 	}
 	tokens, err := s.issueSession(ctx, u.ID, userAgent, ip)
 	if err != nil {
@@ -153,15 +153,22 @@ func (s *Service) Verify2FA(ctx context.Context, pendingToken, code, userAgent, 
 // an unused recovery code (which it consumes). Errors decrypting the secret fail
 // closed.
 func (s *Service) verifyTOTPOrRecovery(ctx context.Context, userID, encSecret, code string) bool {
+	code = normalizeCode(code)
 	secret, err := s.cipher.Decrypt(encSecret)
 	if err == nil && totp.Validate(secret, code, s.clock.Now()) {
 		return true
 	}
 	// Recovery-code fallback: codes are stored as upper-case base32; normalize
 	// the input so formatting/case differences still match.
-	normalized := strings.ToUpper(strings.TrimSpace(code))
+	normalized := strings.ToUpper(code)
 	ok, err := s.recovery.Consume(ctx, userID, token.Hash(normalized))
 	return err == nil && ok
+}
+
+// normalizeCode strips the spaces and dashes people type or paste into codes
+// ("123 456", "ABCDE-FGHIJ").
+func normalizeCode(code string) string {
+	return strings.NewReplacer(" ", "", "-", "", "\t", "").Replace(strings.TrimSpace(code))
 }
 
 // genRecoveryCodes returns n human-typable recovery codes and their storage

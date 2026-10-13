@@ -1,3 +1,4 @@
+import { clearSession, markSession } from '@/lib/auth/session-hint';
 import type { ApiErrorBody, TokenResponse } from './types';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:8080/api/v1';
@@ -12,6 +13,9 @@ const tokenListeners = new Set<(t: string | null) => void>();
 
 export function setAccessToken(token: string | null): void {
   accessToken = token;
+  // Keep the "has a session" marker in step with the token (see session-hint).
+  if (token) markSession();
+  else clearSession();
   for (const fn of tokenListeners) fn(token);
 }
 
@@ -64,27 +68,56 @@ async function toApiError(res: Response): Promise<ApiError> {
 // ---- Single-flight refresh --------------------------------------------------
 
 let refreshInFlight: Promise<boolean> | null = null;
+let refreshAttempted = false;
+
+/**
+ * Whether a session restore is still worth waiting for: the refresh currently
+ * in flight (so callers share it), or null when this page load has already
+ * tried and settled. Pages that never tried get a fresh attempt.
+ */
+export function restoreSession(): Promise<boolean> | null {
+  if (refreshInFlight) return refreshInFlight;
+  return refreshAttempted ? null : refreshSession();
+}
+
+// Cross-tab lock name. The refresh cookie is shared by every tab, and the server
+// treats a rotated token presented twice as theft (revoking the whole family,
+// docs/04-AUTH.md §3). Two tabs refreshing at once would do exactly that, so
+// refreshes are serialized across tabs: inside the lock the browser always
+// sends the newest cookie.
+const REFRESH_LOCK = 'fluxboard-auth-refresh';
+
+async function postRefresh(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'X-Requested-With': 'fetch' },
+    });
+    if (!res.ok) {
+      setAccessToken(null);
+      return false;
+    }
+    const tok = (await res.json()) as TokenResponse;
+    setAccessToken(tok.access_token);
+    return true;
+  } catch {
+    // Network failure (offline, API restarting): the session may well be
+    // fine, so keep any token we hold instead of logging the user out. The
+    // next request's 401 path retries the refresh.
+    return false;
+  }
+}
 
 /** Try to mint a fresh access token from the refresh cookie. Returns success. */
 export async function refreshSession(): Promise<boolean> {
+  refreshAttempted = true;
   if (!refreshInFlight) {
     refreshInFlight = (async () => {
       try {
-        const res = await fetch(`${API_BASE}/auth/refresh`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'X-Requested-With': 'fetch' },
-        });
-        if (!res.ok) {
-          setAccessToken(null);
-          return false;
-        }
-        const tok = (await res.json()) as TokenResponse;
-        setAccessToken(tok.access_token);
-        return true;
-      } catch {
-        setAccessToken(null);
-        return false;
+        const locks = typeof navigator !== 'undefined' ? navigator.locks : undefined;
+        if (locks?.request) return await locks.request(REFRESH_LOCK, postRefresh);
+        return await postRefresh();
       } finally {
         // released on the next tick so concurrent callers share this attempt
         setTimeout(() => {

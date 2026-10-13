@@ -2,6 +2,7 @@ package authuc
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -44,7 +45,14 @@ func (f *fakeUsers) UpdatePasswordHash(_ context.Context, id, hash string) error
 	}
 	return nil
 }
-func (f *fakeUsers) MarkEmailVerified(context.Context, string) error { return nil }
+func (f *fakeUsers) MarkEmailVerified(_ context.Context, id string) error {
+	for _, u := range f.byEmail {
+		if u.ID == id {
+			u.EmailVerified = true
+		}
+	}
+	return nil
+}
 func (f *fakeUsers) SetTOTP(_ context.Context, id, enc string, enabled bool) error {
 	for _, u := range f.byEmail {
 		if u.ID == id {
@@ -90,6 +98,10 @@ func (fakeTokens) Create(context.Context, *auth.OneTimeToken) error { return nil
 func (fakeTokens) Consume(context.Context, auth.TokenPurpose, []byte, time.Time) (*auth.OneTimeToken, error) {
 	return nil, domain.ErrNotFound
 }
+func (fakeTokens) Peek(context.Context, auth.TokenPurpose, []byte) (*auth.OneTimeToken, error) {
+	return nil, domain.ErrNotFound
+}
+func (fakeTokens) InvalidateAll(context.Context, string, auth.TokenPurpose) error { return nil }
 
 type fakeCache struct{ active map[string]bool }
 
@@ -167,8 +179,8 @@ func TestLoginWrongPasswordUnauthorized(t *testing.T) {
 	seedUser(t, users, "a@b.com", "a-strong-passphrase-1")
 
 	_, err := svc.Login(context.Background(), LoginInput{Email: "a@b.com", Password: "wrong-password-here"})
-	if err != domain.ErrUnauthorized {
-		t.Fatalf("want ErrUnauthorized, got %v", err)
+	if !errors.Is(err, domain.ErrUnauthorized) || codeOf(err) != "invalid_credentials" {
+		t.Fatalf("want invalid_credentials, got %v", err)
 	}
 	if obs.invalid != 1 {
 		t.Fatalf("expected invalid metric, got %d", obs.invalid)
@@ -178,8 +190,8 @@ func TestLoginWrongPasswordUnauthorized(t *testing.T) {
 func TestLoginUnknownEmailUniformUnauthorized(t *testing.T) {
 	svc, _ := newTestService(t, &fakeSessions{}, &fakeObs{})
 	_, err := svc.Login(context.Background(), LoginInput{Email: "nobody@b.com", Password: "whatever-123456"})
-	if err != domain.ErrUnauthorized {
-		t.Fatalf("want ErrUnauthorized, got %v", err)
+	if !errors.Is(err, domain.ErrUnauthorized) || codeOf(err) != "invalid_credentials" {
+		t.Fatalf("want the same invalid_credentials as a wrong password, got %v", err)
 	}
 }
 
@@ -197,22 +209,56 @@ func TestRefreshReuseReportsAndFails(t *testing.T) {
 	}
 }
 
-func TestRegisterWeakPasswordValidation(t *testing.T) {
-	svc, _ := newTestService(t, &fakeSessions{}, &fakeObs{})
-	_, err := svc.Register(context.Background(), RegisterInput{Email: "a@b.com", Password: "short"})
-	if err == nil {
-		t.Fatal("expected validation error")
+// codeOf returns the CodedError code carried by err, or "".
+func codeOf(err error) string {
+	var ce *domain.CodedError
+	if errors.As(err, &ce) {
+		return ce.Code
+	}
+	return ""
+}
+
+// fieldOf returns the CodedError field carried by err, or "".
+func fieldOf(err error) string {
+	var ce *domain.CodedError
+	if errors.As(err, &ce) {
+		return ce.Field
+	}
+	return ""
+}
+
+func TestRegisterFieldErrors(t *testing.T) {
+	cases := []struct {
+		name            string
+		in              RegisterInput
+		wantCode, field string
+	}{
+		{"short password", RegisterInput{Email: "a@b.com", Password: "short"}, "password_too_short", "password"},
+		{"long password", RegisterInput{Email: "a@b.com", Password: string(make([]byte, 129))}, "password_too_long", "password"},
+		{"breached password", RegisterInput{Email: "a@b.com", Password: "password1234"}, "password_breached", "password"},
+		{"password equals email", RegisterInput{Email: "longlocalpart@b.com", Password: "longlocalpart"}, "password_matches_email", "password"},
+		{"no at sign", RegisterInput{Email: "not-an-email", Password: "a-strong-passphrase-1"}, "email_invalid", "email"},
+		{"no domain dot", RegisterInput{Email: "a@localhost", Password: "a-strong-passphrase-1"}, "email_invalid", "email"},
+		{"header injection", RegisterInput{Email: "a@b.com\r\nBcc: x@y.z", Password: "a-strong-passphrase-1"}, "email_invalid", "email"},
+		{"display name", RegisterInput{Email: "Eve <a@b.com>", Password: "a-strong-passphrase-1"}, "email_invalid", "email"},
+		{"long name", RegisterInput{Email: "a@b.com", Password: "a-strong-passphrase-1", Name: string(make([]rune, 101))}, "name_too_long", "name"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			svc, _ := newTestService(t, &fakeSessions{}, &fakeObs{})
+			_, err := svc.Register(context.Background(), c.in)
+			if !errors.Is(err, domain.ErrValidation) || codeOf(err) != c.wantCode || fieldOf(err) != c.field {
+				t.Fatalf("want %s on %s, got %v (code=%q field=%q)", c.wantCode, c.field, err, codeOf(err), fieldOf(err))
+			}
+		})
 	}
 }
 
-func TestRegisterDuplicateIsGeneric(t *testing.T) {
+func TestRegisterDuplicateReportsEmailTaken(t *testing.T) {
 	svc, users := newTestService(t, &fakeSessions{}, &fakeObs{})
 	seedUser(t, users, "a@b.com", "a-strong-passphrase-1")
-	res, err := svc.Register(context.Background(), RegisterInput{Email: "a@b.com", Password: "a-strong-passphrase-2"})
-	if err != nil {
-		t.Fatalf("duplicate register should not error, got %v", err)
-	}
-	if res.Created {
-		t.Fatal("duplicate should report Created=false")
+	_, err := svc.Register(context.Background(), RegisterInput{Email: " A@B.com ", Password: "a-strong-passphrase-2"})
+	if !errors.Is(err, domain.ErrConflict) || codeOf(err) != "email_taken" || fieldOf(err) != "email" {
+		t.Fatalf("want email_taken conflict on email, got %v", err)
 	}
 }

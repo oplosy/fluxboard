@@ -15,10 +15,12 @@ import {
   getAccessToken,
   onAccessTokenChange,
   refreshSession,
+  restoreSession,
   setAccessToken,
 } from '@/lib/api/client';
 import type { TokenResponse } from '@/lib/api/types';
 import { decodeAccessClaims, type AccessClaims } from './jwt';
+import { shouldRestoreSession } from './session-hint';
 
 interface AuthState {
   /** True until the initial cookie → refresh bootstrap resolves. */
@@ -44,6 +46,9 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** How long before access-token expiry the proactive refresh fires. */
+const REFRESH_LEAD_MS = 60_000;
+
 function deriveState(token: string | null, loading: boolean): AuthState {
   const claims = decodeAccessClaims(token);
   return {
@@ -64,10 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Mirror the module-level token store into React state so components re-render.
   useEffect(() => onAccessTokenChange(setToken), []);
 
-  // Bootstrap: exchange the refresh cookie for an access token on first mount.
+  // Bootstrap: exchange the refresh cookie for an access token on first mount —
+  // only when this browser is marked as signed in or the page needs a session,
+  // so signed-out visitors don't fire a doomed refresh on every page view.
   useEffect(() => {
     let active = true;
-    void refreshSession().finally(() => {
+    const attempt = shouldRestoreSession(window.location.pathname) ? refreshSession() : Promise.resolve(false);
+    void attempt.finally(() => {
       if (active) setLoading(false);
     });
     return () => {
@@ -75,11 +83,35 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
+  // Refresh shortly before the access token expires, so requests (and the SSE
+  // stream) never hit a 401 first. A tab that slept past expiry refreshes as
+  // soon as it becomes visible again.
+  useEffect(() => {
+    const exp = decodeAccessClaims(token)?.exp;
+    if (!exp) return;
+    const delay = Math.max(5_000, exp * 1000 - Date.now() - REFRESH_LEAD_MS);
+    const timer = window.setTimeout(() => void refreshSession(), delay);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && exp * 1000 - Date.now() < REFRESH_LEAD_MS) {
+        void refreshSession();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [token]);
+
   const adopt = useCallback((tok: TokenResponse) => {
     setAccessToken(tok.access_token);
   }, []);
 
   const logout = useCallback(async () => {
+    // Settle the session restore first: /auth/logout needs the access token to
+    // know which session to revoke, and a refresh landing after logout would
+    // sign the user straight back in.
+    await restoreSession();
     try {
       await apiFetch('/auth/logout', { method: 'POST', skipAuthRetry: true });
     } catch {

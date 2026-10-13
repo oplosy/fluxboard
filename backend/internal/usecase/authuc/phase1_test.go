@@ -51,15 +51,19 @@ func (f *fakeRecovery) Consume(_ context.Context, _ string, hash []byte) (bool, 
 	return false, nil
 }
 
-type fakeMailer struct{ verify, reset int }
+type fakeMailer struct {
+	verify, reset int
+	err           error
+}
 
-func (f *fakeMailer) SendEmailVerify(context.Context, string, string) error   { f.verify++; return nil }
+func (f *fakeMailer) SendEmailVerify(context.Context, string, string) error   { f.verify++; return f.err }
 func (f *fakeMailer) SendPasswordReset(context.Context, string, string) error { f.reset++; return nil }
 
 type fakeOTT struct {
-	created  []*auth.OneTimeToken
-	consume  *auth.OneTimeToken
-	consumed bool
+	created     []*auth.OneTimeToken
+	consume     *auth.OneTimeToken
+	consumed    bool
+	invalidated int
 }
 
 func (f *fakeOTT) Create(_ context.Context, t *auth.OneTimeToken) error {
@@ -67,11 +71,21 @@ func (f *fakeOTT) Create(_ context.Context, t *auth.OneTimeToken) error {
 	return nil
 }
 func (f *fakeOTT) Consume(context.Context, auth.TokenPurpose, []byte, time.Time) (*auth.OneTimeToken, error) {
-	if f.consume == nil {
+	if f.consume == nil || f.consumed {
 		return nil, domain.ErrNotFound
 	}
 	f.consumed = true
 	return f.consume, nil
+}
+func (f *fakeOTT) Peek(context.Context, auth.TokenPurpose, []byte) (*auth.OneTimeToken, error) {
+	if f.consume == nil || f.consumed {
+		return nil, domain.ErrNotFound
+	}
+	return f.consume, nil
+}
+func (f *fakeOTT) InvalidateAll(context.Context, string, auth.TokenPurpose) error {
+	f.invalidated++
+	return nil
 }
 
 type stubProvider struct {
@@ -225,8 +239,11 @@ func TestVerify2FARejectsBadCode(t *testing.T) {
 	_, _ = svc.Activate2FA(context.Background(), "user-1", code)
 
 	res, _ := svc.Login(context.Background(), LoginInput{Email: "a@b.com", Password: "a-strong-passphrase-1"})
-	if _, err := svc.Verify2FA(context.Background(), res.PendingToken, "000000", "ua", "ip"); !errors.Is(err, domain.ErrUnauthorized) {
-		t.Fatalf("want ErrUnauthorized, got %v", err)
+	if _, err := svc.Verify2FA(context.Background(), res.PendingToken, "000000", "ua", "ip"); !errors.Is(err, domain.ErrUnauthorized) || codeOf(err) != "invalid_code" {
+		t.Fatalf("want invalid_code, got %v", err)
+	}
+	if _, err := svc.Verify2FA(context.Background(), "garbage", "000000", "ua", "ip"); codeOf(err) != "pending_2fa_expired" {
+		t.Fatalf("want pending_2fa_expired for a bad pending token, got %v", err)
 	}
 }
 
@@ -264,6 +281,41 @@ func TestResetPasswordRevokesSessions(t *testing.T) {
 	if sess.revokedAll != 1 {
 		t.Fatalf("reset must revoke all sessions, got %d", sess.revokedAll)
 	}
+	if !users.byEmail["a@b.com"].EmailVerified {
+		t.Fatal("a completed reset proves mailbox control and must verify the email")
+	}
+	if ott.invalidated != 1 {
+		t.Fatal("other outstanding reset links must be retired")
+	}
+}
+
+func TestResetPasswordRejectedPasswordKeepsLink(t *testing.T) {
+	signer, _ := testSigner(t)
+	users := &fakeUsers{byEmail: map[string]*auth.User{}}
+	seedUser(t, users, "a@b.com", "old-strong-passphrase-1")
+	ott := &fakeOTT{consume: &auth.OneTimeToken{UserID: "user-1", Purpose: auth.PurposePasswordReset}}
+	sess := &fakeSessions{}
+	svc := New(Deps{Users: users, Sessions: sess, Tokens: ott,
+		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer})
+
+	err := svc.ResetPassword(context.Background(), "raw-token", "short")
+	if codeOf(err) != "password_too_short" || fieldOf(err) != "password" {
+		t.Fatalf("want password_too_short on password, got %v", err)
+	}
+	if ott.consumed || sess.revokedAll != 0 {
+		t.Fatal("a rejected password must not burn the link or touch sessions")
+	}
+	// The same link still works with a valid password.
+	if err := svc.ValidateResetToken(context.Background(), "raw-token"); err != nil {
+		t.Fatalf("link should still be valid: %v", err)
+	}
+	if err := svc.ResetPassword(context.Background(), "raw-token", "new-strong-passphrase-9"); err != nil {
+		t.Fatalf("retry reset: %v", err)
+	}
+	// And it is single-use afterwards.
+	if err := svc.ResetPassword(context.Background(), "raw-token", "new-strong-passphrase-9"); codeOf(err) != "token_invalid" {
+		t.Fatalf("want token_invalid on reuse, got %v", err)
+	}
 }
 
 func TestChangePasswordVerifiesCurrentAndRevokes(t *testing.T) {
@@ -274,9 +326,13 @@ func TestChangePasswordVerifiesCurrentAndRevokes(t *testing.T) {
 	svc := New(Deps{Users: users, Sessions: sess, Tokens: &fakeOTT{},
 		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer})
 
-	// Wrong current password → 401.
-	if err := svc.ChangePassword(context.Background(), "user-1", "wrong", "new-strong-passphrase-9", "sid"); !errors.Is(err, domain.ErrUnauthorized) {
-		t.Fatalf("want ErrUnauthorized, got %v", err)
+	// Wrong current password → field error, not 401 (the session is fine).
+	if err := svc.ChangePassword(context.Background(), "user-1", "wrong", "new-strong-passphrase-9", "sid"); codeOf(err) != "current_password_incorrect" || errors.Is(err, domain.ErrUnauthorized) {
+		t.Fatalf("want current_password_incorrect, got %v", err)
+	}
+	// Same password again → rejected.
+	if err := svc.ChangePassword(context.Background(), "user-1", "old-strong-passphrase-1", "old-strong-passphrase-1", "sid"); codeOf(err) != "password_unchanged" {
+		t.Fatalf("want password_unchanged, got %v", err)
 	}
 	// Correct current password → succeeds and revokes.
 	if err := svc.ChangePassword(context.Background(), "user-1", "old-strong-passphrase-1", "new-strong-passphrase-9", "sid"); err != nil {
@@ -302,6 +358,41 @@ func TestForgotPasswordSilentForUnknownEmail(t *testing.T) {
 	}
 }
 
+func TestForgotPasswordLetsOAuthOnlyAccountSetPassword(t *testing.T) {
+	signer, _ := testSigner(t)
+	users := &fakeUsers{byEmail: map[string]*auth.User{
+		"g@b.com": {ID: "user-g", Email: "g@b.com", EmailVerified: true},
+	}}
+	mail := &fakeMailer{}
+	svc := New(Deps{Users: users, Sessions: &fakeSessions{}, Tokens: &fakeOTT{},
+		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer, Mailer: mail})
+	if err := svc.ForgotPassword(context.Background(), "g@b.com"); err != nil {
+		t.Fatalf("forgot: %v", err)
+	}
+	if mail.reset != 1 {
+		t.Fatal("an OAuth-only account should get a link to set a password")
+	}
+}
+
+func TestRegisterSurvivesMailFailure(t *testing.T) {
+	signer, _ := testSigner(t)
+	users := &fakeUsers{byEmail: map[string]*auth.User{}}
+	mail := &fakeMailer{err: errors.New("smtp down")}
+	svc := New(Deps{Users: users, Sessions: &fakeSessions{}, Tokens: &fakeOTT{},
+		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer, Mailer: mail})
+	res, err := svc.Register(context.Background(), RegisterInput{Email: "n@b.com", Password: "a-strong-passphrase-1", Name: "N"})
+	if err != nil || !res.Created {
+		t.Fatalf("register must succeed when mail fails (resend exists), got %v", err)
+	}
+}
+
+func TestVerifyEmailInvalidToken(t *testing.T) {
+	svc, _ := newTestService(t, &fakeSessions{}, &fakeObs{})
+	if err := svc.VerifyEmail(context.Background(), "nope"); codeOf(err) != "token_invalid" {
+		t.Fatalf("want token_invalid, got %v", err)
+	}
+}
+
 // --- OAuth linking ---------------------------------------------------------
 
 func oauthService(t *testing.T, prov auth.OAuthProvider) (*Service, *fakeUsers, *fakeOAuth) {
@@ -310,8 +401,21 @@ func oauthService(t *testing.T, prov auth.OAuthProvider) (*Service, *fakeUsers, 
 	users := &fakeUsers{byEmail: map[string]*auth.User{}}
 	oa := &fakeOAuth{bySub: map[string]*auth.OAuthIdentity{}}
 	svc := New(Deps{Users: users, Sessions: &fakeSessions{}, Tokens: &fakeOTT{}, OAuth: oa,
-		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer, Google: prov})
+		Cache: &fakeCache{active: map[string]bool{}}, Signer: signer, Google: prov, GitHub: prov})
 	return svc, users, oa
+}
+
+// startState runs StartOAuth for provider and returns the saved state.
+func startState(t *testing.T, svc *Service, states *fakeStates, provider, redirect string) string {
+	t.Helper()
+	start, err := svc.StartOAuth(context.Background(), states, provider, redirect)
+	if err != nil || start.URL == "" || start.State == "" {
+		t.Fatalf("start: %v %+v", err, start)
+	}
+	if _, ok := states.m[start.State]; !ok {
+		t.Fatal("state not saved")
+	}
+	return start.State
 }
 
 type fakeOAuth struct {
@@ -336,15 +440,8 @@ func TestOAuthNewUserIsCreatedVerified(t *testing.T) {
 	svc, users, oa := oauthService(t, prov)
 	states := &fakeStates{}
 
-	url, err := svc.StartOAuth(context.Background(), states, "/dashboard")
-	if err != nil || url == "" {
-		t.Fatalf("start: %v url=%q", err, url)
-	}
-	var state string
-	for s := range states.m {
-		state = s
-	}
-	res, err := svc.CompleteOAuth(context.Background(), states, "code", state, "ua", "ip")
+	state := startState(t, svc, states, ProviderGoogle, "/dashboard")
+	res, err := svc.CompleteOAuth(context.Background(), states, ProviderGoogle, "code", state, "ua", "ip")
 	if err != nil {
 		t.Fatalf("callback: %v", err)
 	}
@@ -365,13 +462,9 @@ func TestOAuthUnverifiedLocalUserRefused(t *testing.T) {
 	svc, users, _ := oauthService(t, prov)
 	users.byEmail["a@b.com"] = &auth.User{ID: "user-1", Email: "a@b.com", EmailVerified: false}
 	states := &fakeStates{}
-	_, _ = svc.StartOAuth(context.Background(), states, "/")
-	var state string
-	for s := range states.m {
-		state = s
-	}
-	_, err := svc.CompleteOAuth(context.Background(), states, "code", state, "ua", "ip")
-	if !errors.Is(err, domain.ErrConflict) {
+	state := startState(t, svc, states, ProviderGoogle, "/")
+	_, err := svc.CompleteOAuth(context.Background(), states, ProviderGoogle, "code", state, "ua", "ip")
+	if !errors.Is(err, domain.ErrConflict) || codeOf(err) != "oauth_verify_first" {
 		t.Fatalf("want ErrConflict (verify_first), got %v", err)
 	}
 }
@@ -380,16 +473,75 @@ func TestOAuthStateSingleUse(t *testing.T) {
 	prov := stubProvider{user: auth.OAuthUser{Sub: "g-3", Email: "c@b.com", EmailVerified: true}}
 	svc, _, _ := oauthService(t, prov)
 	states := &fakeStates{}
-	_, _ = svc.StartOAuth(context.Background(), states, "/")
-	var state string
-	for s := range states.m {
-		state = s
-	}
-	if _, err := svc.CompleteOAuth(context.Background(), states, "code", state, "ua", "ip"); err != nil {
+	state := startState(t, svc, states, ProviderGoogle, "/")
+	if _, err := svc.CompleteOAuth(context.Background(), states, ProviderGoogle, "code", state, "ua", "ip"); err != nil {
 		t.Fatalf("first callback: %v", err)
 	}
 	// Replaying the same state must fail (deleted on read).
-	if _, err := svc.CompleteOAuth(context.Background(), states, "code", state, "ua", "ip"); !errors.Is(err, domain.ErrUnauthorized) {
-		t.Fatalf("want ErrUnauthorized on replay, got %v", err)
+	if _, err := svc.CompleteOAuth(context.Background(), states, ProviderGoogle, "code", state, "ua", "ip"); codeOf(err) != "oauth_state_invalid" {
+		t.Fatalf("want oauth_state_invalid on replay, got %v", err)
+	}
+}
+
+func TestOAuthStateIsBoundToProvider(t *testing.T) {
+	prov := stubProvider{user: auth.OAuthUser{Sub: "g-4", Email: "d@b.com", EmailVerified: true}}
+	svc, _, _ := oauthService(t, prov)
+	states := &fakeStates{}
+	state := startState(t, svc, states, ProviderGoogle, "/")
+	if _, err := svc.CompleteOAuth(context.Background(), states, ProviderGitHub, "code", state, "ua", "ip"); codeOf(err) != "oauth_state_invalid" {
+		t.Fatalf("a google state must not complete a github callback, got %v", err)
+	}
+}
+
+func TestOAuthUnknownProviderUnavailable(t *testing.T) {
+	svc, _, _ := oauthService(t, stubProvider{})
+	if _, err := svc.StartOAuth(context.Background(), &fakeStates{}, "myspace", "/"); codeOf(err) != "oauth_unavailable" {
+		t.Fatalf("want oauth_unavailable, got %v", err)
+	}
+	if got := svc.Providers(); len(got) != 2 || got[0] != ProviderGitHub || got[1] != ProviderGoogle {
+		t.Fatalf("Providers() = %v", got)
+	}
+}
+
+func TestOAuthUnverifiedProviderEmailRefused(t *testing.T) {
+	prov := stubProvider{user: auth.OAuthUser{Sub: "gh-1", Email: "e@b.com", EmailVerified: false}}
+	svc, users, _ := oauthService(t, prov)
+	states := &fakeStates{}
+	state := startState(t, svc, states, ProviderGitHub, "/")
+	if _, err := svc.CompleteOAuth(context.Background(), states, ProviderGitHub, "code", state, "ua", "ip"); codeOf(err) != "oauth_email_unverified" {
+		t.Fatalf("want oauth_email_unverified, got %v", err)
+	}
+	if len(users.byEmail) != 0 {
+		t.Fatal("no account may be created from an unverified provider email")
+	}
+}
+
+func TestOAuthLinksExistingVerifiedAccountAndKeeps2FA(t *testing.T) {
+	prov := stubProvider{user: auth.OAuthUser{Sub: "gh-2", Email: "A@B.com", EmailVerified: true}}
+	svc, users, oa := oauthService(t, prov)
+	users.byEmail["a@b.com"] = &auth.User{ID: "user-1", Email: "a@b.com", EmailVerified: true, TOTPEnabled: true}
+	states := &fakeStates{}
+	state := startState(t, svc, states, ProviderGitHub, "/app")
+	res, err := svc.CompleteOAuth(context.Background(), states, ProviderGitHub, "code", state, "ua", "ip")
+	if err != nil {
+		t.Fatalf("callback: %v", err)
+	}
+	if oa.created != 1 || oa.bySub["gh-2"].UserID != "user-1" || oa.bySub["gh-2"].Provider != ProviderGitHub {
+		t.Fatalf("expected github identity linked to the existing user, got %+v", oa.bySub["gh-2"])
+	}
+	if !res.TwoFactor || res.PendingToken == "" || res.Tokens.AccessToken != "" {
+		t.Fatalf("a TOTP account must still pass 2FA after OAuth, got %+v", res)
+	}
+}
+
+func TestOAuthLockedAccountRefused(t *testing.T) {
+	prov := stubProvider{user: auth.OAuthUser{Sub: "g-5", Email: "l@b.com", EmailVerified: true}}
+	svc, users, _ := oauthService(t, prov)
+	locked := time.Now()
+	users.byEmail["l@b.com"] = &auth.User{ID: "user-l", Email: "l@b.com", EmailVerified: true, LockedAt: &locked}
+	states := &fakeStates{}
+	state := startState(t, svc, states, ProviderGoogle, "/")
+	if _, err := svc.CompleteOAuth(context.Background(), states, ProviderGoogle, "code", state, "ua", "ip"); codeOf(err) != "account_locked" {
+		t.Fatalf("want account_locked, got %v", err)
 	}
 }

@@ -28,7 +28,7 @@ Guard legend: **P** public · **A** authenticated · **V** authenticated+verifie
 | `/verify-email/confirm?token=…` | P | Token consumption → success/expired states |
 | `/forgot-password` | P | Request reset (identical response for unknown email) |
 | `/reset-password?token=…` | P | Set new password |
-| `/oauth/google/callback` | P | OAuth code exchange (server-side route handler, then redirect) |
+| `/oauth/callback` | P | Landing after a Google/GitHub sign-in: mints the access token from the refresh cookie (or hands a pending-2FA token to `/login/2fa`), then continues to `next`. Failures go to `/login?oauth_error=<code>` |
 | `/invite/{token}` | P | Invitation landing: logged-in → accept; logged-out → login/register then auto-accept |
 | `/logout` | A | POST-only route handler; revokes session, clears cookie, redirects `/login` |
 

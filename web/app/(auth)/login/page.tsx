@@ -15,50 +15,46 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { Field, FormError } from '@/components/auth/field';
+import { Field, keepFocus, FormError, FormNotice } from '@/components/auth/field';
+import { OAuthButtons } from '@/components/auth/oauth-buttons';
 import { login } from '@/lib/api/auth';
-import { API_BASE, ApiError } from '@/lib/api/client';
+import { ApiError } from '@/lib/api/client';
 import { isTwoFactorRequired } from '@/lib/api/types';
 import { useAuth } from '@/lib/auth/context';
-import { PENDING_2FA_KEY } from '@/lib/auth/pending';
+import { authErrorMessage, messageForCode } from '@/lib/auth/errors';
+import { PENDING_2FA_KEY, rememberEmail, useRememberedEmail } from '@/lib/auth/pending';
+import { validateEmail } from '@/lib/auth/validation';
 import { sanitizeNext } from '@/lib/nav/safe-next';
 import { useTransitionNav } from '@/components/motion/route-transition';
 
-function GoogleIcon() {
-  return (
-    <svg className="h-4 w-4" viewBox="0 0 24 24" aria-hidden>
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 01-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"
-        fill="#EA4335"
-      />
-    </svg>
-  );
-}
+// One-off notices other auth screens hand over via ?notice=<key>.
+const NOTICES: Record<string, string> = {
+  password_reset: 'Your password was updated. Sign in with your new password.',
+  password_changed: 'Your password was changed and every session was signed out. Sign in again.',
+  email_verified: 'Your email is verified. Sign in to continue.',
+  signed_out: 'You’re signed out.',
+  session_expired: 'Your session expired. Sign in again to continue.',
+};
 
 function LoginForm() {
   const router = useRouter();
   const { go } = useTransitionNav();
   const params = useSearchParams();
   const next = sanitizeNext(params.get('next'));
+  const notice = NOTICES[params.get('notice') ?? ''];
+  const oauthError = messageForCode(params.get('oauth_error')) ?? (params.get('oauth_error') ? messageForCode('oauth_failed') : undefined);
   const { adopt } = useAuth();
 
-  const [email, setEmail] = useState('');
+  // Prefilled from an earlier auth screen until the user types.
+  const remembered = useRememberedEmail();
+  const [typedEmail, setEmail] = useState<string | null>(null);
+  const email = typedEmail ?? remembered;
   const [password, setPassword] = useState('');
+  const [touched, setTouched] = useState<{ email?: boolean; password?: boolean }>({});
+  const [submitted, setSubmitted] = useState(false);
 
   const mutation = useMutation({
-    mutationFn: () => login({ email, password }),
+    mutationFn: () => login({ email: email.trim(), password }),
     onSuccess: (res) => {
       if (isTwoFactorRequired(res)) {
         sessionStorage.setItem(PENDING_2FA_KEY, res.pending_token);
@@ -68,19 +64,29 @@ function LoginForm() {
       adopt(res);
       go(next, { replace: true });
     },
+    onError: (err) => {
+      // Keep the email, clear the password so the retry starts clean — and
+      // don't flag the now-empty field; the banner already says what happened.
+      if (err instanceof ApiError && err.status === 401) {
+        setPassword('');
+        setSubmitted(false);
+        setTouched((t) => ({ ...t, password: false }));
+      }
+    },
   });
 
+  const show = (f: 'email' | 'password') => submitted || touched[f];
+  const emailError = show('email') ? validateEmail(email) : undefined;
+  const passwordError = show('password') && !password ? 'Enter your password.' : undefined;
+
   const err = mutation.error;
-  const message =
-    err instanceof ApiError
-      ? err.status === 401
-        ? 'Incorrect email or password.'
-        : err.status === 429
-          ? 'Too many attempts. Try again shortly.'
-          : err.message
-      : err
-        ? 'Something went wrong. Try again.'
-        : null;
+  const banner = authErrorMessage(err) ?? (mutation.isIdle ? oauthError : null);
+  const bannerAction =
+    err instanceof ApiError && err.code === 'invalid_credentials' ? (
+      <Link href="/forgot-password" onClick={() => rememberEmail(email)} className="underline underline-offset-2">
+        Reset your password
+      </Link>
+    ) : null;
 
   return (
     <Card>
@@ -90,62 +96,61 @@ function LoginForm() {
       </CardHeader>
       <CardContent>
         <form
+          noValidate
           className="space-y-4"
           onSubmit={(e) => {
             e.preventDefault();
+            setSubmitted(true);
+            if (validateEmail(email) || !password) return;
             mutation.mutate();
           }}
         >
-          <FormError message={message} />
-          <Field id="email" label="Email">
+          {banner ? <FormError message={banner} action={bannerAction} /> : <FormNotice message={notice} variant="success" />}
+          <Field id="email" label="Email" error={emailError}>
             <Input
               id="email"
               type="email"
+              inputMode="email"
               autoComplete="email"
-              required
+              autoFocus
+              placeholder="name@company.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={(e) => e.target.value && setTouched((t) => ({ ...t, email: true }))}
             />
           </Field>
-          <Field id="password" label="Password">
+          <Field
+            id="password"
+            label="Password"
+            error={passwordError}
+            labelAside={
+              <Link
+                href="/forgot-password"
+                onClick={() => rememberEmail(email)}
+                className="text-[13px] text-muted-foreground underline-offset-2 transition-colors hover:text-foreground hover:underline"
+              >
+                Forgot password?
+              </Link>
+            }
+          >
             <PasswordInput
               id="password"
               autoComplete="current-password"
-              required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              onBlur={(e) => e.target.value && setTouched((t) => ({ ...t, password: true }))}
             />
           </Field>
-          <div className="text-right">
-            <Link href="/forgot-password" className="text-sm text-primary hover:underline">
-              Forgot password?
-            </Link>
-          </div>
-          <Button type="submit" className="w-full" isLoading={mutation.isPending}>
+          <Button type="submit" className="w-full" isLoading={mutation.isPending} onMouseDown={keepFocus}>
             {mutation.isPending ? 'Signing in…' : 'Sign in'}
           </Button>
         </form>
 
-        <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="h-px flex-1 bg-border" />
-          OR
-          <span className="h-px flex-1 bg-border" />
-        </div>
-
-        <a
-          href={`${API_BASE}/auth/oauth/google/start?redirect=${encodeURIComponent(
-            `/oauth/google/callback?next=${encodeURIComponent(next)}`,
-          )}`}
-        >
-          <Button variant="outline" className="w-full">
-            <GoogleIcon />
-            Continue with Google
-          </Button>
-        </a>
+        <OAuthButtons next={next} />
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           No account?{' '}
-          <Link href="/register" className="text-primary hover:underline">
+          <Link href={`/register${next !== '/app' ? `?next=${encodeURIComponent(next)}` : ''}`} className="text-primary hover:underline">
             Create one
           </Link>
         </p>

@@ -60,7 +60,7 @@ func (s *Session) Active(now time.Time) bool {
 	return s.RevokedAt == nil && s.RotatedAt == nil && s.ExpiresAt.After(now)
 }
 
-// OAuthIdentity links a user to an external identity provider (Phase 1 Google).
+// OAuthIdentity links a user to an external identity provider (Google, GitHub).
 type OAuthIdentity struct {
 	ID          string
 	UserID      string

@@ -38,7 +38,7 @@ type RecoveryCodeRepository interface {
 }
 
 // OAuthIdentityRepository links external provider identities to users (Google,
-// docs/04-AUTH.md §4).
+// GitHub; docs/04-AUTH.md §4).
 type OAuthIdentityRepository interface {
 	// GetByProviderSub returns domain.ErrNotFound when the identity is unknown.
 	GetByProviderSub(ctx context.Context, provider, sub string) (*OAuthIdentity, error)
@@ -53,13 +53,15 @@ type OAuthUser struct {
 	Name          string
 }
 
-// OAuthProvider abstracts an external IdP (Google) so the usecase stays off the
-// golang.org/x/oauth2 dependency. Implemented in cmd/api.
+// OAuthProvider abstracts an external IdP (Google, GitHub) so the usecase stays
+// off the golang.org/x/oauth2 dependency. Implemented in infrastructure.
 type OAuthProvider interface {
 	// AuthCodeURL builds the consent URL for the given state and PKCE S256
 	// challenge.
 	AuthCodeURL(state, codeChallenge string) string
 	// Exchange swaps an authorization code + PKCE verifier for the user profile.
+	// EmailVerified must only be true when the IdP asserts the address is
+	// verified — account linking relies on it.
 	Exchange(ctx context.Context, code, codeVerifier string) (OAuthUser, error)
 }
 
@@ -68,6 +70,7 @@ type OAuthProvider interface {
 type OAuthState struct {
 	Verifier      string `json:"verifier"`
 	RedirectAfter string `json:"redirect_after"`
+	Provider      string `json:"provider,omitempty"`
 }
 
 // OAuthStateStore persists OAuthState for the duration of a flow. Implemented in
@@ -117,6 +120,11 @@ type OneTimeTokenRepository interface {
 	// Consume atomically marks the token used (UPDATE ... WHERE used_at IS NULL
 	// RETURNING) and returns it; domain.ErrNotFound if missing/expired/used.
 	Consume(ctx context.Context, purpose TokenPurpose, hash []byte, now time.Time) (*OneTimeToken, error)
+	// Peek returns a still-usable token without consuming it, so a flow can
+	// validate its other input first; domain.ErrNotFound if missing/expired/used.
+	Peek(ctx context.Context, purpose TokenPurpose, hash []byte) (*OneTimeToken, error)
+	// InvalidateAll retires every outstanding token of purpose for the user.
+	InvalidateAll(ctx context.Context, userID string, purpose TokenPurpose) error
 }
 
 // LoginRateLimiter throttles password-login attempts keyed by (email, IP) to

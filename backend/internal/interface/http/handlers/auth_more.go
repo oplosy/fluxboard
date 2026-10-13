@@ -1,7 +1,10 @@
 package handlers
 
 import (
+	"crypto/subtle"
+	"errors"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -37,6 +40,20 @@ func (h *AuthHandlers) PasswordForgot(w http.ResponseWriter, r *http.Request) {
 type resetReq struct {
 	Token    string `json:"token"`
 	Password string `json:"password"`
+}
+
+// PasswordResetValidate reports whether a reset link is still usable (204) or
+// not (422 token_invalid) without consuming it, so the page can say so upfront.
+func (h *AuthHandlers) PasswordResetValidate(w http.ResponseWriter, r *http.Request) {
+	var req verifyEmailReq // reuse {token}
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if err := h.svc.ValidateResetToken(r.Context(), req.Token); err != nil {
+		response.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
 }
 
 // PasswordReset consumes a reset token and sets a new password (revokes all
@@ -89,6 +106,40 @@ func (h *AuthHandlers) VerifyEmailRequest(w http.ResponseWriter, r *http.Request
 	}
 	response.JSON(w, http.StatusAccepted, map[string]string{
 		"message": "If the email is valid and unverified, a verification link has been sent.",
+	})
+}
+
+// VerifyEmailResendSelf re-sends the verification link to the signed-in
+// caller's own address (requires auth, not a verified email).
+func (h *AuthHandlers) VerifyEmailResendSelf(w http.ResponseWriter, r *http.Request) {
+	p, _ := mw.PrincipalFrom(r.Context())
+	if err := h.svc.ResendEmailVerifyForUser(r.Context(), p.UserID); err != nil {
+		response.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusAccepted)
+}
+
+type authMeResp struct {
+	ID            string `json:"id"`
+	Email         string `json:"email"`
+	Name          string `json:"name"`
+	EmailVerified bool   `json:"email_verified"`
+	HasPassword   bool   `json:"has_password"`
+}
+
+// AuthMe is the minimal account view available before email verification
+// (GET /me sits behind the verified-email gate).
+func (h *AuthHandlers) AuthMe(w http.ResponseWriter, r *http.Request) {
+	p, _ := mw.PrincipalFrom(r.Context())
+	u, err := h.svc.Account(r.Context(), p.UserID)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, authMeResp{
+		ID: u.ID, Email: u.Email, Name: u.Name,
+		EmailVerified: u.EmailVerified, HasPassword: u.HasPassword(),
 	})
 }
 
@@ -208,53 +259,123 @@ func (h *AuthHandlers) Verify2FA(w http.ResponseWriter, r *http.Request) {
 	h.writeSession(w, &tokens)
 }
 
-// --- Google OAuth (PKCE) --------------------------------------------------
+// --- OAuth: Google + GitHub (PKCE) ------------------------------------------
 
-// OAuthGoogleStart redirects the browser to Google's consent screen.
-func (h *AuthHandlers) OAuthGoogleStart(w http.ResponseWriter, r *http.Request) {
-	if h.states == nil {
-		response.Error(w, domain.ErrForbidden) // OAuth not configured
-		return
+const (
+	// oauthStateCookie pins a started flow to the browser that started it, so a
+	// callback URL lured onto another browser cannot log that browser into the
+	// attacker's account (login CSRF). Lax: the callback is a top-level GET
+	// navigation coming back from the provider.
+	oauthStateCookie     = "fluxboard_oauth_state"
+	oauthStateCookiePath = "/api/v1/auth/oauth"
+	oauthStateCookieTTL  = 10 * time.Minute
+)
+
+// OAuthProviders lists the configured sign-in providers so the web app only
+// renders buttons that work.
+func (h *AuthHandlers) OAuthProviders(w http.ResponseWriter, _ *http.Request) {
+	providers := []string{}
+	if h.states != nil {
+		providers = h.svc.Providers()
 	}
-	redirectAfter := sanitizeRedirect(r.URL.Query().Get("redirect"))
-	url, err := h.svc.StartOAuth(r.Context(), h.states, redirectAfter)
-	if err != nil {
-		response.Error(w, err)
-		return
-	}
-	http.Redirect(w, r, url, http.StatusFound)
+	response.JSON(w, http.StatusOK, map[string]any{"providers": providers})
 }
 
-// OAuthGoogleCallback completes the flow: validates state, exchanges the code,
-// sets the refresh cookie, and redirects back to the web app with the access
-// token in the URL fragment (kept out of server logs / Referer).
-func (h *AuthHandlers) OAuthGoogleCallback(w http.ResponseWriter, r *http.Request) {
-	if h.states == nil {
-		response.Error(w, domain.ErrForbidden)
-		return
-	}
-	q := r.URL.Query()
-	if e := q.Get("error"); e != "" {
-		response.Error(w, domain.ErrUnauthorized)
-		return
-	}
-	res, err := h.svc.CompleteOAuth(r.Context(), h.states, q.Get("code"), q.Get("state"), r.UserAgent(), clientIP(r))
+// OAuthStart redirects the browser to the provider's consent screen. Failures
+// are browser navigations too, so they redirect back to the login page with a
+// code instead of rendering JSON.
+func (h *AuthHandlers) OAuthStart(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	redirectAfter := sanitizeRedirect(r.URL.Query().Get("redirect"))
+	start, err := h.svc.StartOAuth(r.Context(), h.states, provider, redirectAfter)
 	if err != nil {
-		response.Error(w, err)
+		h.oauthFail(w, r, provider, err)
+		return
+	}
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookie,
+		Value:    start.State,
+		Path:     oauthStateCookiePath,
+		MaxAge:   int(oauthStateCookieTTL.Seconds()),
+		HttpOnly: true,
+		Secure:   h.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
+	http.Redirect(w, r, start.URL, http.StatusFound)
+}
+
+// OAuthCallback completes the flow: checks the state against the browser
+// cookie, exchanges the code, sets the refresh cookie, and redirects to the web
+// app, which mints its in-memory access token via /auth/refresh. No token ever
+// travels in the URL. A TOTP account instead receives a short-lived pending
+// token in the URL fragment (never sent to servers) to finish at /login/2fa.
+func (h *AuthHandlers) OAuthCallback(w http.ResponseWriter, r *http.Request) {
+	provider := chi.URLParam(r, "provider")
+	q := r.URL.Query()
+	h.clearOAuthStateCookie(w)
+	if e := q.Get("error"); e != "" {
+		code := "oauth_failed"
+		if e == "access_denied" {
+			code = "oauth_cancelled"
+		}
+		h.redirectLogin(w, r, code)
+		return
+	}
+	state := q.Get("state")
+	c, err := r.Cookie(oauthStateCookie)
+	if err != nil || state == "" || subtle.ConstantTimeCompare([]byte(c.Value), []byte(state)) != 1 {
+		h.redirectLogin(w, r, "oauth_state_invalid")
+		return
+	}
+	res, err := h.svc.CompleteOAuth(r.Context(), h.states, provider, q.Get("code"), state, r.UserAgent(), clientIP(r))
+	if err != nil {
+		h.oauthFail(w, r, provider, err)
+		return
+	}
+	dest := strings.TrimRight(h.webOrigin, "/") + "/oauth/callback?next=" + url.QueryEscape(sanitizeRedirect(res.RedirectAfter))
+	if res.TwoFactor {
+		http.Redirect(w, r, dest+"#pending_token="+url.QueryEscape(res.PendingToken), http.StatusFound)
 		return
 	}
 	h.setRefreshCookie(w, res.Tokens.RefreshToken, res.Tokens.RefreshExpiresAt)
-	dest := strings.TrimRight(h.webOrigin, "/") + sanitizeRedirect(res.RedirectAfter) +
-		"#access_token=" + res.Tokens.AccessToken
 	http.Redirect(w, r, dest, http.StatusFound)
+}
+
+// oauthFail logs unexpected failures and sends the browser back to /login with
+// the failure's code (coded domain errors) or a generic one.
+func (h *AuthHandlers) oauthFail(w http.ResponseWriter, r *http.Request, provider string, err error) {
+	code := "oauth_failed"
+	var ce *domain.CodedError
+	if errors.As(err, &ce) && ce.Code != "" {
+		code = ce.Code
+	} else {
+		h.logger.ErrorContext(r.Context(), "oauth flow failed", "provider", provider, "err", err)
+	}
+	h.redirectLogin(w, r, code)
+}
+
+func (h *AuthHandlers) redirectLogin(w http.ResponseWriter, r *http.Request, code string) {
+	http.Redirect(w, r, strings.TrimRight(h.webOrigin, "/")+"/login?oauth_error="+url.QueryEscape(code), http.StatusFound)
+}
+
+func (h *AuthHandlers) clearOAuthStateCookie(w http.ResponseWriter) {
+	http.SetCookie(w, &http.Cookie{
+		Name:     oauthStateCookie,
+		Value:    "",
+		Path:     oauthStateCookiePath,
+		MaxAge:   -1,
+		HttpOnly: true,
+		Secure:   h.cookieSecure,
+		SameSite: http.SameSiteLaxMode,
+	})
 }
 
 // sanitizeRedirect confines post-login redirects to same-origin paths so the
 // flow cannot be turned into an open redirect. Anything not starting with a
-// single "/" (or starting with "//") collapses to "/".
+// single "/" (or starting with "//" or "/\") collapses to "/app".
 func sanitizeRedirect(p string) string {
-	if p == "" || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") {
-		return "/"
+	if p == "" || !strings.HasPrefix(p, "/") || strings.HasPrefix(p, "//") || strings.HasPrefix(p, "/\\") {
+		return "/app"
 	}
 	return p
 }

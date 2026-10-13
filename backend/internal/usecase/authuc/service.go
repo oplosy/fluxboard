@@ -9,10 +9,11 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"errors"
-	"fmt"
 	"log/slog"
+	"net/mail"
 	"strings"
 	"time"
+	"unicode/utf8"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/audit"
@@ -58,10 +59,11 @@ type Service struct {
 	signer   *jwtx.Signer
 	verifier *jwtx.Verifier
 	cipher   SecretCipher
-	google   auth.OAuthProvider
-	clock    clock.Clock
-	obs      Observer
-	auditor  audit.Writer
+	// providers holds the configured OAuth IdPs by name (google, github).
+	providers map[string]auth.OAuthProvider
+	clock     clock.Clock
+	obs       Observer
+	auditor   audit.Writer
 
 	accessTTL  time.Duration
 	refreshTTL time.Duration
@@ -82,7 +84,8 @@ type Deps struct {
 	Signer   *jwtx.Signer
 	Verifier *jwtx.Verifier
 	Cipher   SecretCipher
-	Google   auth.OAuthProvider
+	Google   auth.OAuthProvider // nil => Google sign-in disabled
+	GitHub   auth.OAuthProvider // nil => GitHub sign-in disabled
 	Clock    clock.Clock
 	Observer Observer
 	Audit    audit.Writer
@@ -112,11 +115,18 @@ func New(d Deps) *Service {
 	if d.Audit == nil {
 		d.Audit = noopAudit{}
 	}
+	providers := map[string]auth.OAuthProvider{}
+	if d.Google != nil {
+		providers[ProviderGoogle] = d.Google
+	}
+	if d.GitHub != nil {
+		providers[ProviderGitHub] = d.GitHub
+	}
 	return &Service{
 		users: d.Users, sessions: d.Sessions, tokens: d.Tokens,
 		recovery: d.Recovery, oauth: d.OAuth, cache: d.Cache,
 		limiter: d.Limiter, mailer: d.Mailer,
-		signer: d.Signer, verifier: d.Verifier, cipher: d.Cipher, google: d.Google,
+		signer: d.Signer, verifier: d.Verifier, cipher: d.Cipher, providers: providers,
 		clock: d.Clock, obs: d.Observer, auditor: d.Audit,
 		accessTTL: d.AccessTTL, refreshTTL: d.RefreshTTL,
 	}
@@ -172,26 +182,40 @@ type RegisterInput struct {
 	Name     string
 }
 
-// RegisterResult is intentionally non-committal: the caller returns the same
-// generic "check your email" response whether or not the account was created,
-// to avoid user enumeration (docs/04-AUTH.md §6). VerifyToken is the raw
-// email-verification token (empty when nothing was created).
+// RegisterResult reports the created account. VerifyToken is the raw
+// email-verification token that was mailed.
 type RegisterResult struct {
 	Created     bool
 	UserID      string
 	VerifyToken string
 }
 
-// Register validates the password policy, creates an unverified user, and mints
-// an email-verification token. A duplicate email is swallowed into a
-// non-created result (no enumeration).
+// maxNameLen bounds the display name (characters).
+const maxNameLen = 100
+
+// Register validates the input, creates an unverified user, and mails an
+// email-verification link. A taken email is reported as a field-level
+// email_taken conflict so the form can say so (ADR-032); login and password
+// recovery stay enumeration-safe. A mail delivery failure does not fail the
+// registration: the account exists and the verify screen can resend.
 func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterResult, error) {
 	email := normalizeEmail(in.Email)
 	if !validEmail(email) {
-		return RegisterResult{}, fmt.Errorf("email: %w", domain.ErrValidation)
+		return RegisterResult{}, errEmailInvalid
+	}
+	name := strings.TrimSpace(in.Name)
+	if utf8.RuneCountInString(name) > maxNameLen {
+		return RegisterResult{}, errNameTooLong
 	}
 	if err := argon2x.CheckPolicy(in.Password, email); err != nil {
-		return RegisterResult{}, fmt.Errorf("%s: %w", err.Error(), domain.ErrValidation)
+		return RegisterResult{}, policyError(err, "password")
+	}
+	// Cheap existence check first so a taken address never pays for Argon2id.
+	// The unique index still decides races (Create -> ErrConflict below).
+	if _, err := s.users.GetByEmail(ctx, email); err == nil {
+		return RegisterResult{}, errEmailTaken
+	} else if !errors.Is(err, domain.ErrNotFound) {
+		return RegisterResult{}, err
 	}
 
 	hash, err := argon2x.Hash(in.Password)
@@ -204,14 +228,14 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterResul
 		ID:           uuidv7.New().String(),
 		Email:        email,
 		PasswordHash: hash,
-		Name:         strings.TrimSpace(in.Name),
+		Name:         name,
 		PlatformRole: auth.PlatformRoleUser,
 		CreatedAt:    now,
 		UpdatedAt:    now,
 	}
 	if err := s.users.Create(ctx, u); err != nil {
 		if errors.Is(err, domain.ErrConflict) {
-			return RegisterResult{Created: false}, nil // email taken -> generic response
+			return RegisterResult{}, errEmailTaken
 		}
 		return RegisterResult{}, err
 	}
@@ -221,7 +245,7 @@ func (s *Service) Register(ctx context.Context, in RegisterInput) (RegisterResul
 		return RegisterResult{}, err
 	}
 	if err := s.mailer.SendEmailVerify(ctx, u.Email, rawVerify); err != nil {
-		return RegisterResult{}, err
+		slog.Default().ErrorContext(ctx, "register: verification email not sent", "user_id", u.ID, "err", err)
 	}
 	return RegisterResult{Created: true, UserID: u.ID, VerifyToken: rawVerify}, nil
 }
@@ -266,16 +290,49 @@ func (s *Service) ResendEmailVerify(ctx context.Context, email string) error {
 	return s.mailer.SendEmailVerify(ctx, u.Email, raw)
 }
 
-// VerifyEmail consumes an email-verification token and marks the user verified.
+// Account returns the caller's account. Unlike GET /me it is reachable before
+// the email is verified, so the verify screen can show which address to check.
+func (s *Service) Account(ctx context.Context, userID string) (*auth.User, error) {
+	return s.users.GetByID(ctx, userID)
+}
+
+// ResendEmailVerifyForUser re-sends the verification link to the signed-in
+// caller's own address (no email input to mistype). No-op when already verified.
+func (s *Service) ResendEmailVerifyForUser(ctx context.Context, userID string) error {
+	u, err := s.users.GetByID(ctx, userID)
+	if err != nil {
+		return err
+	}
+	if u.EmailVerified {
+		return nil
+	}
+	raw, err := s.mintEmailVerify(ctx, u.ID, s.clock.Now())
+	if err != nil {
+		return err
+	}
+	return s.mailer.SendEmailVerify(ctx, u.Email, raw)
+}
+
+// VerifyEmail consumes an email-verification token, marks the user verified,
+// and retires any other outstanding verification links for that user.
 func (s *Service) VerifyEmail(ctx context.Context, rawToken string) error {
+	if rawToken == "" {
+		return errTokenInvalid
+	}
 	ott, err := s.tokens.Consume(ctx, auth.PurposeEmailVerify, token.Hash(rawToken), s.clock.Now())
 	if err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return domain.ErrUnauthorized // invalid/expired/used
+			return errTokenInvalid // invalid/expired/used
 		}
 		return err
 	}
-	return s.users.MarkEmailVerified(ctx, ott.UserID)
+	if err := s.users.MarkEmailVerified(ctx, ott.UserID); err != nil {
+		return err
+	}
+	if err := s.tokens.InvalidateAll(ctx, ott.UserID, auth.PurposeEmailVerify); err != nil {
+		slog.Default().WarnContext(ctx, "verify email: stale links not retired", "err", err)
+	}
+	return nil
 }
 
 // --- Password reset / change ----------------------------------------------
@@ -292,8 +349,9 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 		}
 		return err
 	}
-	// OAuth-only accounts have no password to reset; stay silent all the same.
-	if !u.HasPassword() {
+	// A locked account gets nothing. OAuth-only accounts do get a link: proving
+	// control of the mailbox is enough to add a password to them.
+	if u.Locked() {
 		return nil
 	}
 	raw, err := token.New()
@@ -314,30 +372,69 @@ func (s *Service) ForgotPassword(ctx context.Context, email string) error {
 	return s.mailer.SendPasswordReset(ctx, u.Email, raw)
 }
 
-// ResetPassword consumes a password-reset token, sets the new password (policy
-// enforced), and revokes every session so a leaked token cannot outlive the
-// reset (FR-AUTH-010/012, docs/04-AUTH.md §6).
-func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
-	ott, err := s.tokens.Consume(ctx, auth.PurposePasswordReset, token.Hash(rawToken), s.clock.Now())
-	if err != nil {
+// ValidateResetToken reports whether a password-reset link is still usable,
+// without consuming it, so the reset page can say so before the user types.
+func (s *Service) ValidateResetToken(ctx context.Context, rawToken string) error {
+	if rawToken == "" {
+		return errTokenInvalid
+	}
+	if _, err := s.tokens.Peek(ctx, auth.PurposePasswordReset, token.Hash(rawToken)); err != nil {
 		if errors.Is(err, domain.ErrNotFound) {
-			return domain.ErrUnauthorized // invalid / expired / used
+			return errTokenInvalid
 		}
 		return err
 	}
-	u, err := s.users.GetByID(ctx, ott.UserID)
+	return nil
+}
+
+// ResetPassword sets a new password from a reset link. The password policy is
+// checked BEFORE the single-use token is consumed, so a rejected password never
+// burns the link. On success it marks the email verified (the link proved
+// mailbox control), retires other reset links, and revokes every session so a
+// leaked token cannot outlive the reset (FR-AUTH-010/012, docs/04-AUTH.md §6).
+func (s *Service) ResetPassword(ctx context.Context, rawToken, newPassword string) error {
+	if rawToken == "" {
+		return errTokenInvalid
+	}
+	hashed := token.Hash(rawToken)
+	pending, err := s.tokens.Peek(ctx, auth.PurposePasswordReset, hashed)
 	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return errTokenInvalid
+		}
+		return err
+	}
+	u, err := s.users.GetByID(ctx, pending.UserID)
+	if err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return errTokenInvalid
+		}
 		return err
 	}
 	if err := argon2x.CheckPolicy(newPassword, u.Email); err != nil {
-		return fmt.Errorf("%s: %w", err.Error(), domain.ErrValidation)
+		return policyError(err, "password")
 	}
 	hash, err := argon2x.Hash(newPassword)
 	if err != nil {
 		return err
 	}
+	// Consume now; a concurrent reset that won the race leaves us ErrNotFound.
+	if _, err := s.tokens.Consume(ctx, auth.PurposePasswordReset, hashed, s.clock.Now()); err != nil {
+		if errors.Is(err, domain.ErrNotFound) {
+			return errTokenInvalid
+		}
+		return err
+	}
 	if err := s.users.UpdatePasswordHash(ctx, u.ID, hash); err != nil {
 		return err
+	}
+	if !u.EmailVerified {
+		if err := s.users.MarkEmailVerified(ctx, u.ID); err != nil {
+			return err
+		}
+	}
+	if err := s.tokens.InvalidateAll(ctx, u.ID, auth.PurposePasswordReset); err != nil {
+		slog.Default().WarnContext(ctx, "reset password: stale links not retired", "err", err)
 	}
 	if err := s.sessions.RevokeAllForUser(ctx, u.ID, "password_reset"); err != nil {
 		return err
@@ -360,17 +457,22 @@ func (s *Service) ChangePassword(ctx context.Context, userID, currentPassword, n
 		return err
 	}
 	if !u.HasPassword() {
-		return domain.ErrForbidden // OAuth-only account: nothing to change here
+		return errPasswordNotSet // OAuth-only account: set one via the reset link
 	}
 	ok, err := argon2x.Verify(currentPassword, u.PasswordHash)
 	if err != nil {
 		return err
 	}
 	if !ok {
-		return domain.ErrUnauthorized
+		// A validation error, not 401: the session is fine, the input is not
+		// (a 401 would make the client refresh and retry for nothing).
+		return errCurrentPasswordIncorrect
+	}
+	if newPassword == currentPassword {
+		return errPasswordUnchanged
 	}
 	if err := argon2x.CheckPolicy(newPassword, u.Email); err != nil {
-		return fmt.Errorf("%s: %w", err.Error(), domain.ErrValidation)
+		return policyError(err, "new_password")
 	}
 	hash, err := argon2x.Hash(newPassword)
 	if err != nil {
@@ -418,12 +520,12 @@ type LoginResult struct {
 // HTTP layer can set Retry-After.
 type RateLimitError struct{ RetryAfter time.Duration }
 
-func (e *RateLimitError) Error() string { return "too many login attempts" }
+func (e *RateLimitError) Error() string { return "Too many sign-in attempts. Try again later." }
 func (e *RateLimitError) Unwrap() error { return domain.ErrRateLimited }
 
 // Login gates on the per-(email,IP) rate limiter, verifies credentials with
 // uniform timing, and either issues a session or (TOTP users) returns a pending
-// 2FA token. All credential failures return the same domain.ErrUnauthorized so
+// 2FA token. All credential failures return the same invalid_credentials error so
 // nothing leaks account existence (no enumeration).
 func (s *Service) Login(ctx context.Context, in LoginInput) (LoginResult, error) {
 	email := normalizeEmail(in.Email)
@@ -445,19 +547,20 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginResult, error)
 			// account existence (docs/04-AUTH.md §4).
 			_, _ = argon2x.Verify(in.Password, argon2x.DummyHash)
 			s.observe(ctx).LoginAttempt(ctx, "invalid")
-			return LoginResult{}, domain.ErrUnauthorized
+			return LoginResult{}, errInvalidCredentials
 		}
 		return LoginResult{}, err
 	}
 
 	if u.Locked() {
+		_, _ = argon2x.Verify(in.Password, argon2x.DummyHash) // uniform timing
 		s.observe(ctx).LoginAttempt(ctx, "locked")
-		return LoginResult{}, domain.ErrUnauthorized
+		return LoginResult{}, errInvalidCredentials
 	}
 	if !u.HasPassword() {
 		_, _ = argon2x.Verify(in.Password, argon2x.DummyHash)
 		s.observe(ctx).LoginAttempt(ctx, "invalid")
-		return LoginResult{}, domain.ErrUnauthorized
+		return LoginResult{}, errInvalidCredentials
 	}
 
 	ok, err := argon2x.Verify(in.Password, u.PasswordHash)
@@ -472,7 +575,7 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (LoginResult, error)
 			Metadata:    map[string]any{"reason": "invalid_password"},
 			Severity:    audit.SeverityWarning,
 		})
-		return LoginResult{}, domain.ErrUnauthorized
+		return LoginResult{}, errInvalidCredentials
 	}
 
 	// Credentials are correct: clear the throttle so the user's own earlier
@@ -676,7 +779,19 @@ func (noopLimiter) Reset(context.Context, string) error { return nil }
 
 func normalizeEmail(e string) string { return strings.ToLower(strings.TrimSpace(e)) }
 
+// validEmail accepts a bare RFC 5322 addr-spec (no display name) of at most 254
+// octets whose domain has a dot. Rejecting CR/LF here also keeps the address
+// safe to place in mail headers.
 func validEmail(e string) bool {
-	at := strings.IndexByte(e, '@')
-	return at > 0 && at < len(e)-1 && !strings.ContainsAny(e, " \t\n")
+	if e == "" || len(e) > 254 || strings.ContainsAny(e, " \t\r\n<>") {
+		return false
+	}
+	a, err := mail.ParseAddress(e)
+	if err != nil || a.Address != e || a.Name != "" {
+		return false
+	}
+	at := strings.LastIndexByte(e, '@')
+	host := e[at+1:]
+	return at > 0 && strings.Contains(host, ".") &&
+		!strings.HasPrefix(host, ".") && !strings.HasSuffix(host, ".")
 }
