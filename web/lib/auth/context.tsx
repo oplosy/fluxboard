@@ -15,10 +15,12 @@ import {
   getAccessToken,
   onAccessTokenChange,
   refreshSession,
+  restoreSession,
   setAccessToken,
 } from '@/lib/api/client';
 import type { TokenResponse } from '@/lib/api/types';
 import { decodeAccessClaims, type AccessClaims } from './jwt';
+import { shouldRestoreSession } from './session-hint';
 
 interface AuthState {
   /** True until the initial cookie → refresh bootstrap resolves. */
@@ -67,10 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Mirror the module-level token store into React state so components re-render.
   useEffect(() => onAccessTokenChange(setToken), []);
 
-  // Bootstrap: exchange the refresh cookie for an access token on first mount.
+  // Bootstrap: exchange the refresh cookie for an access token on first mount —
+  // only when this browser is marked as signed in or the page needs a session,
+  // so signed-out visitors don't fire a doomed refresh on every page view.
   useEffect(() => {
     let active = true;
-    void refreshSession().finally(() => {
+    const attempt = shouldRestoreSession(window.location.pathname) ? refreshSession() : Promise.resolve(false);
+    void attempt.finally(() => {
       if (active) setLoading(false);
     });
     return () => {
@@ -103,6 +108,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    // Settle the session restore first: /auth/logout needs the access token to
+    // know which session to revoke, and a refresh landing after logout would
+    // sign the user straight back in.
+    await restoreSession();
     try {
       await apiFetch('/auth/logout', { method: 'POST', skipAuthRetry: true });
     } catch {

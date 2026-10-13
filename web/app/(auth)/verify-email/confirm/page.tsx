@@ -11,6 +11,7 @@ import { confirmEmail } from '@/lib/api/auth';
 import { ApiError } from '@/lib/api/client';
 import { useAuth } from '@/lib/auth/context';
 import { authErrorMessage } from '@/lib/auth/errors';
+import { hasSessionHint } from '@/lib/auth/session-hint';
 
 type State = 'pending' | 'success' | 'invalid' | 'error';
 
@@ -39,7 +40,7 @@ function ConfirmInner() {
       .then(() => {
         setState('success');
         // A signed-in tab gets a fresh token carrying ver=true right away.
-        void refresh();
+        if (hasSessionHint()) void refresh();
       })
       .catch((err: unknown) => {
         if (err instanceof ApiError && err.code === 'token_invalid') setState('invalid');
