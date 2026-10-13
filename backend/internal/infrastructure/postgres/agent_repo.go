@@ -23,7 +23,27 @@ type AgentRepo struct{ tp *TenantPool }
 // NewAgentRepo builds the repo over the tenant pool.
 func NewAgentRepo(tp *TenantPool) *AgentRepo { return &AgentRepo{tp: tp} }
 
-var _ agent.Repository = (*AgentRepo)(nil)
+var (
+	_ agent.Repository = (*AgentRepo)(nil)
+	_ agent.Lookup     = (*AgentRepo)(nil)
+)
+
+// IsAgent reports whether userID is (or was) one of the org's agents. A
+// non-uuid principal (an org key, "apikey:<id>") is not.
+func (r *AgentRepo) IsAgent(ctx context.Context, orgID, userID string) (bool, error) {
+	id, err := uuid.Parse(userID)
+	if err != nil {
+		return false, nil
+	}
+	var ok bool
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		var err error
+		ok, err = q.IsAgent(ctx, gen.IsAgentParams{OrgID: oid, ID: id})
+		return err
+	})
+	return ok, err
+}
 
 // Create inserts the users row, the agent and its first key. A live agent with
 // the same name (case-insensitive) ⇒ domain.ErrConflict.

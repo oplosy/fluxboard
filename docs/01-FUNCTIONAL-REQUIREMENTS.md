@@ -152,6 +152,6 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-AGT-003 | M | `max_agents` per plan (Free 1, Pro 10, Business unlimited); agents are not seats. Creation over the cap → 402 `plan_limit_exceeded` (`limit=max_agents`). Paused agents count; per-org admin override. |
 | FR-AGT-004 | M | `tasks.claim` with a renewable lease (default 30 min, `tasks.heartbeat`); expired leases auto-release; a held task → 409 with the holder. |
 | FR-AGT-005 | M | Task `version` on every agent write; stale → 409 `version_conflict` with the current task. Write tools accept an idempotency key (24 h). |
-| FR-AGT-006 | M | Column roles per project (`backlog`, `todo`, `in_progress`, `review`, `done`); agents move tasks by role. |
-| FR-AGT-007 | M | Agents can move work up to `review` with a result summary; only a human moves to `done` (agent → 403 `human_approval_required`). |
+| FR-AGT-006 | M | Column roles per project (`backlog`, `todo`, `in_progress`, `review`, `done`); agents move tasks by role. A lead sets a column's role; unset roles are inferred from column names. New projects include a Review column. |
+| FR-AGT-007 | M | Agents can move work up to `review` with a result summary; only a human moves to `done` (agent → 403 `human_approval_required`). A person approves (→ done) or sends it back with a required comment (→ in progress, same assignee). |
 | FR-AGT-008 | S | Agent write tools: `tasks.next` (ready = unblocked, unclaimed, highest priority), `tasks.update`, `tasks.comment`, `tasks.create` (incl. subtasks), `tasks.link`, `tasks.submit_for_review`. |

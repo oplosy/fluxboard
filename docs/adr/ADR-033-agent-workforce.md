@@ -106,6 +106,32 @@ themselves: pick a task, do it, report, hand over. Today that cannot work:
   tools that are not idempotent by nature; tools idempotent by design (claim,
   heartbeat, `ai.plan_apply` with its own key) are left alone.
 
+## Implementation notes (step 4)
+
+- **Column roles.** `board_columns.role` (migration 0037) holds an explicit
+  stage set by a project lead (`PUT …/columns/{id}/role`, one column per role
+  per board, moved atomically). A column without one gets its role inferred
+  from its name ("Todo", "In Progress", "Code Review", "Done", …), so existing
+  boards needed no data change. New projects get five columns: Backlog, Todo,
+  In Progress, **Review**, Done. "Done" for the dependency guard and velocity is
+  now the done role, else the last column (as before).
+- **Human-approved Done** is enforced in the usecases for every path that can
+  put a task in the done column: drag/`PATCH …/position`, move by role, bulk
+  move, task creation (incl. `ai.plan_apply`). The caller is an agent when it
+  has an `agents` row (`agent.Lookup`).
+- **Review.** `tasks.submit_for_review` moves the task to the review column
+  (version-checked), posts the summary as a comment and ends the claim; the
+  agent stays the assignee. A person decides with `POST /tasks/{id}/review`:
+  `approve` → done; `changes` (comment required) → in progress (todo if the
+  board has none), same assignee. Agents get 403 `human_approval_required`.
+- **Write tools** (agent-only except `tasks.link`): `tasks.next` (claims by
+  default: work it already holds, then work sent back to it, then the most
+  urgent ready todo — unclaimed, unassigned or its own, every blocker done),
+  `tasks.update` (needs the agent's live claim and the version it read; may
+  move to backlog/todo/in_progress), `tasks.comment`, `tasks.create` (with
+  checklist subtasks and blockers, never into done), `tasks.link`,
+  `tasks.submit_for_review`.
+
 ## Rejected
 
 - **Agents as members/seats:** bills an automated worker like a person and

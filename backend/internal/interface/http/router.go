@@ -258,6 +258,7 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Post("/columns", d.Projects.AddColumn)
 					p.With(read(tenant.ObjOrg)).Patch("/columns/{columnId}", d.Projects.RenameColumn)
 					p.With(read(tenant.ObjOrg)).Patch("/columns/{columnId}/position", d.Projects.ReorderColumn)
+					p.With(read(tenant.ObjOrg)).Put("/columns/{columnId}/role", d.Projects.SetColumnRole) // ADR-033
 					p.With(read(tenant.ObjOrg)).Delete("/columns/{columnId}", d.Projects.DeleteColumn)
 					p.With(read(tenant.ObjOrg)).Post("/tasks", d.Tasks.CreateTask)
 					p.With(read(tenant.ObjOrg)).Get("/tasks", d.Tasks.ListTasks)
@@ -294,6 +295,7 @@ func NewRouter(d Deps) http.Handler {
 					t.With(read(tenant.ObjOrg)).Delete("/", d.Tasks.TrashTask)        // FR-TASK-009
 					t.With(read(tenant.ObjOrg)).Post("/restore", d.Tasks.RestoreTask) // FR-TASK-009
 					t.With(read(tenant.ObjOrg)).Patch("/position", d.Projects.MoveTask)
+					t.With(read(tenant.ObjOrg)).Post("/review", d.Projects.ReviewTask) // ADR-033: approve | changes
 					t.With(read(tenant.ObjOrg)).Get("/activity", d.Tasks.ListActivity)
 					// Attachments (FR-TASK-006). Presigned PUT/GET; API proxies no bytes.
 					t.With(read(tenant.ObjOrg)).Get("/attachments", d.Tasks.ListAttachments)

@@ -70,6 +70,9 @@ type ConcurrencyRepository interface {
 	Heartbeat(ctx context.Context, orgID, id, agentID string, expiresAt time.Time) (bool, error)
 	// Release drops agentID's claim (and its assignment); false when it holds none.
 	Release(ctx context.Context, orgID, id, agentID string) (bool, error)
+	// EndClaim drops agentID's claim but keeps the assignment (work handed over
+	// for review); false when it holds none.
+	EndClaim(ctx context.Context, orgID, id, agentID string) (bool, error)
 	// ReleaseExpired clears every lapsed claim in the org; returns the count.
 	ReleaseExpired(ctx context.Context, orgID string) (int, error)
 }

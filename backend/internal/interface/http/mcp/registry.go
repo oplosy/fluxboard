@@ -17,6 +17,7 @@ type Deps struct {
 func Tools(d Deps) []Tool {
 	tools := workTools(d.Projects, d.Tasks)
 	tools = append(tools, claimTools(d.Tasks)...)
+	tools = append(tools, agentTools(d.Projects, d.Tasks)...)
 	if d.AI != nil {
 		tools = append(tools, aiTools(d.AI)...)
 	}

@@ -137,7 +137,7 @@ func ValidKey(s string) bool { return keyRe.MatchString(s) }
 
 // DefaultColumns are the seeded board statuses for a new project (FR-PROJ-004),
 // in board order.
-var DefaultColumns = []string{"Backlog", "Todo", "In Progress", "Done"}
+var DefaultColumns = []string{"Backlog", "Todo", "In Progress", "Review", "Done"}
 
 // ---- Models ---------------------------------------------------------------
 
@@ -178,11 +178,14 @@ type Board struct {
 
 // Column is a board status column, ordered by Rank (FR-PROJ-004).
 type Column struct {
-	ID        string
-	BoardID   string
-	Name      string
-	Rank      string
-	WIPLimit  *int
+	ID       string
+	BoardID  string
+	Name     string
+	Rank     string
+	WIPLimit *int
+	// Role is the column's explicit workflow stage ("" ⇒ inferred from Name;
+	// see EffectiveRoles).
+	Role      ColumnRole
 	CreatedAt time.Time
 	UpdatedAt time.Time
 }

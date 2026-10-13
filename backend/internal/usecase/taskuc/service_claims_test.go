@@ -92,6 +92,15 @@ func (s *claimStore) Release(_ context.Context, _, id, agent string) (bool, erro
 	return true, nil
 }
 
+func (s *claimStore) EndClaim(_ context.Context, _, id, agent string) (bool, error) {
+	t := s.tasks[id]
+	if t.ClaimedBy == nil || *t.ClaimedBy != agent {
+		return false, nil
+	}
+	t.ClaimedBy, t.LeaseExpiresAt = nil, nil
+	return true, nil
+}
+
 func (s *claimStore) ReleaseExpired(context.Context, string) (int, error) { return 0, nil }
 
 type activityLog struct {

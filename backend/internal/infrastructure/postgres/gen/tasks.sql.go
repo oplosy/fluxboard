@@ -117,6 +117,27 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
 	return err
 }
 
+const endTaskClaim = `-- name: EndTaskClaim :execrows
+UPDATE tasks SET claimed_by = NULL, lease_expires_at = NULL
+WHERE org_id = $1 AND id = $2 AND deleted_at IS NULL AND claimed_by = $3
+`
+
+type EndTaskClaimParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	ID      uuid.UUID   `json:"id"`
+	AgentID pgtype.UUID `json:"agent_id"`
+}
+
+// Finish a claim but keep the assignment: the agent handed the task over for
+// review and stays its assignee for attribution.
+func (q *Queries) EndTaskClaim(ctx context.Context, arg EndTaskClaimParams) (int64, error) {
+	result, err := q.db.Exec(ctx, endTaskClaim, arg.OrgID, arg.ID, arg.AgentID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getTask = `-- name: GetTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
        assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,

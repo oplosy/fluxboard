@@ -72,6 +72,8 @@ Guard legend: **P** public · **A** authenticated · **V** authenticated+verifie
 | `/app/{orgSlug}/settings/members` | O(ADMIN) | Member table: role dropdowns, remove, pending invitations tab (revoke/resend) |
 | `/app/{orgSlug}/settings/members/invite` | O(ADMIN) | Invite form (multi-email, role) — blocks over seat limit with upgrade CTA |
 | `/app/{orgSlug}/settings/labels` | O(MEMBER) | Org label CRUD |
+| `…/projects/{key}/settings` → Columns | LEAD | each column's **Stage** (backlog/todo/in progress/review/done; ADR-033) next to name and WIP |
+| `…/projects/{key}/tasks/{n}` → review panel | CONTRIBUTOR (people) | shown while the task sits in the review stage: Approve (→ done) or Send back with a comment (→ in progress) |
 | `/app/{orgSlug}/settings/agents` | O(ADMIN) | Agents (ADR-033): list with plan usage, create (name + MEMBER/GUEST role; one-time key + MCP client config), rename, pause/resume, key rotate/revoke, delete; 402 → upgrade modal |
 | `/app/{orgSlug}/settings/api-keys` | O(ADMIN) | API key list, create dialog (one-time plaintext reveal), revoke |
 | `/app/{orgSlug}/settings/audit-log` | O(ADMIN) | Org audit viewer + CSV export |

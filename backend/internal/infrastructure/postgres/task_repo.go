@@ -278,6 +278,13 @@ func (r *TaskRepo) Release(ctx context.Context, orgID, id, agentID string) (bool
 	})
 }
 
+// EndClaim drops the agent's claim but keeps its assignment.
+func (r *TaskRepo) EndClaim(ctx context.Context, orgID, id, agentID string) (bool, error) {
+	return r.claimOp(ctx, orgID, id, agentID, func(q *gen.Queries, oid, tid, aid uuid.UUID) (int64, error) {
+		return q.EndTaskClaim(ctx, gen.EndTaskClaimParams{OrgID: oid, ID: tid, AgentID: pgUUIDOf(aid)})
+	})
+}
+
 // ReleaseExpired clears the org's lapsed claims (sweeper job).
 func (r *TaskRepo) ReleaseExpired(ctx context.Context, orgID string) (int, error) {
 	var n int64

@@ -30,6 +30,8 @@ type Querier interface {
 	// agent's live lease, or by an assignee who is neither this agent nor the
 	// holder of a lapsed claim (a person, or someone assigned by a person).
 	ClaimTask(ctx context.Context, arg ClaimTaskParams) (int64, error)
+	// Free a role on a board before giving it to another column (one per board).
+	ClearColumnRole(ctx context.Context, arg ClearColumnRoleParams) error
 	// Removes the org logo (empty-string logo_key in UpdateProfile). A separate
 	// query because coalesce() above cannot express "set NULL".
 	ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
@@ -138,6 +140,9 @@ type Querier interface {
 	// Clears any prior codes before a fresh batch is issued (activate / regenerate).
 	DeleteUserRecoveryCodes(ctx context.Context, userID uuid.UUID) error
 	DetachLabel(ctx context.Context, arg DetachLabelParams) (int64, error)
+	// Finish a claim but keep the assignment: the agent handed the task over for
+	// review and stays its assignee for attribution.
+	EndTaskClaim(ctx context.Context, arg EndTaskClaimParams) (int64, error)
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
 	// to 401 rather than a silent miss. An agent's key carries the agent's role and
 	// status (ADR-033); the owner pool reads agents across tenants like api_keys.
@@ -207,6 +212,9 @@ type Querier interface {
 	// Retires every outstanding token of one purpose for a user, so older links
 	// from earlier emails stop working once one of them has been used.
 	InvalidateUserOneTimeTokens(ctx context.Context, arg InvalidateUserOneTimeTokensParams) error
+	// Whether a user id is (or was) one of the org's agents: the human-approval
+	// gate refuses agents moving work to done (ADR-033 decision 6).
+	IsAgent(ctx context.Context, arg IsAgentParams) (bool, error)
 	// Most recent recorded value for a metric on/before a day (point-in-time
 	// dimensions: seats, storage). ErrNoRows ⇒ caller treats as 0.
 	LatestUsageValue(ctx context.Context, arg LatestUsageValueParams) (int64, error)
@@ -352,6 +360,7 @@ type Querier interface {
 	// total).
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
 	SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error)
+	SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)
 	SetTaskSprint(ctx context.Context, arg SetTaskSprintParams) (int64, error)
 	// Sets (or clears, via empty secret) the encrypted TOTP secret and its enabled

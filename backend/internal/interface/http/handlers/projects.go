@@ -89,6 +89,9 @@ type taskCardResp struct {
 
 type boardColumnResp struct {
 	columnResp
+	// Role is the column's workflow role (ADR-033): explicit, else inferred
+	// from its name; empty when it has none.
+	Role  string         `json:"role,omitempty"`
 	Tasks []taskCardResp `json:"tasks"`
 }
 
@@ -295,7 +298,7 @@ func (h *ProjectHandlers) GetBoard(w http.ResponseWriter, r *http.Request) {
 	}
 	resp := boardResp{BoardID: view.Board.ID, Columns: []boardColumnResp{}}
 	for _, cv := range view.Columns {
-		bc := boardColumnResp{columnResp: toColumnResp(&cv.Column), Tasks: []taskCardResp{}}
+		bc := boardColumnResp{columnResp: toColumnResp(&cv.Column), Role: string(cv.Role), Tasks: []taskCardResp{}}
 		for i := range cv.Tasks {
 			t := cv.Tasks[i]
 			card := taskCardResp{
@@ -360,6 +363,60 @@ func (h *ProjectHandlers) RenameColumn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+type columnRoleReq struct {
+	Role string `json:"role"` // backlog|todo|in_progress|review|done, "" clears
+}
+
+// SetColumnRole gives a column a workflow role, or clears it (LEAD, ADR-033).
+func (h *ProjectHandlers) SetColumnRole(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	var req columnRoleReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	err := h.svc.SetColumnRole(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "projectId"),
+		chi.URLParam(r, "columnId"), project.ColumnRole(req.Role), tc.Role)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+type reviewReq struct {
+	Decision string `json:"decision"` // approve | changes
+	Comment  string `json:"comment"`
+}
+
+// ReviewTask records a person's review decision on a task in review: approve
+// moves it to done, changes sends it back with a comment (ADR-033 decision 6).
+func (h *ProjectHandlers) ReviewTask(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	var req reviewReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	if req.Decision != "approve" && req.Decision != "changes" {
+		response.Error(w, domain.NewFieldError("decision", "decision_invalid", "Decision must be approve or changes."))
+		return
+	}
+	col, err := h.svc.ReviewTask(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "taskId"),
+		req.Decision == "approve", req.Comment, tc.Role)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusOK, map[string]any{"column_id": col.ID, "column": col.Name})
 }
 
 type reorderReq struct {

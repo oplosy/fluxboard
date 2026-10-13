@@ -17,13 +17,14 @@ import {
   getBoard,
   renameColumn,
   reorderColumn,
+  setColumnRole,
 } from '@/lib/api/board';
 import { between } from '@/lib/board/rank';
 import { useToast } from '@/components/ui/toast';
 import { ProjectHeader } from '@/components/board/project-header';
 import { FieldsManager } from '@/components/board/fields-manager';
 import { FormsManager } from '@/components/board/forms-manager';
-import type { BoardColumn, Project, Visibility } from '@/lib/api/types';
+import type { BoardColumn, ColumnRole, Project, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
 export default function ProjectSettingsPage(props: { params: Promise<{ projectKey: string }> }) {
@@ -201,6 +202,12 @@ function ColumnsSection({ project }: { project: Project }) {
     onError: () => toast({ title: 'Couldn’t delete column', variant: 'error' }),
   });
 
+  const setRole = useMutation({
+    mutationFn: (v: { id: string; role: ColumnRole | null }) => setColumnRole(orgId, project.id, v.id, v.role),
+    onSuccess: invalidate,
+    onError: () => toast({ title: 'Couldn’t change the column’s stage', variant: 'error' }),
+  });
+
   function move(i: number, dir: -1 | 1) {
     const j = i + dir;
     if (j < 0 || j >= columns.length) return;
@@ -224,6 +231,10 @@ function ColumnsSection({ project }: { project: Project }) {
   return (
     <section>
       <SectionTitle>Columns</SectionTitle>
+      <p className="-mt-1 mb-3 text-xs text-muted-foreground">
+        Each column can stand for a workflow stage. Agents move work by stage and can take it as far as Review;
+        only a person moves it to Done. Stages left unset are inferred from column names.
+      </p>
       {board.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading columns…</p>
       ) : (
@@ -239,7 +250,8 @@ function ColumnsSection({ project }: { project: Project }) {
               onRename={(name, wip) => rename.mutate({ id: c.id, name, wip_limit: wip })}
               onMove={(dir) => move(i, dir)}
               onDelete={(target) => remove.mutate({ id: c.id, target })}
-              busy={rename.isPending || reorder.isPending || remove.isPending}
+              onRole={(role) => setRole.mutate({ id: c.id, role })}
+              busy={rename.isPending || reorder.isPending || remove.isPending || setRole.isPending}
             />
           ))}
 
@@ -264,6 +276,14 @@ function ColumnsSection({ project }: { project: Project }) {
   );
 }
 
+const STAGES: { value: ColumnRole; label: string }[] = [
+  { value: 'backlog', label: 'Backlog' },
+  { value: 'todo', label: 'To do' },
+  { value: 'in_progress', label: 'In progress' },
+  { value: 'review', label: 'Review' },
+  { value: 'done', label: 'Done' },
+];
+
 function ColumnRow({
   column,
   index,
@@ -272,6 +292,7 @@ function ColumnRow({
   onRename,
   onMove,
   onDelete,
+  onRole,
   busy,
 }: {
   column: BoardColumn;
@@ -281,6 +302,7 @@ function ColumnRow({
   onRename: (name: string, wip: number | null) => void;
   onMove: (dir: -1 | 1) => void;
   onDelete: (target: string) => void;
+  onRole: (role: ColumnRole | null) => void;
   busy: boolean;
 }) {
   const [name, setName] = useState(column.name);
@@ -312,6 +334,23 @@ function ColumnRow({
             placeholder="—"
             className="h-8 w-16"
           />
+        </label>
+        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+          Stage
+          <select
+            value={column.role ?? ''}
+            onChange={(e) => onRole((e.target.value || null) as ColumnRole | null)}
+            disabled={busy}
+            aria-label={`Stage of ${column.name}`}
+            className="h-8 rounded border border-input bg-card px-2 text-sm text-foreground transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
+          >
+            <option value="">None</option>
+            {STAGES.map((s) => (
+              <option key={s.value} value={s.value}>
+                {s.label}
+              </option>
+            ))}
+          </select>
         </label>
         <div className="ml-auto flex items-center gap-1">
           <button

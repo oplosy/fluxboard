@@ -208,16 +208,17 @@ func (s *Service) sprintInProject(ctx context.Context, orgID, projectID, sprintI
 	return sp, nil
 }
 
-// finalColumnID returns the last column by rank (the "done" bucket used for
-// velocity). Empty when the board has no columns.
+// finalColumnID returns the board's done column: the done role, else the last
+// column by rank (the "done" bucket used for velocity and the dependency
+// guard). Empty when the board has no columns.
 func (s *Service) finalColumnID(ctx context.Context, orgID, projectID string) string {
 	board, err := s.boards.GetByProject(ctx, orgID, projectID)
 	if err != nil {
 		return ""
 	}
 	cols, err := s.columns.ListByBoard(ctx, orgID, board.ID)
-	if err != nil || len(cols) == 0 {
+	if err != nil {
 		return ""
 	}
-	return cols[len(cols)-1].ID // ListByBoard is rank-ordered
+	return project.DoneColumnID(cols) // the done role, else the last column
 }

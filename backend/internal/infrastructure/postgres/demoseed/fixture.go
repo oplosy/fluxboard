@@ -315,13 +315,14 @@ func buildTask(clock time.Time, p Project, n, total int, assignees []string, mar
 }
 
 // columnFor buckets a task by age: older tasks are mostly done, recent ones
-// mostly open. Index into project.DefaultColumns (Backlog, Todo, In Progress, Done).
+// mostly open. Index into project.DefaultColumns (Backlog, Todo, In Progress,
+// Review, Done); Done is the last column.
 func columnFor(clock time.Time, t Task, key string, n int) int {
 	r := hash(key, fmt.Sprint(n), "column") % 100
 	old := clock.Sub(t.CreatedAt) > 21*24*time.Hour
 	switch {
 	case old && r < 60, !old && r < 15:
-		return 3
+		return len(project.DefaultColumns) - 1
 	case old && r < 75, !old && r < 40:
 		return 2
 	case old && r < 90, !old && r < 70:

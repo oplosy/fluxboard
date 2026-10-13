@@ -20,6 +20,7 @@ import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
 import { ActivityTimeline } from './activity-timeline';
+import { ReviewPanel } from './review-panel';
 
 // Full task detail (FR-TASK-001/002). Inline-edits every field; UpdateTask
 // replaces the whole field set, so each change is merged onto the current task
@@ -203,6 +204,7 @@ export function TaskDetail({
 
       {/* Meta sidebar */}
       <aside className="space-y-5">
+        <ReviewPanel taskId={taskId} projectId={projectId} columnId={task.column_id} canEdit={canEdit} />
         <Field label="Assignee">
           {canEdit ? (
             <select
