@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { ApiError, apiFetch } from './client';
 import type {
   Activity,
   Attachment,
@@ -52,6 +52,15 @@ export function getTask(orgId: string, taskId: string): Promise<Task> {
 
 export function updateTask(orgId: string, taskId: string, input: UpdateTaskInput): Promise<Task> {
   return apiFetch(`/orgs/${orgId}/tasks/${taskId}`, { method: 'PATCH', body: input });
+}
+
+/** The current task carried by a 409 version_conflict (FR-AGT-005), if err is one. */
+export function conflictCurrent(err: unknown): Task | null {
+  if (err instanceof ApiError && err.status === 409 && err.code === 'version_conflict') {
+    const cur = err.details?.current;
+    if (cur && typeof cur === 'object') return cur as Task;
+  }
+  return null;
 }
 
 export async function listActivity(orgId: string, taskId: string): Promise<Activity[]> {

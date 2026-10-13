@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 import { listActivity } from '@/lib/api/tasks';
 import { useOrg } from '@/lib/org/context';
 import { useOrgMembers, memberName } from '@/lib/org/use-members';
+import { useOrgAgents } from '@/lib/org/use-agents';
 import type { Activity } from '@/lib/api/types';
 
 // Task activity timeline (FR-TASK-002). Renders the server's field-change log as
@@ -12,6 +13,7 @@ import type { Activity } from '@/lib/api/types';
 export function ActivityTimeline({ taskId }: { taskId: string }) {
   const { orgId } = useOrg();
   const { byId } = useOrgMembers();
+  const { names: agentNames } = useOrgAgents();
   const { data: activity } = useQuery({
     queryKey: ['activity', orgId, taskId],
     queryFn: () => listActivity(orgId, taskId),
@@ -33,7 +35,7 @@ export function ActivityTimeline({ taskId }: { taskId: string }) {
       <ul className="space-y-2">
         {list.map((a) => (
           <li key={a.id} className="text-sm text-muted-foreground">
-            <span className="font-medium text-foreground">{memberName(byId, a.actor_id)}</span>{' '}
+            <span className="font-medium text-foreground">{memberName(byId, a.actor_id, agentNames)}</span>{' '}
             {describe(a)}{' '}
             <span className="text-xs">· {new Date(a.created_at).toLocaleString()}</span>
           </li>

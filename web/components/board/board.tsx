@@ -23,6 +23,7 @@ import { listOrgMembers } from '@/lib/api/orgs';
 import { listSprints } from '@/lib/api/sprints';
 import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
+import { useOrgAgents } from '@/lib/org/use-agents';
 import { ApiError } from '@/lib/api/client';
 import { useToast } from '@/components/ui/toast';
 import { between } from '@/lib/board/rank';
@@ -85,7 +86,12 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
     queryKey: ['members', orgId],
     queryFn: () => listOrgMembers(orgId, { limit: 100 }),
   });
-  const members = (membersPage?.items ?? []).map((m) => ({ user_id: m.user_id, name: m.name || m.email }));
+  const { agents } = useOrgAgents();
+  // Agents are assignable like people (ADR-033); they come last, marked.
+  const members = [
+    ...(membersPage?.items ?? []).map((m) => ({ user_id: m.user_id, name: m.name || m.email })),
+    ...agents.map((a) => ({ user_id: a.id, name: `${a.name} (agent)` })),
+  ];
 
   const [filter, setFilter] = useState<BoardFilter>(EMPTY_FILTER);
   const [selectMode, setSelectMode] = useState(false);

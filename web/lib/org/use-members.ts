@@ -43,10 +43,17 @@ export function useOrgMembers(): OrgMembers {
   return { members, byId, isLoading };
 }
 
-/** Best-effort display name for a user id (falls back to email, then a short id). */
-export function memberName(byId: Map<string, OrgMember>, userId: string | null | undefined): string {
+/**
+ * Best-effort display name for a user id (falls back to email, then a short
+ * id). Pass the agents' names (useOrgAgents) to resolve agent ids too.
+ */
+export function memberName(
+  byId: Map<string, OrgMember>,
+  userId: string | null | undefined,
+  agents?: Map<string, string>,
+): string {
   if (!userId) return 'Unassigned';
   const m = byId.get(userId);
-  if (!m) return userId.slice(0, 8);
+  if (!m) return agents?.get(userId) ?? userId.slice(0, 8);
   return m.name || m.email || userId.slice(0, 8);
 }

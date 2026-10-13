@@ -6,6 +6,7 @@ import type { ReactNode } from 'react';
 import type { Priority, Project, Task } from '@/lib/api/types';
 import { priorityClass, priorityLabel } from '@/lib/board/priority';
 import { memberName, useOrgMembers } from '@/lib/org/use-members';
+import { useOrgAgents } from '@/lib/org/use-agents';
 import { cn } from '@/lib/utils';
 
 // A single task row for the org-level task views (search / my-tasks / trash).
@@ -26,6 +27,7 @@ export function TaskRow({
   disableLink?: boolean;
 }) {
   const { byId } = useOrgMembers();
+  const { names: agentNames } = useOrgAgents();
   const href =
     project && !disableLink
       ? `/app/${orgSlug}/projects/${project.key}/tasks/${task.number}`
@@ -63,7 +65,7 @@ export function TaskRow({
         <div className="min-w-0 flex-1">{title}</div>
       )}
       {task.assignee_id ? (
-        <span className="shrink-0 text-xs text-muted-foreground">{memberName(byId, task.assignee_id)}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">{memberName(byId, task.assignee_id, agentNames)}</span>
       ) : null}
       {action}
     </div>

@@ -3,12 +3,14 @@
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { CalendarDays, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Bot, CalendarDays, MessageSquare, MoreHorizontal } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent, type SyntheticEvent } from 'react';
 
 import type { Label, Priority, Task, TaskCard } from '@/lib/api/types';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
-import { attachLabel, detachLabel, getTask, updateTask } from '@/lib/api/tasks';
+import { attachLabel, conflictCurrent, detachLabel, getTask, updateTask } from '@/lib/api/tasks';
+import { claimLive } from '@/lib/org/use-agents';
+import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { PriorityBars } from './priority-bars';
@@ -87,6 +89,7 @@ export function Card({
     animationDelay: `${Math.min(index, 10) * 40}ms`,
   };
   const due = task.due_date ? dueState(task.due_date) : null;
+  const working = claimLive(task);
 
   return (
     <div
@@ -159,7 +162,7 @@ export function Card({
               ) : null}
             </div>
           ) : null}
-          {due || task.comment_count > 0 || task.subtask_total > 0 || task.assignee_id ? (
+          {due || task.comment_count > 0 || task.subtask_total > 0 || task.assignee_id || working ? (
             <div className="mt-3 flex items-center gap-2.5 text-[11px] text-muted-foreground">
               {due ? (
                 <span
@@ -182,7 +185,18 @@ export function Card({
                   {task.subtask_done}/{task.subtask_total}
                 </span>
               ) : null}
-              {task.assignee_id ? <Avatar name={assigneeName ?? task.assignee_id} size="sm" className="ml-auto" /> : null}
+              {working ? (
+                <span
+                  className="ml-auto inline-flex items-center gap-1 font-medium text-primary"
+                  title={`${assigneeName?.replace(/ \(agent\)$/, '') ?? 'An agent'} is working on this`}
+                >
+                  <Bot className="h-3 w-3 animate-pulse" aria-hidden />
+                  working
+                </span>
+              ) : null}
+              {task.assignee_id ? (
+                <Avatar name={assigneeName ?? task.assignee_id} size="sm" className={working ? undefined : 'ml-auto'} />
+              ) : null}
             </div>
           ) : null}
         </div>
@@ -210,6 +224,7 @@ function QuickMenu({
   const [open, setOpen] = useState(false);
   const [full, setFull] = useState<Task | null>(null);
   const [busy, setBusy] = useState(false);
+  const { toast } = useToast();
 
   async function ensureFull(): Promise<Task | null> {
     if (full) return full;
@@ -245,9 +260,18 @@ function QuickMenu({
         priority: (p.priority ?? base.priority) as Priority,
         start_date: p.start_date !== undefined ? p.start_date : (base.start_date ?? null),
         due_date: p.due_date !== undefined ? p.due_date : (base.due_date ?? null),
+        version: base.version,
       });
       setFull(next);
       onMutated();
+    } catch (err) {
+      // Changed meanwhile (e.g. by an agent): keep the latest and let the
+      // user retry on it rather than overwrite it (FR-AGT-005).
+      const current = conflictCurrent(err);
+      if (!current) throw err;
+      setFull(current);
+      onMutated();
+      toast({ title: 'This task just changed', description: 'Your change wasn’t saved. Try again.', variant: 'error' });
     } finally {
       setBusy(false);
     }
