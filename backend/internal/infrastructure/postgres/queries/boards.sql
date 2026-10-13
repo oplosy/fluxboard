@@ -14,12 +14,12 @@ INSERT INTO board_columns (id, org_id, board_id, name, rank, wip_limit)
 VALUES (@id, @org_id, @board_id, @name, @rank, sqlc.narg('wip_limit'));
 
 -- name: GetColumn :one
-SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at
+SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at, role
 FROM board_columns
 WHERE org_id = @org_id AND id = @id;
 
 -- name: ListColumnsByBoard :many
-SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at
+SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at, role
 FROM board_columns
 WHERE org_id = @org_id AND board_id = @board_id
 ORDER BY rank;
@@ -32,6 +32,15 @@ WHERE org_id = @org_id AND id = @id;
 -- name: SetColumnRank :execrows
 UPDATE board_columns SET rank = @rank
 WHERE org_id = @org_id AND id = @id;
+
+-- name: ClearColumnRole :exec
+-- Free a role on a board before giving it to another column (one per board).
+UPDATE board_columns SET role = NULL
+WHERE org_id = @org_id AND board_id = @board_id AND role = @role;
+
+-- name: SetColumnRole :execrows
+UPDATE board_columns SET role = sqlc.narg('role')
+WHERE org_id = @org_id AND board_id = @board_id AND id = @id;
 
 -- name: DeleteColumn :execrows
 DELETE FROM board_columns

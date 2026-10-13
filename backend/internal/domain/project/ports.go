@@ -60,6 +60,9 @@ type ColumnRepository interface {
 	Update(ctx context.Context, orgID, id, name string, wipLimit *int) error
 	// SetRank moves a column (reorder, FR-PROJ-004).
 	SetRank(ctx context.Context, orgID, id, rank string) error
+	// SetRole gives a column a workflow role ("" clears it). The role moves off
+	// any other column of the same board, atomically (one column per role).
+	SetRole(ctx context.Context, orgID, boardID, id string, role ColumnRole) error
 	// Delete removes a column. Callers must migrate its tasks first.
 	Delete(ctx context.Context, orgID, id string) error
 	// CountTasks counts tasks in a column (delete guard / WIP warning).

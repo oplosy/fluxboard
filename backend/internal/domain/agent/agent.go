@@ -86,6 +86,12 @@ type Agent struct {
 	Keys      []apikey.APIKey
 }
 
+// Lookup tells whether a user id belongs to one of the org's agents. Usecases
+// use it for rules that apply to agents only, such as human-approved Done.
+type Lookup interface {
+	IsAgent(ctx context.Context, orgID, userID string) (bool, error)
+}
+
 // Repository persists agents. agents is tenant-owned ([T]); every method runs
 // under a tenant tx. Deleted agents are invisible to every method.
 type Repository interface {

@@ -16,6 +16,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/automation"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/notify"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
@@ -43,8 +44,14 @@ type Deps struct {
 	// Concurrency backs version-checked moves (FR-AGT-005); nil ⇒ a version on a
 	// move is refused.
 	Concurrency project.ConcurrencyRepository
-	Logger      *slog.Logger
-	Now         func() time.Time // injectable for tests; defaults to time.Now
+	// Agents identifies agent callers for the human-approved Done gate
+	// (ADR-033); nil ⇒ every caller is treated as a person.
+	Agents agent.Lookup
+	// Commenter posts the review comment on a send-back (taskuc.Service);
+	// nil ⇒ review decisions are unavailable.
+	Commenter Commenter
+	Logger    *slog.Logger
+	Now       func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // Service implements the project/board application logic.
@@ -64,6 +71,8 @@ type Service struct {
 	links      project.TaskLinkRepository
 	events     notify.EventBus
 	conc       project.ConcurrencyRepository
+	agents     agent.Lookup
+	commenter  Commenter
 	logger     *slog.Logger
 	now        func() time.Time
 }
@@ -81,7 +90,7 @@ func New(d Deps) *Service {
 	return &Service{
 		projects: d.Projects, members: d.Members, boards: d.Boards,
 		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, fields: d.Fields, forms: d.Forms, labels: d.Labels, subtasks: d.Subtasks,
-		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, logger: logger, now: now,
+		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, agents: d.Agents, commenter: d.Commenter, logger: logger, now: now,
 	}
 }
 
@@ -98,8 +107,8 @@ func (s *Service) checkBlockers(ctx context.Context, orgID, boardID, columnID, t
 	if err != nil || len(cols) == 0 {
 		return err
 	}
-	if cols[len(cols)-1].ID != columnID {
-		return nil // only the final column is guarded
+	if project.DoneColumnID(cols) != columnID {
+		return nil // only the done column is guarded
 	}
 	blockers, err := s.links.Blockers(ctx, orgID, taskID)
 	if err != nil {
@@ -167,6 +176,8 @@ type ColumnView struct {
 	Labels   map[string][]project.Label
 	Subtasks map[string]project.SubtaskCount
 	Comments map[string]int
+	// Role is the column's effective workflow role ("" ⇒ none), ADR-033.
+	Role project.ColumnRole
 }
 
 // BoardView is the kanban projection: the default board and its columns+tasks.
@@ -363,9 +374,10 @@ func (s *Service) GetBoard(ctx context.Context, orgID, userID, projectID string,
 			s.logger.Warn("board comment enrichment failed", "err", err, "project", projectID)
 		}
 	}
+	roles := project.EffectiveRoles(cols)
 	for _, c := range cols {
 		view.Columns = append(view.Columns, ColumnView{
-			Column: c, Tasks: tasksByColumn[c.ID],
+			Column: c, Tasks: tasksByColumn[c.ID], Role: roles[c.ID],
 			Labels: labelsByTask, Subtasks: subtasksByTask, Comments: commentsByTask,
 		})
 	}
@@ -484,8 +496,13 @@ func (s *Service) MoveTask(ctx context.Context, orgID, userID, taskID, columnID,
 	if col.BoardID != board.ID {
 		return domain.ErrValidation
 	}
-	// Dependency guard (FR-LINKS): moving into the final column fails while
-	// open blockers exist. Open = blocker not in its own final column.
+	// Human-approved Done (ADR-033 decision 6): an agent never moves work into
+	// the done column; it submits it for review.
+	if err := s.refuseAgentDone(ctx, orgID, userID, board.ID, columnID); err != nil {
+		return err
+	}
+	// Dependency guard (FR-LINKS): moving into the done column fails while
+	// open blockers exist. Open = blocker not in its own done column.
 	if err := s.checkBlockers(ctx, orgID, board.ID, columnID, taskID); err != nil {
 		return err
 	}

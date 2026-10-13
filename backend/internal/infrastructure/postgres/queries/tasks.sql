@@ -165,3 +165,9 @@ UPDATE tasks
 SET claimed_by = NULL, lease_expires_at = NULL,
     assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
 WHERE org_id = @org_id AND claimed_by IS NOT NULL AND lease_expires_at <= now();
+
+-- name: EndTaskClaim :execrows
+-- Finish a claim but keep the assignment: the agent handed the task over for
+-- review and stays its assignee for attribution.
+UPDATE tasks SET claimed_by = NULL, lease_expires_at = NULL
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL AND claimed_by = @agent_id;

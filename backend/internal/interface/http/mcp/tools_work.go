@@ -63,7 +63,7 @@ func workTools(projects *projectuc.Service, tasks *taskuc.Service) []Tool {
 					for j := range cv.Tasks {
 						ts = append(ts, taskSummary(&cv.Tasks[j]))
 					}
-					col := map[string]any{"id": cv.Column.ID, "name": cv.Column.Name, "tasks": ts}
+					col := map[string]any{"id": cv.Column.ID, "name": cv.Column.Name, "role": nilIfEmpty(string(cv.Role)), "tasks": ts}
 					if cv.Column.WIPLimit != nil {
 						col["wip_limit"] = *cv.Column.WIPLimit
 					}
@@ -214,6 +214,13 @@ func linkViews(ls []project.TaskLink, otherIsTaskID bool) []map[string]any {
 		})
 	}
 	return out
+}
+
+func nilIfEmpty(s string) any {
+	if s == "" {
+		return nil
+	}
+	return s
 }
 
 func dateOrNil(t *time.Time) any {

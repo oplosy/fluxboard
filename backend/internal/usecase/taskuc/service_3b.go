@@ -168,6 +168,9 @@ func (s *Service) BulkMove(ctx context.Context, orgID, userID string, taskIDs []
 	if err := s.columnInProject(ctx, orgID, projectID, columnID); err != nil {
 		return err
 	}
+	if err := s.refuseAgentDone(ctx, orgID, userID, projectID, columnID); err != nil {
+		return err
+	}
 	existing, err := s.tasks.ListByColumn(ctx, orgID, columnID)
 	if err != nil {
 		return err

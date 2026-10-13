@@ -11,6 +11,23 @@ import (
 	"github.com/google/uuid"
 )
 
+const clearColumnRole = `-- name: ClearColumnRole :exec
+UPDATE board_columns SET role = NULL
+WHERE org_id = $1 AND board_id = $2 AND role = $3
+`
+
+type ClearColumnRoleParams struct {
+	OrgID   uuid.UUID `json:"org_id"`
+	BoardID uuid.UUID `json:"board_id"`
+	Role    *string   `json:"role"`
+}
+
+// Free a role on a board before giving it to another column (one per board).
+func (q *Queries) ClearColumnRole(ctx context.Context, arg ClearColumnRoleParams) error {
+	_, err := q.db.Exec(ctx, clearColumnRole, arg.OrgID, arg.BoardID, arg.Role)
+	return err
+}
+
 const countColumnTasks = `-- name: CountColumnTasks :one
 SELECT count(*) FROM tasks
 WHERE org_id = $1 AND column_id = $2
@@ -122,7 +139,7 @@ func (q *Queries) GetBoardByProject(ctx context.Context, arg GetBoardByProjectPa
 }
 
 const getColumn = `-- name: GetColumn :one
-SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at
+SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at, role
 FROM board_columns
 WHERE org_id = $1 AND id = $2
 `
@@ -144,12 +161,13 @@ func (q *Queries) GetColumn(ctx context.Context, arg GetColumnParams) (BoardColu
 		&i.WipLimit,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Role,
 	)
 	return i, err
 }
 
 const listColumnsByBoard = `-- name: ListColumnsByBoard :many
-SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at
+SELECT id, org_id, board_id, name, rank, wip_limit, created_at, updated_at, role
 FROM board_columns
 WHERE org_id = $1 AND board_id = $2
 ORDER BY rank
@@ -178,6 +196,7 @@ func (q *Queries) ListColumnsByBoard(ctx context.Context, arg ListColumnsByBoard
 			&i.WipLimit,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Role,
 		); err != nil {
 			return nil, err
 		}
@@ -202,6 +221,31 @@ type SetColumnRankParams struct {
 
 func (q *Queries) SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error) {
 	result, err := q.db.Exec(ctx, setColumnRank, arg.Rank, arg.OrgID, arg.ID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const setColumnRole = `-- name: SetColumnRole :execrows
+UPDATE board_columns SET role = $1
+WHERE org_id = $2 AND board_id = $3 AND id = $4
+`
+
+type SetColumnRoleParams struct {
+	Role    *string   `json:"role"`
+	OrgID   uuid.UUID `json:"org_id"`
+	BoardID uuid.UUID `json:"board_id"`
+	ID      uuid.UUID `json:"id"`
+}
+
+func (q *Queries) SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error) {
+	result, err := q.db.Exec(ctx, setColumnRole,
+		arg.Role,
+		arg.OrgID,
+		arg.BoardID,
+		arg.ID,
+	)
 	if err != nil {
 		return 0, err
 	}

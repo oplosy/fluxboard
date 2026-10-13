@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/automation"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/notify"
@@ -60,8 +61,11 @@ type Deps struct {
 	// Concurrency backs version-checked writes and agent claims (ADR-033); nil ⇒
 	// a version on a write is refused and claims are unavailable.
 	Concurrency project.ConcurrencyRepository
-	Logger      *slog.Logger
-	Now         func() time.Time // injectable for tests; defaults to time.Now
+	// Agents identifies agent callers for the human-approved Done gate
+	// (ADR-033); nil ⇒ every caller is treated as a person.
+	Agents agent.Lookup
+	Logger *slog.Logger
+	Now    func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // Service implements the task application logic.
@@ -84,6 +88,7 @@ type Service struct {
 	notifier     Notifier
 	automation   automation.Evaluator
 	conc         project.ConcurrencyRepository
+	agents       agent.Lookup
 	logger       *slog.Logger
 	now          func() time.Time
 }
@@ -103,7 +108,7 @@ func New(d Deps) *Service {
 		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, projects: d.Projects,
 		members: d.Members, boards: d.Boards, columns: d.Columns, store: d.Store,
 		entitlements: d.Entitlements, events: d.Events, notifier: d.Notifier,
-		automation: d.Automation, conc: d.Concurrency,
+		automation: d.Automation, conc: d.Concurrency, agents: d.Agents,
 		logger: logger, now: now,
 	}
 }
@@ -194,6 +199,9 @@ func (s *Service) CreateTask(ctx context.Context, orgID, userID string, in Creat
 		return nil, err
 	}
 	if err := s.columnInProject(ctx, orgID, in.ProjectID, in.ColumnID); err != nil {
+		return nil, err
+	}
+	if err := s.refuseAgentDone(ctx, orgID, userID, in.ProjectID, in.ColumnID); err != nil {
 		return nil, err
 	}
 	existing, err := s.tasks.ListByColumn(ctx, orgID, in.ColumnID)

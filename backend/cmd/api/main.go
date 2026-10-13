@@ -472,19 +472,23 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Columns: columnRepo, Boards: boardRepo, Logger: logger,
 	})
 	automationHandlers := handlers.NewAutomationHandlers(automationSvc, logger)
-	projectSvc := projectuc.New(projectuc.Deps{
-		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
-		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
-		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
-		Automation: automationSvc, Concurrency: taskRepo,
-		Events: eventBus, Logger: logger,
-	})
+	// Agents are identified for the human-approved Done gate (ADR-033).
+	agentLookup := postgres.NewAgentRepo(tenantPool)
 	taskSvc := taskuc.New(taskuc.Deps{
 		Tasks: taskRepo, Subtasks: subtaskRepo, Labels: labelRepo, Comments: commentRepo,
 		Activity: activityRepo, Attachments: attachmentRepo, Projects: projectRepo,
 		Members: projectMemberRepo, Boards: boardRepo, Columns: columnRepo,
 		Store: objectStore, Entitlements: billingSvc, TimeEntries: timeEntryRepo, Links: linkRepo,
-		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo, Logger: logger,
+		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo,
+		Agents: agentLookup, Logger: logger,
+	})
+	projectSvc := projectuc.New(projectuc.Deps{
+		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
+		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
+		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
+		Automation: automationSvc, Concurrency: taskRepo,
+		Agents: agentLookup, Commenter: taskSvc, // review notes (ADR-033)
+		Events: eventBus, Logger: logger,
 	})
 	projectHandlers := handlers.NewProjectHandlers(projectSvc, logger)
 	publicFormHandlers := handlers.NewPublicFormHandlers(projectSvc, logger)

@@ -77,7 +77,7 @@ var _ project.ColumnRepository = (*ColumnRepo)(nil)
 func mapColumn(row gen.BoardColumn) project.Column {
 	return project.Column{
 		ID: row.ID.String(), BoardID: row.BoardID.String(), Name: row.Name,
-		Rank: row.Rank, WIPLimit: intPtr(row.WipLimit),
+		Rank: row.Rank, WIPLimit: intPtr(row.WipLimit), Role: project.ColumnRole(derefStr(row.Role)),
 		CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 	}
 }
@@ -170,6 +170,35 @@ func (r *ColumnRepo) SetRank(ctx context.Context, orgID, id, rank string) error 
 	return r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
 		oid, _ := parseUUID(orgID)
 		n, err := q.SetColumnRank(ctx, gen.SetColumnRankParams{Rank: rank, OrgID: oid, ID: cid})
+		if err != nil {
+			return err
+		}
+		if n == 0 {
+			return domain.ErrNotFound
+		}
+		return nil
+	})
+}
+
+// SetRole gives a column a role (or clears it with ""), first freeing the role
+// on any other column of the board, in one transaction.
+func (r *ColumnRepo) SetRole(ctx context.Context, orgID, boardID, id string, role project.ColumnRole) error {
+	cid, err := parseUUID(id)
+	if err != nil {
+		return domain.ErrNotFound
+	}
+	bid, err := parseUUID(boardID)
+	if err != nil {
+		return fmt.Errorf("column role: board: %w", err)
+	}
+	return r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		if role != "" {
+			if err := q.ClearColumnRole(ctx, gen.ClearColumnRoleParams{OrgID: oid, BoardID: bid, Role: ptrOrNil(string(role))}); err != nil {
+				return err
+			}
+		}
+		n, err := q.SetColumnRole(ctx, gen.SetColumnRoleParams{OrgID: oid, BoardID: bid, ID: cid, Role: ptrOrNil(string(role))})
 		if err != nil {
 			return err
 		}

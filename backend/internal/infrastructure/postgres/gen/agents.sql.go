@@ -146,6 +146,24 @@ func (q *Queries) GetAgent(ctx context.Context, arg GetAgentParams) (Agent, erro
 	return i, err
 }
 
+const isAgent = `-- name: IsAgent :one
+SELECT EXISTS (SELECT 1 FROM agents WHERE org_id = $1 AND id = $2)
+`
+
+type IsAgentParams struct {
+	OrgID uuid.UUID `json:"org_id"`
+	ID    uuid.UUID `json:"id"`
+}
+
+// Whether a user id is (or was) one of the org's agents: the human-approval
+// gate refuses agents moving work to done (ADR-033 decision 6).
+func (q *Queries) IsAgent(ctx context.Context, arg IsAgentParams) (bool, error) {
+	row := q.db.QueryRow(ctx, isAgent, arg.OrgID, arg.ID)
+	var exists bool
+	err := row.Scan(&exists)
+	return exists, err
+}
+
 const listAgentAPIKeys = `-- name: ListAgentAPIKeys :many
 SELECT id, org_id, prefix, key_hash, name, scopes, created_by,
        last_used_at, revoked_at, created_at, agent_id

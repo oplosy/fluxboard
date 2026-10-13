@@ -65,3 +65,8 @@ UPDATE tasks
 SET claimed_by = NULL, lease_expires_at = NULL,
     assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
 WHERE org_id = @org_id AND claimed_by = @agent_id;
+
+-- name: IsAgent :one
+-- Whether a user id is (or was) one of the org's agents: the human-approval
+-- gate refuses agents moving work to done (ADR-033 decision 6).
+SELECT EXISTS (SELECT 1 FROM agents WHERE org_id = @org_id AND id = @id);
