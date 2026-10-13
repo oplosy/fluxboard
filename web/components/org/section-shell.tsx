@@ -37,7 +37,7 @@ export function SectionShell({
       {locked ? (
         <p className="max-w-2xl animate-fade-in rounded-lg border border-border bg-card p-5 text-sm text-muted-foreground">{locked}</p>
       ) : (
-        <div className="grid gap-8 md:grid-cols-[190px_1fr] md:gap-12">
+        <div className="grid grid-cols-1 gap-8 md:grid-cols-[190px_1fr] md:gap-12">
           <div className="md:sticky md:top-20 md:self-start">
             <SlidingTabs vertical tabs={tabs} />
           </div>
