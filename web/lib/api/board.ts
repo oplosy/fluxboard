@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { Board, BulkActionInput, Column, CreateTaskInput, Task } from './types';
+import type { Board, BulkActionInput, Column, ColumnRole, CreateTaskInput, Task } from './types';
 
 // Board / column / task-move surface (docs/08 §5, FR-PROJ-004/005). The board
 // projection is fetched whole and cached under ['board', projectId]; drag-drop
@@ -70,6 +70,31 @@ export function deleteColumn(
   return apiFetch(`/orgs/${orgId}/projects/${projectId}/columns/${columnId}${qs}`, {
     method: 'DELETE',
   });
+}
+
+/** Give a column a workflow stage, or clear it with null (LEAD). */
+export function setColumnRole(
+  orgId: string,
+  projectId: string,
+  columnId: string,
+  role: ColumnRole | null,
+): Promise<void> {
+  return apiFetch(`/orgs/${orgId}/projects/${projectId}/columns/${columnId}/role`, {
+    method: 'PUT',
+    body: { role: role ?? '' },
+  });
+}
+
+/**
+ * Decide on a task waiting in review (people only): approve moves it to done,
+ * changes sends it back to in progress with the comment (required).
+ */
+export function reviewTask(
+  orgId: string,
+  taskId: string,
+  input: { decision: 'approve' | 'changes'; comment?: string },
+): Promise<{ column_id: string; column: string }> {
+  return apiFetch(`/orgs/${orgId}/tasks/${taskId}/review`, { method: 'POST', body: input });
 }
 
 export function createTask(

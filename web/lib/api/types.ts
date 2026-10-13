@@ -247,8 +247,13 @@ export interface TaskCard {
   lease_expires_at?: string | null;
 }
 
+/** A workflow stage a column maps onto (ADR-033); agents move work by stage. */
+export type ColumnRole = 'backlog' | 'todo' | 'in_progress' | 'review' | 'done';
+
 /** One column with its cards in the board projection. */
 export interface BoardColumn extends Column {
+  /** Effective stage: set by a lead, else inferred from the name. */
+  role?: ColumnRole;
   tasks: TaskCard[];
 }
 
