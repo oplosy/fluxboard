@@ -57,7 +57,11 @@ mandatory). Clients in the field still speak the handshake-based revisions
    semantics, still metered/audited by aiuc) plus read tools for agents:
    `projects.list`, `projects.board`, `tasks.search`, `tasks.get`
    (with subtasks, comments, blockers). Write tools land with claim/version
-   control (ADR-033 step 3–4).
+   control (ADR-033 step 3–4). `ai.plan_apply` is held back until agents are
+   principals (ADR-033 step 2): it creates tasks, whose author must be a user
+   or an agent, and an API key is neither (`created_by` is a user FK).
+   Id-shaped arguments are validated as UUIDs in the tool layer, so a model
+   that passes a project key gets an actionable tool error instead of a 500.
 
 ## Rejected
 
