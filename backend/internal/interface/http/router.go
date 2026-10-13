@@ -33,6 +33,7 @@ type Deps struct {
 	Events         *handlers.EventHandlers        // nil ⇒ SSE disabled (tests)
 	Notifications  *handlers.NotificationHandlers // nil ⇒ notification center disabled (tests)
 	APIKeys        *handlers.APIKeyHandlers       // nil ⇒ API-key management disabled
+	Agents         *handlers.AgentHandlers        // nil ⇒ agent management disabled
 	AuditView      *handlers.AuditHandlers        // nil ⇒ org audit viewer disabled
 	Analytics      *handlers.AnalyticsHandlers    // nil ⇒ analytics disabled
 	Admin          *handlers.AdminHandlers        // nil ⇒ /admin surface disabled
@@ -182,23 +183,30 @@ func NewRouter(d Deps) http.Handler {
 			sec.Use(mw.RequireVerified)          // FR-AUTH-002: block unverified email (API keys are marked verified)
 			sec.Use(mw.RejectImpersonationWrite) // FR-ADM-003: an impersonation token is read-only everywhere, incl. /me and POST /orgs
 
-			// Account self-service (docs/08 §3, FR-AUTH-014). User-scoped, org-independent.
-			if d.User != nil {
-				sec.Get("/me", d.User.Me)
-				sec.Patch("/me", d.User.UpdateMe)
-				sec.Delete("/me", d.User.DeleteMe)
-				sec.Get("/me/export", d.User.ExportMe) // personal data export (B09)
-				sec.Post("/me/avatar/upload-url", d.User.AvatarUploadURL)
-				sec.Post("/me/avatar/confirm", d.User.AvatarConfirm)
-			}
+			// User-scoped, org-independent routes are session-only: an API key —
+			// an agent's included — never edits a user account or joins/creates
+			// orgs (ADR-033).
+			sec.Group(func(u chi.Router) {
+				u.Use(mw.SessionOnly)
 
-			// Org root (no {orgId} — cannot resolve a tenant).
-			sec.Post("/orgs", d.Orgs.CreateOrg)
-			sec.Get("/orgs", d.Orgs.ListMyOrgs)
-			// Static "by-slug" is matched ahead of the {orgId} subrouter; org ids
-			// are UUIDs so there is no collision (FR-TEN-007 slug 301 resolver).
-			sec.Get("/orgs/by-slug/{slug}", d.Orgs.ResolveSlug)
-			sec.Post("/invitations/accept", d.Orgs.AcceptInvitation)
+				// Account self-service (docs/08 §3, FR-AUTH-014).
+				if d.User != nil {
+					u.Get("/me", d.User.Me)
+					u.Patch("/me", d.User.UpdateMe)
+					u.Delete("/me", d.User.DeleteMe)
+					u.Get("/me/export", d.User.ExportMe) // personal data export (B09)
+					u.Post("/me/avatar/upload-url", d.User.AvatarUploadURL)
+					u.Post("/me/avatar/confirm", d.User.AvatarConfirm)
+				}
+
+				// Org root (no {orgId} — cannot resolve a tenant).
+				u.Post("/orgs", d.Orgs.CreateOrg)
+				u.Get("/orgs", d.Orgs.ListMyOrgs)
+				// Static "by-slug" is matched ahead of the {orgId} subrouter; org ids
+				// are UUIDs so there is no collision (FR-TEN-007 slug 301 resolver).
+				u.Get("/orgs/by-slug/{slug}", d.Orgs.ResolveSlug)
+				u.Post("/invitations/accept", d.Orgs.AcceptInvitation)
+			})
 
 			// Org-scoped surface (docs/08 §4).
 			sec.Route("/orgs/{orgId}", func(o chi.Router) {
@@ -388,6 +396,16 @@ func NewRouter(d Deps) http.Handler {
 					o.With(write(tenant.ObjAPIKeys)).Get("/api-keys", d.APIKeys.List)
 					o.With(write(tenant.ObjAPIKeys)).Post("/api-keys", d.APIKeys.Create)
 					o.With(write(tenant.ObjAPIKeys)).Delete("/api-keys/{id}", d.APIKeys.Revoke)
+				}
+				// Agents (ADR-033, FR-AGT-002/003): members see them, ADMIN+ manage
+				// them; creation is capped by the plan's max_agents.
+				if d.Agents != nil {
+					o.With(read(tenant.ObjAgents)).Get("/agents", d.Agents.List)
+					o.With(write(tenant.ObjAgents), d.Entitlement.RequireAgents()).Post("/agents", d.Agents.Create)
+					o.With(write(tenant.ObjAgents)).Patch("/agents/{agentId}", d.Agents.Update)
+					o.With(write(tenant.ObjAgents)).Delete("/agents/{agentId}", d.Agents.Delete)
+					o.With(write(tenant.ObjAgents)).Post("/agents/{agentId}/keys", d.Agents.CreateKey)
+					o.With(write(tenant.ObjAgents)).Delete("/agents/{agentId}/keys/{keyId}", d.Agents.RevokeKey)
 				}
 				if d.AuditView != nil {
 					o.With(read(tenant.ObjAudit)).Get("/audit", d.AuditView.List)

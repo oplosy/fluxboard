@@ -9,11 +9,13 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/apikey"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 	mw "github.com/mesutokul/fluxboard/backend/internal/interface/http/middleware"
 )
 
@@ -37,6 +39,12 @@ var testTools = []Tool{
 		},
 	},
 	{
+		Name: "agent.thing", Description: "authors rows", InputSchema: objectSchema(map[string]any{}), Write: true, AgentOnly: true,
+		Call: func(_ context.Context, c Caller, _ Args) (map[string]any, error) {
+			return map[string]any{"user": c.UserID, "role": string(c.Role)}, nil
+		},
+	},
+	{
 		Name: "fails.notfound", Description: "nf", InputSchema: objectSchema(map[string]any{}),
 		Call: func(context.Context, Caller, Args) (map[string]any, error) {
 			return nil, fmt.Errorf("project: %w", domain.ErrNotFound)
@@ -55,14 +63,20 @@ var testTools = []Tool{
 }
 
 // handler runs the server behind the real key→tenant guard, authenticated as
-// an API key of org "org-1" with the given scope ("" = no credential).
-func handler(scope apikey.Scope) http.Handler {
+// an API key of org "org-1" with the given scope ("" = no credential). With an
+// agentID the key is that agent's (role MEMBER), as HybridAuth resolves it.
+func handler(scope apikey.Scope, agentID string) http.Handler {
 	srv := NewServer(Config{Version: "test", WebOrigin: "https://app.example.com"}, testTools)
 	guarded := (&mw.TenantGuard{}).ResolveFromAPIKey(srv)
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if scope != "" {
-			ctx := mw.WithPrincipal(r.Context(), mw.Principal{UserID: "apikey:k1", EmailVerified: true})
-			ctx = mw.WithAPIKey(ctx, mw.APIKeyInfo{OrgID: "org-1", KeyID: "k1", Scopes: []apikey.Scope{scope}})
+			info := mw.APIKeyInfo{OrgID: "org-1", KeyID: "k1", Scopes: []apikey.Scope{scope}}
+			user := "apikey:k1"
+			if agentID != "" {
+				info.AgentID, info.AgentRole, user = agentID, tenant.RoleMember, agentID
+			}
+			ctx := mw.WithPrincipal(r.Context(), mw.Principal{UserID: user, EmailVerified: true})
+			ctx = mw.WithAPIKey(ctx, info)
 			r = r.WithContext(ctx)
 		}
 		guarded.ServeHTTP(w, r)
@@ -79,6 +93,7 @@ func modernMeta() map[string]any {
 
 type call struct {
 	scope   apikey.Scope
+	agentID string
 	headers map[string]string
 	body    any
 	method  string
@@ -107,7 +122,7 @@ func do(t *testing.T, c call) (*httptest.ResponseRecorder, map[string]any) {
 		r.Header.Set(k, v)
 	}
 	rec := httptest.NewRecorder()
-	handler(c.scope).ServeHTTP(rec, r)
+	handler(c.scope, c.agentID).ServeHTTP(rec, r)
 	var out map[string]any
 	if rec.Body.Len() > 0 {
 		_ = json.Unmarshal(rec.Body.Bytes(), &out)
@@ -187,6 +202,30 @@ func TestModernToolsListFiltersByScope(t *testing.T) {
 		if n == "write.thing" {
 			t.Fatal("a read-only key must not see write tools")
 		}
+	}
+}
+
+func TestAgentOnlyTools(t *testing.T) {
+	// An org key neither sees nor may call an agent-only tool.
+	call := modern("tools/call", 1, map[string]any{"name": "agent.thing"})
+	_, out := do(t, call)
+	r := result(t, out)
+	if r["isError"] != true || !strings.Contains(r["content"].([]any)[0].(map[string]any)["text"].(string), "agent") {
+		t.Fatalf("org key calling an agent-only tool: %v", r)
+	}
+	// An agent's key sees it and calls it as itself, with its own role.
+	list := modern("tools/list", 2, nil)
+	list.agentID = "agent-7"
+	_, out = do(t, list)
+	if !slices.Contains(toolNames(result(t, out)), "agent.thing") {
+		t.Fatal("an agent's key must see agent-only tools")
+	}
+	call = modern("tools/call", 3, map[string]any{"name": "agent.thing"})
+	call.agentID = "agent-7"
+	_, out = do(t, call)
+	sc := result(t, out)["structuredContent"].(map[string]any)
+	if sc["user"] != "agent-7" || sc["role"] != "MEMBER" {
+		t.Fatalf("agent call ran as %v, want the agent with its MEMBER role", sc)
 	}
 }
 
@@ -349,7 +388,7 @@ func TestLegacyFlow(t *testing.T) {
 		t.Fatalf("notification: %d %q", rec.Code, rec.Body)
 	}
 	_, out := do(t, legacy("tools/list", 2, nil, "2025-06-18"))
-	if len(toolNames(result(t, out))) != len(testTools) {
+	if len(toolNames(result(t, out))) != len(testTools)-1 { // all but the agent-only tool
 		t.Fatalf("tools/list = %v", out)
 	}
 	_, out = do(t, legacy("tools/call", 3, map[string]any{"name": "echo", "arguments": map[string]any{"text": "a"}}, ""))
@@ -399,7 +438,7 @@ func TestTransportGuards(t *testing.T) {
 	t.Run("no API key is 401", func(t *testing.T) {
 		rec := httptest.NewRecorder()
 		r := httptest.NewRequestWithContext(context.Background(), http.MethodPost, "/api/v1/mcp", strings.NewReader(`{}`))
-		handler("").ServeHTTP(rec, r)
+		handler("", "").ServeHTTP(rec, r)
 		if rec.Code != http.StatusUnauthorized {
 			t.Fatalf("got %d", rec.Code)
 		}

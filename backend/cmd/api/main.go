@@ -46,6 +46,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/aesgcm"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/jwtx"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/adminuc"
+	"github.com/mesutokul/fluxboard/backend/internal/usecase/agentuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/aiuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/analyticsuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/apikeyuc"
@@ -327,9 +328,11 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Gateway:  stripeGW,
 		Cache:    entitlementCache,
 		Seats:    membershipRepo,
-		Bus:      eventBus,
-		Logger:   logger,
-		BaseURL:  cfg.WebOrigin,
+		// Platform-admin per-org limits (FR-ADM-002), e.g. max_agents (ADR-033).
+		Overrides: postgres.NewOverrideRepo(tenantPool),
+		Bus:       eventBus,
+		Logger:    logger,
+		BaseURL:   cfg.WebOrigin,
 	})
 
 	tenantSvc := tenantuc.New(tenantuc.Deps{
@@ -382,6 +385,8 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	// disabled (nil Deps ⇒ routes not mounted) rather than booting on the app role.
 	var (
 		apiKeyHandlers    *handlers.APIKeyHandlers
+		agentHandlers     *handlers.AgentHandlers
+		agentCount        mw.CountFunc
 		auditHandlers     *handlers.AuditHandlers
 		analyticsHandlers *handlers.AnalyticsHandlers
 		adminHandlers     *handlers.AdminHandlers
@@ -432,6 +437,15 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		})
 
 		apiKeyHandlers = handlers.NewAPIKeyHandlers(apikeySvc, logger)
+		// Agents authenticate with API keys, so they live on the same surface.
+		agentSvc := agentuc.New(agentuc.Deps{
+			Agents: postgres.NewAgentRepo(tenantPool),
+			Limits: billingSvc,
+			Audit:  auditRepo,
+			Logger: logger,
+		})
+		agentHandlers = handlers.NewAgentHandlers(agentSvc, logger)
+		agentCount = agentSvc.Count
 		auditHandlers = handlers.NewAuditHandlers(auditSvc, logger)
 		analyticsHandlers = handlers.NewAnalyticsHandlers(analyticsSvc, logger)
 		adminHandlers = handlers.NewAdminHandlers(adminSvc, auditSvc, jobsInspector{insp: inspector}, logger)
@@ -509,6 +523,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Resolver:     billingSvc,
 		ProjectCount: projectRepo.CountByOrg,
 		MemberCount:  membershipRepo.CountMembers,
+		AgentCount:   agentCount,
 		Logger:       logger,
 	}
 
@@ -538,6 +553,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Events:           eventHandlers,
 		Notifications:    notificationHandlers,
 		APIKeys:          apiKeyHandlers,
+		Agents:           agentHandlers,
 		AuditView:        auditHandlers,
 		Analytics:        analyticsHandlers,
 		Admin:            adminHandlers,

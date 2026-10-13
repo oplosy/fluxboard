@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/apikey"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/audit"
 )
@@ -129,5 +130,21 @@ func TestResolveByKey(t *testing.T) {
 	}
 	if _, err := svc.ResolveByKey(context.Background(), c.Plaintext); !errors.Is(err, domain.ErrUnauthorized) {
 		t.Fatalf("revoked: want ErrUnauthorized, got %v", err)
+	}
+}
+
+func TestResolveByKeyPausedAgent(t *testing.T) {
+	repo := newFakeKeyRepo()
+	svc := New(Deps{Keys: repo})
+	g, err := apikey.Generate()
+	if err != nil {
+		t.Fatal(err)
+	}
+	repo.byHash[g.KeyHash] = apikey.APIKey{ID: "k1", OrgID: "org1", KeyHash: g.KeyHash, AgentID: "a1", AgentRole: "MEMBER", AgentPaused: true}
+	if _, err := svc.ResolveByKey(context.Background(), g.Plaintext); !errors.Is(err, agent.ErrPaused) {
+		t.Fatalf("paused agent: want agent.ErrPaused, got %v", err)
+	}
+	if repo.touched != 0 {
+		t.Fatal("a refused key must not touch last_used")
 	}
 }

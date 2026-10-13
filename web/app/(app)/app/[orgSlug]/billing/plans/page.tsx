@@ -105,6 +105,9 @@ export default function PlansPage() {
               <ul className="mb-5 flex-1 space-y-2 text-sm">
                 <Feat>{limitLabel(p.max_members)} members</Feat>
                 <Feat>{limitLabel(p.max_projects)} projects</Feat>
+                <Feat>
+                  {limitLabel(p.max_agents)} {p.max_agents === 1 ? 'agent' : 'agents'}
+                </Feat>
                 <Feat>{formatBytes(p.max_storage_bytes)} storage</Feat>
                 <Feat>{p.api_rate_per_min}/min API rate</Feat>
                 <Feat>{p.audit_retention_days}-day audit retention</Feat>

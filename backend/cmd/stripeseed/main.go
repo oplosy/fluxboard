@@ -68,7 +68,7 @@ func run(logger *slog.Logger) error {
 	}
 	for _, p := range planseed.Plans {
 		logger.Info("seeded plan", "code", p.Code, "max_members", p.MaxMembers,
-			"max_projects", p.MaxProjects, "metered", p.Metered)
+			"max_projects", p.MaxProjects, "max_agents", p.MaxAgents, "metered", p.Metered)
 	}
 	if !live {
 		logger.Info("stripeseed complete (stub)", "plans", len(planseed.Plans))

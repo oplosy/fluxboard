@@ -37,6 +37,7 @@ type entitlementsResp struct {
 	Status             string `json:"status"`
 	MaxMembers         int    `json:"max_members"`
 	MaxProjects        int    `json:"max_projects"`
+	MaxAgents          int    `json:"max_agents"`
 	MaxStorageBytes    int64  `json:"max_storage_bytes"`
 	APIRatePerMin      int    `json:"api_rate_per_min"`
 	AuditRetentionDays int    `json:"audit_retention_days"`
@@ -46,7 +47,7 @@ type entitlementsResp struct {
 func toEntitlementsResp(e billing.Entitlements) entitlementsResp {
 	return entitlementsResp{
 		Plan: string(e.Plan), Status: string(e.Status),
-		MaxMembers: e.MaxMembers, MaxProjects: e.MaxProjects,
+		MaxMembers: e.MaxMembers, MaxProjects: e.MaxProjects, MaxAgents: e.MaxAgents,
 		MaxStorageBytes: e.MaxStorageBytes, APIRatePerMin: e.APIRatePerMin,
 		AuditRetentionDays: e.AuditRetentionDays, Metered: e.Metered,
 	}
@@ -134,6 +135,7 @@ type catalogPlanResp struct {
 	SeatPrice          int64  `json:"seat_price"`  // minor units, per billable seat per interval
 	MaxMembers         int    `json:"max_members"` // -1 = unlimited
 	MaxProjects        int    `json:"max_projects"`
+	MaxAgents          int    `json:"max_agents"` // agents are not seats (ADR-033)
 	MaxStorageBytes    int64  `json:"max_storage_bytes"`
 	APIRatePerMin      int    `json:"api_rate_per_min"`
 	AuditRetentionDays int    `json:"audit_retention_days"`
@@ -164,8 +166,8 @@ func (h *BillingHandlers) Catalog(w http.ResponseWriter, r *http.Request) {
 	for _, p := range plans {
 		out.Plans = append(out.Plans, catalogPlanResp{
 			Code: string(p.Code), Name: p.Name, SeatPrice: p.MonthlyPrice,
-			MaxMembers: p.MaxMembers, MaxProjects: p.MaxProjects, MaxStorageBytes: p.MaxStorageBytes,
-			APIRatePerMin: p.APIRatePerMin, AuditRetentionDays: p.AuditRetentionDays, Metered: p.Metered,
+			MaxMembers: p.MaxMembers, MaxProjects: p.MaxProjects, MaxAgents: p.MaxAgents,
+			MaxStorageBytes: p.MaxStorageBytes, APIRatePerMin: p.APIRatePerMin, AuditRetentionDays: p.AuditRetentionDays, Metered: p.Metered,
 		})
 	}
 	w.Header().Set("Cache-Control", "public, max-age=300")

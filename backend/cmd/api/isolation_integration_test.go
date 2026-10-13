@@ -147,7 +147,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "rule", "entry", "invitation", "notification", "apikey"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	e.bParams = map[string]string{
@@ -156,6 +156,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
 		"sprintId": e.bIDs["sprint"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
+		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"],
 	}
 
 	if err := pgx.BeginFunc(ctx, owner, func(tx pgx.Tx) error {
@@ -243,6 +244,15 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{b["notification"], e.orgB, b["member"], orgBMarker + " notification"}},
 		{`INSERT INTO api_keys (id, org_id, prefix, key_hash, name, scopes, created_by) VALUES ($1, $2, 'fbk_live_iso', 'isolation-key-hash', 'Beta key', '{read}', $3)`,
 			[]any{b["apikey"], e.orgB, owner}},
+		// An agent is a users row plus an agents row, with one key (ADR-033).
+		{`INSERT INTO users (id, email, name, email_verified) VALUES ($1, 'agent-iso@agents.fluxboard.invalid', $2, true)
+		  ON CONFLICT (id) DO NOTHING`, // users is global: it outlives a re-seeded org B
+			[]any{b["agent"], orgBMarker + " agent"}},
+		{`INSERT INTO agents (id, org_id, name, created_by) VALUES ($1, $2, $3, $4)`,
+			[]any{b["agent"], e.orgB, orgBMarker + " agent", owner}},
+		{`INSERT INTO api_keys (id, org_id, prefix, key_hash, name, scopes, created_by, agent_id)
+		  VALUES ($1, $2, 'fbk_live_isa', 'isolation-agent-key-hash', 'Beta agent', '{read,write}', $3, $4)`,
+			[]any{b["agentkey"], e.orgB, owner, b["agent"]}},
 	}
 	for _, s := range stmts {
 		if _, err := tx.Exec(ctx, s.sql, s.args...); err != nil {

@@ -64,19 +64,15 @@ func (g *TenantGuard) Resolve(next http.Handler) http.Handler {
 			return
 		}
 		// API key: bound to one org, no membership. A probe for any other org stays
-		// opaque (404). The scope maps to a synthetic role (write⇒ADMIN, read⇒MEMBER)
-		// so the existing route gates apply; APIKeyScopeGuard enforces write scope.
+		// opaque (404). The role is the agent's, or the org key's scope role
+		// (APIKeyInfo.Role); APIKeyScopeGuard enforces write scope.
 		if info, ok := APIKeyFrom(r.Context()); ok {
 			if info.OrgID != orgID {
 				response.Error(w, domain.ErrNotFound)
 				return
 			}
-			role := tenant.RoleMember
-			if info.HasWrite() {
-				role = tenant.RoleAdmin
-			}
 			ctx := context.WithValue(r.Context(), ctxKeyTenant,
-				TenantContext{OrgID: orgID, UserID: p.UserID, Role: role})
+				TenantContext{OrgID: orgID, UserID: p.UserID, Role: info.Role()})
 			next.ServeHTTP(w, r.WithContext(ctx))
 			return
 		}
@@ -105,8 +101,8 @@ func (g *TenantGuard) Resolve(next http.Handler) http.Handler {
 }
 
 // ResolveFromAPIKey is Resolve for org-less routes reached with an API key (the
-// MCP endpoint, ADR-034): the key's org becomes the tenant, with the same
-// scope→role mapping as Resolve (write⇒ADMIN, read⇒MEMBER). Anything else —
+// MCP endpoint, ADR-034): the key's org becomes the tenant, with the same role
+// as Resolve (the agent's, or the org key's scope role). Anything else —
 // a session token, or no credential — is 401: these routes are key-only.
 func (g *TenantGuard) ResolveFromAPIKey(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -116,12 +112,8 @@ func (g *TenantGuard) ResolveFromAPIKey(next http.Handler) http.Handler {
 			response.Error(w, domain.ErrUnauthorized)
 			return
 		}
-		role := tenant.RoleMember
-		if info.HasWrite() {
-			role = tenant.RoleAdmin
-		}
 		ctx := context.WithValue(r.Context(), ctxKeyTenant,
-			TenantContext{OrgID: info.OrgID, UserID: p.UserID, Role: role})
+			TenantContext{OrgID: info.OrgID, UserID: p.UserID, Role: info.Role()})
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }

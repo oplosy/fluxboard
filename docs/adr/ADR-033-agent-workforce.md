@@ -26,7 +26,9 @@ themselves: pick a task, do it, report, hand over. Today that cannot work:
    personal): any ADMIN+ may create, pause, or delete it; it records who
    created it. It can be assigned tasks and @mentioned, appears in activity
    and audit as itself ("backend-2"), and acts with an org role chosen at
-   creation (CONTRIBUTOR by default, never OWNER/ADMIN).
+   creation: MEMBER (default) or GUEST, never OWNER/ADMIN. (The org roles are
+   OWNER/ADMIN/MEMBER/GUEST; write access to a project comes from a project
+   role such as CONTRIBUTOR, as for a person.)
 2. **Not a seat; capped per plan.** Agents never count toward seats or the
    Stripe quantity. Each plan has `max_agents` (Free 1, Pro 10, Business
    unlimited = -1), enforced only on creation with the standard 402
@@ -58,6 +60,29 @@ themselves: pick a task, do it, report, hand over. Today that cannot work:
 2. Agent principal + `max_agents` (decisions 1–2), web management page.
 3. Claim/lease + versioning + idempotency (decisions 3–4).
 4. Write tools + column roles + review gate (decisions 5–6).
+
+## Implementation notes (step 2)
+
+- **Identity.** An agent is backed by a `users` row with the same id, so every
+  existing `users(id)` reference (task creator/assignee, comment author,
+  activity actor, AI run caller, project membership) works unchanged and shows
+  the agent's name. The row has no password, an unroutable RFC 2606 address
+  (`agent-<id>@agents.fluxboard.invalid`) and no membership: it can never sign
+  in, is never mailed (notifications are in-app only) and is never a seat.
+  Org-side state lives in `agents` [T] (migrations 0034/0035).
+- **Keys.** An agent holds up to 3 active read+write keys (rotation); its role,
+  not the key scope, bounds what it may do. An agent key resolves to the
+  agent's user id and role; a paused agent's key is 403 `agent_paused`. Org
+  keys keep the synthetic `apikey:<id>` principal. No API key — an agent's
+  included — may use user-scoped routes (`/me`, `GET|POST /orgs`, invitation
+  accept): 403.
+- **Delete is soft.** `deleted_at` frees the slot and revokes the keys; history
+  keeps the name.
+- **Overrides.** Entitlement resolution now applies the platform-admin
+  `entitlement_overrides` rows (any numeric limit, e.g. `max_agents`) on top
+  of the plan; they were stored but not applied before.
+- **MCP.** `ai.plan_apply` is agent-only: listed for and callable by an
+  agent's key, hidden from org keys.
 
 ## Rejected
 

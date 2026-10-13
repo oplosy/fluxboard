@@ -62,6 +62,7 @@ func aiTools(svc *aiuc.Service) []Tool {
 		},
 		{
 			Name:        "ai.plan_apply",
+			AgentOnly:   true, // the tasks are created by the calling agent
 			Title:       "Create tasks from a plan",
 			Description: "Create up to 50 tasks in one project column, all or none. Requires an idempotency key so a retry never duplicates tasks.",
 			InputSchema: objectSchema(map[string]any{

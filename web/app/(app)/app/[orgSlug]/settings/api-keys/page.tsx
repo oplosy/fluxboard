@@ -2,11 +2,11 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Copy, Check } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/auth/field';
+import { SecretReveal } from '@/components/org/secret-reveal';
 import { useOrg } from '@/lib/org/context';
 import { useToast } from '@/components/ui/toast';
 import { createApiKey, listApiKeys, revokeApiKey } from '@/lib/api/apikeys';
@@ -64,7 +64,7 @@ export default function ApiKeysSettingsPage() {
         {!creating ? <Button size="sm" onClick={() => setCreating(true)}>Create key</Button> : null}
       </div>
 
-      {reveal ? <RevealBox result={reveal} onDismiss={() => setReveal(null)} /> : null}
+      {reveal ? <SecretReveal secret={reveal.secret} onDismiss={() => setReveal(null)} /> : null}
 
       {creating ? (
         <form
@@ -129,43 +129,6 @@ export default function ApiKeysSettingsPage() {
           ))}
         </div>
       )}
-    </div>
-  );
-}
-
-function RevealBox({ result, onDismiss }: { result: CreateApiKeyResult; onDismiss: () => void }) {
-  const [copied, setCopied] = useState(false);
-
-  function copy() {
-    // navigator.clipboard is undefined in insecure contexts; guard so the `.then`
-    // doesn't throw synchronously on `undefined`.
-    if (!navigator.clipboard) return;
-    navigator.clipboard.writeText(result.secret).then(
-      () => {
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
-      },
-      () => undefined,
-    );
-  }
-
-  return (
-    <div className="space-y-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-4">
-      <p className="text-sm font-medium text-amber-700 dark:text-amber-400">
-        Copy your key now — you won’t be able to see it again.
-      </p>
-      <div className="flex items-center gap-2">
-        <code className="min-w-0 flex-1 truncate rounded bg-background px-3 py-2 font-mono text-sm">
-          {result.secret}
-        </code>
-        <Button size="sm" variant="outline" onClick={copy}>
-          {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-          {copied ? 'Copied' : 'Copy'}
-        </Button>
-      </div>
-      <button onClick={onDismiss} className="text-xs text-muted-foreground hover:text-foreground">
-        I’ve saved it — dismiss
-      </button>
     </div>
   );
 }

@@ -3,8 +3,8 @@ package billing
 import "testing"
 
 var (
-	freePlan = Plan{Code: PlanFree, MaxMembers: 5, MaxProjects: 3, MaxStorageBytes: 2 << 30, APIRatePerMin: 60, AuditRetentionDays: 7, Metered: false}
-	proPlan  = Plan{Code: PlanPro, MaxMembers: 25, MaxProjects: 50, MaxStorageBytes: 50 << 30, APIRatePerMin: 300, AuditRetentionDays: 30, Metered: false}
+	freePlan = Plan{Code: PlanFree, MaxMembers: 5, MaxProjects: 3, MaxAgents: 1, MaxStorageBytes: 2 << 30, APIRatePerMin: 60, AuditRetentionDays: 7, Metered: false}
+	proPlan  = Plan{Code: PlanPro, MaxMembers: 25, MaxProjects: 50, MaxAgents: 10, MaxStorageBytes: 50 << 30, APIRatePerMin: 300, AuditRetentionDays: 30, Metered: false}
 	bizPlan  = Plan{Code: PlanBusiness, MaxMembers: -1, MaxProjects: -1, MaxStorageBytes: 500 << 30, APIRatePerMin: 1200, AuditRetentionDays: 365, Metered: true}
 )
 
@@ -111,5 +111,27 @@ func TestCanTransition(t *testing.T) {
 		if CanTransition(e[0], e[1]) {
 			t.Errorf("expected illegal transition %s → %s", e[0], e[1])
 		}
+	}
+}
+
+func TestApplyOverride(t *testing.T) {
+	e := DeriveEntitlements(proPlan, freePlan, StatusActive)
+	if e.MaxAgents != 10 {
+		t.Fatalf("max_agents should follow the plan: %+v", e)
+	}
+	if !e.ApplyOverride("max_agents", " 25 ") || e.MaxAgents != 25 {
+		t.Fatalf("max_agents override: %+v", e)
+	}
+	if !e.ApplyOverride("max_members", "-1") || e.MaxMembers != -1 {
+		t.Fatalf("unlimited override: %+v", e)
+	}
+	before := e
+	for _, c := range [][2]string{{"max_agents", "ten"}, {"max_agents", "-2"}, {"plan", "1"}, {"bogus", "3"}} {
+		if e.ApplyOverride(c[0], c[1]) {
+			t.Errorf("ApplyOverride(%q, %q) = true, want false", c[0], c[1])
+		}
+	}
+	if e != before {
+		t.Fatalf("rejected overrides changed entitlements: %+v", e)
 	}
 }

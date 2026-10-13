@@ -45,6 +45,12 @@ type APIKey struct {
 	LastUsedAt *time.Time
 	RevokedAt  *time.Time
 	CreatedAt  time.Time
+	// AgentID is set when the key belongs to an agent principal (ADR-033): the
+	// key then acts as that agent, with the agent's role. AgentRole/AgentPaused
+	// are filled by the auth-path lookup only.
+	AgentID     string
+	AgentRole   string
+	AgentPaused bool
 }
 
 // Active reports whether the key may authenticate at time t (not revoked).

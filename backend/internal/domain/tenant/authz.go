@@ -13,6 +13,7 @@ const (
 	ObjInvitations = "invitations" // manage invitations
 	ObjBilling     = "billing"     // view/manage billing
 	ObjAPIKeys     = "apikeys"     // manage API keys
+	ObjAgents      = "agents"      // list (read) / manage (write) agents, ADR-033
 	ObjAudit       = "audit"       // view org audit log
 	ObjProjects    = "projects"    // create projects
 	ObjLabels      = "labels"      // manage labels

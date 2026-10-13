@@ -12,6 +12,18 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type Agent struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	Name      string             `json:"name"`
+	Role      string             `json:"role"`
+	Status    string             `json:"status"`
+	CreatedBy pgtype.UUID        `json:"created_by"`
+	CreatedAt time.Time          `json:"created_at"`
+	UpdatedAt time.Time          `json:"updated_at"`
+	DeletedAt pgtype.Timestamptz `json:"deleted_at"`
+}
+
 type AiRisk struct {
 	ID          uuid.UUID          `json:"id"`
 	OrgID       uuid.UUID          `json:"org_id"`
@@ -51,6 +63,7 @@ type ApiKey struct {
 	LastUsedAt pgtype.Timestamptz `json:"last_used_at"`
 	RevokedAt  pgtype.Timestamptz `json:"revoked_at"`
 	CreatedAt  time.Time          `json:"created_at"`
+	AgentID    pgtype.UUID        `json:"agent_id"`
 }
 
 type Attachment struct {
@@ -273,6 +286,7 @@ type Plan struct {
 	AuditRetentionDays    int32   `json:"audit_retention_days"`
 	Metered               bool    `json:"metered"`
 	MonthlyPrice          int64   `json:"monthly_price"`
+	MaxAgents             int32   `json:"max_agents"`
 }
 
 type ProcessedStripeEvent struct {

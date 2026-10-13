@@ -31,6 +31,7 @@ type EntitlementGuard struct {
 	Resolver     EntitlementResolver
 	ProjectCount CountFunc
 	MemberCount  CountFunc
+	AgentCount   CountFunc
 	Logger       *slog.Logger
 }
 
@@ -42,6 +43,12 @@ func (g *EntitlementGuard) RequireProjects() func(http.Handler) http.Handler {
 // RequireMembers gates seat consumption (invite) on the plan's max_members.
 func (g *EntitlementGuard) RequireMembers() func(http.Handler) http.Handler {
 	return g.gate("max_members", g.MemberCount, func(e billing.Entitlements) int { return e.MaxMembers })
+}
+
+// RequireAgents gates agent creation on the plan's max_agents (ADR-033). Paused
+// agents count: pausing must not dodge the cap.
+func (g *EntitlementGuard) RequireAgents() func(http.Handler) http.Handler {
+	return g.gate("max_agents", g.AgentCount, func(e billing.Entitlements) int { return e.MaxAgents })
 }
 
 // gate builds a middleware that resolves the org's entitlements (cache-first),

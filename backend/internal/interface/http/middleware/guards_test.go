@@ -4,9 +4,13 @@ import (
 	"context"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/apikey"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 )
 
 func runGuard(guard func(http.Handler) http.Handler, r *http.Request) *httptest.ResponseRecorder {
@@ -103,5 +107,77 @@ func TestAPIKeyScopeGuard(t *testing.T) {
 				t.Fatalf("status = %d, want %d", rec.Code, tc.want)
 			}
 		})
+	}
+}
+
+// ADR-033: an API key — an agent's included — never reaches user-scoped routes.
+func TestSessionOnly(t *testing.T) {
+	r := httptest.NewRequestWithContext(context.Background(), http.MethodDelete, "/me", nil)
+	if rec := runGuard(SessionOnly, r); rec.Code != http.StatusOK {
+		t.Fatalf("session request: status = %d, want 200", rec.Code)
+	}
+	ctx := WithAPIKey(r.Context(), APIKeyInfo{OrgID: "org1", KeyID: "k1", AgentID: "a1", AgentRole: tenant.RoleMember})
+	if rec := runGuard(SessionOnly, r.WithContext(ctx)); rec.Code != http.StatusForbidden {
+		t.Fatalf("API-key request: status = %d, want 403", rec.Code)
+	}
+}
+
+func TestAPIKeyInfoRole(t *testing.T) {
+	cases := []struct {
+		info APIKeyInfo
+		want tenant.OrgRole
+	}{
+		{APIKeyInfo{Scopes: []apikey.Scope{apikey.ScopeWrite}}, tenant.RoleAdmin},
+		{APIKeyInfo{Scopes: []apikey.Scope{apikey.ScopeRead}}, tenant.RoleMember},
+		// An agent acts with its own role, whatever its key's scope.
+		{APIKeyInfo{Scopes: []apikey.Scope{apikey.ScopeWrite}, AgentID: "a1", AgentRole: tenant.RoleGuest}, tenant.RoleGuest},
+	}
+	for _, c := range cases {
+		if got := c.info.Role(); got != c.want {
+			t.Errorf("Role(%+v) = %s, want %s", c.info, got, c.want)
+		}
+	}
+}
+
+type stubKeys struct {
+	k   apikey.APIKey
+	err error
+}
+
+func (s stubKeys) ResolveByKey(context.Context, string) (apikey.APIKey, error) { return s.k, s.err }
+
+// ADR-033: an agent's key authenticates as the agent; a paused agent is 403
+// agent_paused (not 401, so a client does not ask for a new key).
+func TestHybridAuthAgentKey(t *testing.T) {
+	run := func(keys APIKeyResolver) (*httptest.ResponseRecorder, Principal, APIKeyInfo) {
+		var p Principal
+		var info APIKeyInfo
+		next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			p, _ = PrincipalFrom(r.Context())
+			info, _ = APIKeyFrom(r.Context())
+			w.WriteHeader(http.StatusOK)
+		})
+		r := httptest.NewRequestWithContext(context.Background(), http.MethodGet, "/x", nil)
+		r.Header.Set("Authorization", "Bearer "+apikey.Prefix+"abc")
+		rec := httptest.NewRecorder()
+		HybridAuth(&Authenticator{}, keys)(next).ServeHTTP(rec, r)
+		return rec, p, info
+	}
+
+	rec, p, info := run(stubKeys{k: apikey.APIKey{ID: "k1", OrgID: "org1", AgentID: "a1", AgentRole: "MEMBER"}})
+	if rec.Code != http.StatusOK || p.UserID != "a1" || info.AgentID != "a1" || info.Role() != tenant.RoleMember {
+		t.Fatalf("agent key: %d %+v %+v", rec.Code, p, info)
+	}
+	rec, p, _ = run(stubKeys{k: apikey.APIKey{ID: "k2", OrgID: "org1"}})
+	if rec.Code != http.StatusOK || p.UserID != "apikey:k2" {
+		t.Fatalf("org key: %d %+v", rec.Code, p)
+	}
+	rec, _, _ = run(stubKeys{err: agent.ErrPaused})
+	if rec.Code != http.StatusForbidden || !strings.Contains(rec.Body.String(), "agent_paused") {
+		t.Fatalf("paused agent: %d %s", rec.Code, rec.Body)
+	}
+	rec, _, _ = run(stubKeys{err: domain.ErrUnauthorized})
+	if rec.Code != http.StatusUnauthorized {
+		t.Fatalf("bad key: %d", rec.Code)
 	}
 }

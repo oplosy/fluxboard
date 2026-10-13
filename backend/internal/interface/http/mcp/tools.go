@@ -14,10 +14,12 @@ import (
 )
 
 // Caller is who invokes a tool: the org-bound API key resolved by the
-// middleware chain, with the role the tenant guard mapped its scope to.
+// middleware chain, with the role the tenant guard resolved for it — an
+// agent's own role, or an org key's scope role.
 type Caller struct {
 	OrgID    string
-	UserID   string // principal id ("apikey:<id>")
+	UserID   string // principal id: the agent's user id, or "apikey:<id>" for an org key
+	AgentID  string // set when the key belongs to an agent (ADR-033)
 	Role     tenant.OrgRole
 	CanWrite bool
 	// IdempotencyKey is the request's Idempotency-Key header, for tools that
@@ -26,7 +28,8 @@ type Caller struct {
 }
 
 // Tool is one callable MCP tool. Write tools are hidden from, and refused to,
-// read-only keys.
+// read-only keys. AgentOnly tools author rows as the caller, which needs a user
+// identity: they are hidden from, and refused to, org keys (ADR-033).
 type Tool struct {
 	Name        string
 	Title       string
@@ -35,6 +38,7 @@ type Tool struct {
 	Write       bool
 	Destructive bool
 	Idempotent  bool
+	AgentOnly   bool
 	Call        func(ctx context.Context, c Caller, args Args) (map[string]any, error)
 }
 

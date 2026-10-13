@@ -7,6 +7,7 @@ package gen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgtype"
@@ -47,17 +48,36 @@ func (q *Queries) CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) erro
 }
 
 const getAPIKeyByHash = `-- name: GetAPIKeyByHash :one
-SELECT id, org_id, prefix, key_hash, name, scopes, created_by,
-       last_used_at, revoked_at, created_at
-FROM api_keys
-WHERE key_hash = $1
+SELECT k.id, k.org_id, k.prefix, k.key_hash, k.name, k.scopes, k.created_by,
+       k.last_used_at, k.revoked_at, k.created_at, k.agent_id,
+       a.role AS agent_role, a.status AS agent_status
+FROM api_keys k
+LEFT JOIN agents a ON a.id = k.agent_id
+WHERE k.key_hash = $1
 `
 
+type GetAPIKeyByHashRow struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	Prefix      string             `json:"prefix"`
+	KeyHash     string             `json:"key_hash"`
+	Name        string             `json:"name"`
+	Scopes      []string           `json:"scopes"`
+	CreatedBy   pgtype.UUID        `json:"created_by"`
+	LastUsedAt  pgtype.Timestamptz `json:"last_used_at"`
+	RevokedAt   pgtype.Timestamptz `json:"revoked_at"`
+	CreatedAt   time.Time          `json:"created_at"`
+	AgentID     pgtype.UUID        `json:"agent_id"`
+	AgentRole   *string            `json:"agent_role"`
+	AgentStatus *string            `json:"agent_status"`
+}
+
 // Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
-// to 401 rather than a silent miss.
-func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error) {
+// to 401 rather than a silent miss. An agent's key carries the agent's role and
+// status (ADR-033); the owner pool reads agents across tenants like api_keys.
+func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (GetAPIKeyByHashRow, error) {
 	row := q.db.QueryRow(ctx, getAPIKeyByHash, keyHash)
-	var i ApiKey
+	var i GetAPIKeyByHashRow
 	err := row.Scan(
 		&i.ID,
 		&i.OrgID,
@@ -69,18 +89,22 @@ func (q *Queries) GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, 
 		&i.LastUsedAt,
 		&i.RevokedAt,
 		&i.CreatedAt,
+		&i.AgentID,
+		&i.AgentRole,
+		&i.AgentStatus,
 	)
 	return i, err
 }
 
 const listAPIKeysByOrg = `-- name: ListAPIKeysByOrg :many
 SELECT id, org_id, prefix, key_hash, name, scopes, created_by,
-       last_used_at, revoked_at, created_at
+       last_used_at, revoked_at, created_at, agent_id
 FROM api_keys
-WHERE org_id = $1
+WHERE org_id = $1 AND agent_id IS NULL
 ORDER BY created_at DESC
 `
 
+// Org keys only; an agent's keys are listed with the agent (agents.sql).
 func (q *Queries) ListAPIKeysByOrg(ctx context.Context, orgID uuid.UUID) ([]ApiKey, error) {
 	rows, err := q.db.Query(ctx, listAPIKeysByOrg, orgID)
 	if err != nil {
@@ -101,6 +125,7 @@ func (q *Queries) ListAPIKeysByOrg(ctx context.Context, orgID uuid.UUID) ([]ApiK
 			&i.LastUsedAt,
 			&i.RevokedAt,
 			&i.CreatedAt,
+			&i.AgentID,
 		); err != nil {
 			return nil, err
 		}

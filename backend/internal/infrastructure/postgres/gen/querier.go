@@ -36,6 +36,8 @@ type Querier interface {
 	// Single-use consume: marks a matching unused code used. Rows affected = 1 means
 	// the code was valid and is now spent; 0 means invalid/already-used.
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
+	// Live agents, paused included: pausing must not dodge the plan cap.
+	CountAgents(ctx context.Context, orgID uuid.UUID) (int64, error)
 	CountColumnTasks(ctx context.Context, arg CountColumnTasksParams) (int64, error)
 	CountCommentsForProject(ctx context.Context, arg CountCommentsForProjectParams) ([]CountCommentsForProjectRow, error)
 	// Billable seats: members other than GUEST (FR-TEN-010). The same number gates
@@ -54,6 +56,13 @@ type Querier interface {
 	// exists, so their repo methods run on the owner pool (RLS-bypassing); the hash is
 	// globally unique + unguessable, making the cross-org lookup safe.
 	CreateAPIKey(ctx context.Context, arg CreateAPIKeyParams) error
+	CreateAgent(ctx context.Context, arg CreateAgentParams) error
+	CreateAgentAPIKey(ctx context.Context, arg CreateAgentAPIKeyParams) error
+	// Agents — org principals backed by a users row (ADR-033, FR-AGT-002/003).
+	// agents is [T] (RLS via TenantPool); users is global. Create writes the users
+	// row, the agents row and the first key in one tenant tx (agent_repo.go).
+	// No password, an unroutable address, no membership: never signs in, never a seat.
+	CreateAgentUser(ctx context.Context, arg CreateAgentUserParams) error
 	// Attachments ([T], tenant-scoped) — FR-TASK-006 -----------------------------
 	// Insert the 'pending' row alongside minting a presigned PUT URL.
 	CreateAttachment(ctx context.Context, arg CreateAttachmentParams) error
@@ -101,6 +110,7 @@ type Querier interface {
 	// Time entries ([T], tenant-scoped, FR-TIME) -------------------------------
 	CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) error
+	DeleteAgent(ctx context.Context, arg DeleteAgentParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
 	DeleteAutomationRule(ctx context.Context, arg DeleteAutomationRuleParams) (int64, error)
 	DeleteColumn(ctx context.Context, arg DeleteColumnParams) (int64, error)
@@ -122,12 +132,14 @@ type Querier interface {
 	DeleteUserRecoveryCodes(ctx context.Context, userID uuid.UUID) error
 	DetachLabel(ctx context.Context, arg DetachLabelParams) (int64, error)
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
-	// to 401 rather than a silent miss.
-	GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error)
+	// to 401 rather than a silent miss. An agent's key carries the agent's role and
+	// status (ADR-033); the owner pool reads agents across tenants like api_keys.
+	GetAPIKeyByHash(ctx context.Context, keyHash string) (GetAPIKeyByHashRow, error)
 	// Read-only validity check: lets a flow validate its input (e.g. the new
 	// password) before burning the single-use token with ConsumeOneTimeToken.
 	GetActiveOneTimeToken(ctx context.Context, arg GetActiveOneTimeTokenParams) (OneTimeToken, error)
 	GetActiveSprint(ctx context.Context, arg GetActiveSprintParams) (Sprint, error)
+	GetAgent(ctx context.Context, arg GetAgentParams) (Agent, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (Attachment, error)
 	GetAutomationRule(ctx context.Context, arg GetAutomationRuleParams) (AutomationRule, error)
 	GetBoardByProject(ctx context.Context, arg GetBoardByProjectParams) (Board, error)
@@ -189,6 +201,7 @@ type Querier interface {
 	// Most recent recorded value for a metric on/before a day (point-in-time
 	// dimensions: seats, storage). ErrNoRows ⇒ caller treats as 0.
 	LatestUsageValue(ctx context.Context, arg LatestUsageValueParams) (int64, error)
+	// Org keys only; an agent's keys are listed with the agent (agents.sql).
 	ListAPIKeysByOrg(ctx context.Context, orgID uuid.UUID) ([]ApiKey, error)
 	// All non-deleted org ids (organizations has no RLS). Drives per-tenant
 	// maintenance jobs (trash purge, attachment GC) which then run under WithTenant.
@@ -197,6 +210,9 @@ type Querier interface {
 	// head of each refresh family), not expired. Newest first (docs/04-AUTH.md §5).
 	ListActiveUserSessions(ctx context.Context, userID uuid.UUID) ([]ListActiveUserSessionsRow, error)
 	ListActivityByTask(ctx context.Context, arg ListActivityByTaskParams) ([]TaskActivity, error)
+	// Active keys of every agent in the org; the repo groups them by agent.
+	ListAgentAPIKeys(ctx context.Context, orgID uuid.UUID) ([]ApiKey, error)
+	ListAgents(ctx context.Context, orgID uuid.UUID) ([]Agent, error)
 	ListAttachmentsByTask(ctx context.Context, arg ListAttachmentsByTaskParams) ([]Attachment, error)
 	ListAutomationRules(ctx context.Context, orgID uuid.UUID) ([]AutomationRule, error)
 	ListColumnsByBoard(ctx context.Context, arg ListColumnsByBoardParams) ([]BoardColumn, error)
@@ -299,6 +315,8 @@ type Querier interface {
 	RestoreTask(ctx context.Context, arg RestoreTaskParams) (int64, error)
 	// rows-affected 0 ⇒ absent or already revoked ⇒ caller returns ErrNotFound.
 	RevokeAPIKey(ctx context.Context, arg RevokeAPIKeyParams) (int64, error)
+	RevokeAgentAPIKey(ctx context.Context, arg RevokeAgentAPIKeyParams) (int64, error)
+	RevokeAgentAPIKeys(ctx context.Context, arg RevokeAgentAPIKeysParams) error
 	RevokeAllUserSessions(ctx context.Context, arg RevokeAllUserSessionsParams) error
 	RevokeInvitation(ctx context.Context, arg RevokeInvitationParams) (int64, error)
 	RevokeSessionByID(ctx context.Context, arg RevokeSessionByIDParams) error
@@ -336,6 +354,7 @@ type Querier interface {
 	// Advance last_used_at for a live session head. Called by the auth middleware on
 	// the cache-miss backfill path (≤ once per cache TTL), not per request.
 	TouchSessionLastUsed(ctx context.Context, id uuid.UUID) error
+	UpdateAgent(ctx context.Context, arg UpdateAgentParams) (int64, error)
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (int64, error)
 	UpdateColumn(ctx context.Context, arg UpdateColumnParams) (int64, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (int64, error)
