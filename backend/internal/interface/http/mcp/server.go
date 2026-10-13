@@ -2,6 +2,7 @@ package mcp
 
 import (
 	"bytes"
+	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
@@ -23,6 +24,8 @@ type Config struct {
 	Version   string // build version, reported in serverInfo
 	WebOrigin string // the only browser Origin accepted (DNS-rebinding guard)
 	Logger    *slog.Logger
+	// Idempotency keeps write-tool results for key-based replay; nil ⇒ off.
+	Idempotency IdempotencyStore
 }
 
 // Server is the MCP endpoint. It is safe for concurrent use and holds no
@@ -33,6 +36,7 @@ type Server struct {
 	info      implementation
 	webOrigin string
 	logger    *slog.Logger
+	idem      IdempotencyStore
 }
 
 const instructions = "Fluxboard project management. Start with projects.list, read a board with " +
@@ -49,7 +53,13 @@ func NewServer(cfg Config, tools []Tool) *Server {
 	if cfg.Version == "" {
 		cfg.Version = "dev"
 	}
-	sorted := append([]Tool(nil), tools...)
+	sorted := make([]Tool, 0, len(tools))
+	for _, t := range tools {
+		if cfg.Idempotency != nil {
+			t = withIdempotencyArg(t)
+		}
+		sorted = append(sorted, t)
+	}
 	sort.Slice(sorted, func(i, j int) bool { return sorted[i].Name < sorted[j].Name })
 	byName := make(map[string]*Tool, len(sorted))
 	for i := range sorted {
@@ -63,6 +73,7 @@ func NewServer(cfg Config, tools []Tool) *Server {
 		info:      implementation{Name: "fluxboard", Version: cfg.Version},
 		webOrigin: strings.TrimRight(cfg.WebOrigin, "/"),
 		logger:    cfg.Logger,
+		idem:      cfg.Idempotency,
 	}
 }
 
@@ -300,8 +311,34 @@ func (s *Server) call(r *http.Request, req rpcRequest, p requestParams, c Caller
 		return toolError(tool.Name + " needs an agent's key: create an agent in Settings → Agents and connect with its key."), nil
 	}
 
+	var idemStoreKey, idemHash string
+	if s.idem != nil && tool.replayable() {
+		key, aerr := idemKey(c, tool.Name, args)
+		if aerr != nil {
+			return toolError("Invalid arguments: " + aerr.Msg), nil
+		}
+		if key != "" {
+			idemStoreKey, idemHash = key, argsHash(args)
+			prior, msg, err := s.idemBegin(r.Context(), key, idemHash)
+			if err != nil {
+				s.logger.ErrorContext(r.Context(), "mcp idempotency store failed", "tool", tool.Name, "err", err)
+				rep := errorReply(http.StatusInternalServerError, req.ID, codeInternalError, "internal error", nil)
+				return nil, &rep
+			}
+			if msg != "" {
+				return toolError(msg), nil
+			}
+			if prior != nil {
+				return prior, nil
+			}
+		}
+	}
+
 	out, err := tool.Call(r.Context(), c, args)
 	if err != nil {
+		if idemStoreKey != "" {
+			s.idemAbort(r.Context(), idemStoreKey)
+		}
 		if msg, ok := toolErrorMessage(err); ok {
 			return toolError(msg), nil
 		}
@@ -318,11 +355,68 @@ func (s *Server) call(r *http.Request, req rpcRequest, p requestParams, c Caller
 		rep := errorReply(http.StatusInternalServerError, req.ID, codeInternalError, "internal error", nil)
 		return nil, &rep
 	}
-	return map[string]any{
+	result := map[string]any{
 		"content":           []textContent{{Type: "text", Text: string(text)}},
 		"structuredContent": out,
 		"isError":           false,
-	}, nil
+	}
+	if idemStoreKey != "" {
+		s.idemCommit(r.Context(), idemStoreKey, idemHash, result)
+	}
+	return result, nil
+}
+
+// idemBegin looks a key up: the stored result for a repeat, a tool-error
+// message when the key is busy or was used with other arguments, or neither
+// (the key is now reserved for this call).
+func (s *Server) idemBegin(ctx context.Context, key, hash string) (map[string]any, string, error) {
+	raw, err := s.idem.Get(ctx, key)
+	if err != nil {
+		return nil, "", err
+	}
+	if raw == "" {
+		pending, _ := json.Marshal(idemRecord{ArgsHash: hash, Pending: true})
+		ok, err := s.idem.SetNX(ctx, key, string(pending), idemPending)
+		if err != nil {
+			return nil, "", err
+		}
+		if ok {
+			return nil, "", nil
+		}
+		if raw, err = s.idem.Get(ctx, key); err != nil {
+			return nil, "", err
+		}
+	}
+	var rec idemRecord
+	if err := json.Unmarshal([]byte(raw), &rec); err != nil {
+		return nil, "", fmt.Errorf("decode idempotency record: %w", err)
+	}
+	switch {
+	case rec.ArgsHash != hash:
+		return nil, "This idempotency_key was already used with different arguments. Use a new key.", nil
+	case rec.Pending || rec.Result == nil:
+		return nil, "A call with this idempotency_key is still running. Retry in a moment.", nil
+	}
+	return rec.Result, "", nil
+}
+
+// idemCommit stores a successful result for replay (best-effort: a failure
+// only means a retry runs the write again, which the tool's own checks bound).
+func (s *Server) idemCommit(ctx context.Context, key, hash string, result map[string]any) {
+	b, err := json.Marshal(idemRecord{ArgsHash: hash, Result: result})
+	if err == nil {
+		err = s.idem.Set(ctx, key, string(b), idemTTL)
+	}
+	if err != nil {
+		s.logger.WarnContext(ctx, "mcp idempotency commit failed", "err", err)
+	}
+}
+
+// idemAbort frees a key whose call failed, so a retry runs it again.
+func (s *Server) idemAbort(ctx context.Context, key string) {
+	if err := s.idem.Del(ctx, key); err != nil {
+		s.logger.WarnContext(ctx, "mcp idempotency release failed", "err", err)
+	}
 }
 
 func toolError(msg string) map[string]any {

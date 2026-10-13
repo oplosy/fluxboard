@@ -509,7 +509,10 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	})
 	aiHandlers := handlers.NewAIHandlers(aiSvc, logger)
 	// MCP server for agents (ADR-034): same usecases as the REST surface.
-	mcpServer := mcp.NewServer(mcp.Config{Version: version, WebOrigin: cfg.WebOrigin, Logger: logger},
+	mcpServer := mcp.NewServer(mcp.Config{
+		Version: version, WebOrigin: cfg.WebOrigin, Logger: logger,
+		Idempotency: redisx.NewIdempotencyStore(rdb), // write-tool replay (FR-AGT-005)
+	},
 		mcp.Tools(mcp.Deps{AI: aiSvc, Projects: projectSvc, Tasks: taskSvc}))
 	billingHandlers := handlers.NewBillingHandlers(billingSvc, logger)
 	webhookHandlers := handlers.NewWebhookHandlers(billingSvc, stripeGW, logger)
