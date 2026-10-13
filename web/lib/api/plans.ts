@@ -13,6 +13,8 @@ export interface CatalogPlan {
   /** -1 = unlimited. */
   max_members: number;
   max_projects: number;
+  /** Agents are not seats (ADR-033). */
+  max_agents: number;
   max_storage_bytes: number;
   api_rate_per_min: number;
   audit_retention_days: number;

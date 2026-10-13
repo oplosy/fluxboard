@@ -44,6 +44,7 @@ export function PricingTable() {
       features: [
         `${limitLabel(p.max_projects)} ${p.max_projects === 1 ? 'project' : 'projects'}`,
         `${limitLabel(p.max_members)} members`,
+        `${limitLabel(p.max_agents)} ${p.max_agents === 1 ? 'agent' : 'agents'} over MCP`,
         `${formatBytes(p.max_storage_bytes)} storage`,
         `${p.api_rate_per_min.toLocaleString()} API requests / min`,
         `${p.audit_retention_days}-day audit log`,

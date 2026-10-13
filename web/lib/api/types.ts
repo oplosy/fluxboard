@@ -90,6 +90,8 @@ export interface Entitlements {
   status: string;
   max_members: number;
   max_projects: number;
+  /** Agents are not seats (ADR-033). -1 = unlimited. */
+  max_agents: number;
   max_storage_bytes: number;
   api_rate_per_min: number;
   audit_retention_days: number;
@@ -387,6 +389,44 @@ export interface ApiKey {
 /** POST /orgs/{id}/api-keys response — `secret` is shown exactly once. */
 export interface CreateApiKeyResult {
   api_key: ApiKey;
+  secret: string;
+}
+
+/** An org role an agent may hold: never OWNER/ADMIN (ADR-033). */
+export type AgentRole = 'MEMBER' | 'GUEST';
+
+export type AgentStatus = 'active' | 'paused';
+
+/** One of an agent's active keys. Secret never here. */
+export interface AgentKey {
+  id: string;
+  prefix: string;
+  last_used_at?: string;
+  created_at: string;
+}
+
+/** An org agent (GET /orgs/{id}/agents -> { agents, limit }). */
+export interface Agent {
+  id: string;
+  name: string;
+  role: AgentRole;
+  status: AgentStatus;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+  keys: AgentKey[];
+}
+
+/** The org's agent count against its plan's max_agents (-1 = unlimited). */
+export interface AgentLimit {
+  current: number;
+  max: number;
+}
+
+/** POST /agents and POST /agents/{id}/keys — `secret` is shown exactly once. */
+export interface AgentSecretResult {
+  agent: Agent;
+  key_id: string;
   secret: string;
 }
 

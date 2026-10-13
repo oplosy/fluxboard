@@ -23,6 +23,7 @@ const UpgradeModalContext = createContext<UpgradeModalValue | null>(null);
 const LIMIT_COPY: Record<string, string> = {
   max_members: 'You’ve reached the member limit for your current plan.',
   max_projects: 'You’ve reached the project limit for your current plan.',
+  max_agents: 'You’ve reached the agent limit for your current plan.',
   max_storage_bytes: 'You’ve reached the storage limit for your current plan.',
   members: 'You’ve reached the member limit for your current plan.',
   seats: 'You’ve reached the seat limit for your current plan.',
