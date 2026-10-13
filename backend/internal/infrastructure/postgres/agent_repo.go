@@ -160,7 +160,10 @@ func (r *AgentRepo) Delete(ctx context.Context, orgID, id string) error {
 		if n == 0 {
 			return domain.ErrNotFound
 		}
-		return q.RevokeAgentAPIKeys(ctx, gen.RevokeAgentAPIKeysParams{OrgID: oid, AgentID: pgUUIDOf(aid)})
+		if err := q.RevokeAgentAPIKeys(ctx, gen.RevokeAgentAPIKeysParams{OrgID: oid, AgentID: pgUUIDOf(aid)}); err != nil {
+			return err
+		}
+		return q.ReleaseAgentClaims(ctx, gen.ReleaseAgentClaimsParams{OrgID: oid, AgentID: pgUUIDOf(aid)})
 	})
 }
 

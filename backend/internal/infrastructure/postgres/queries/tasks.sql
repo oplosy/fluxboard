@@ -9,20 +9,23 @@ VALUES (@id, @org_id, @project_id, @column_id, @number, @title, @description,
 -- name: GetTask :one
 -- Live tasks only; trashed tasks are addressable through the Trash queries.
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL;
 
 -- name: ListTasksByColumn :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND column_id = @column_id AND deleted_at IS NULL
 ORDER BY rank;
 
 -- name: ListTasksByProject :many
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by, t.created_at, t.updated_at
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by, t.created_at, t.updated_at,
+       t.version, t.claimed_by, t.lease_expires_at
 FROM tasks t
 JOIN board_columns c ON c.id = t.column_id
 WHERE t.org_id = @org_id AND t.project_id = @project_id AND t.deleted_at IS NULL
@@ -33,13 +36,17 @@ UPDATE tasks
 SET title = @title, description = @description,
     assignee_id = sqlc.narg('assignee_id'), priority = @priority,
     start_date = sqlc.narg('start_date'), due_date = sqlc.narg('due_date')
-WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL;
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL
+  -- Optimistic concurrency (FR-AGT-005): with a version, a stale write matches
+  -- no row and the repo reports a conflict.
+  AND (sqlc.narg('if_version')::bigint IS NULL OR version = sqlc.narg('if_version'));
 
 -- name: MoveTask :execrows
 -- Relocate a task. The (column_id, rank) unique index makes a concurrent
 -- identical move raise a unique violation → domain.ErrConflict → 409 (FR-PROJ-005).
 UPDATE tasks SET column_id = @column_id, rank = @rank
-WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL;
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL
+  AND (sqlc.narg('if_version')::bigint IS NULL OR version = sqlc.narg('if_version'));
 
 -- Soft-delete / Trash (FR-TASK-009) -----------------------------------------
 
@@ -55,13 +62,15 @@ WHERE org_id = @org_id AND id = @id AND deleted_at IS NOT NULL;
 
 -- name: GetTrashedTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NOT NULL;
 
 -- name: ListTrashedTasks :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND project_id = @project_id AND deleted_at IS NOT NULL
 ORDER BY deleted_at DESC;
@@ -85,7 +94,7 @@ WHERE org_id = @org_id AND deleted_at IS NOT NULL AND deleted_at < @cutoff;
 -- total).
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
        t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.version, t.claimed_by, t.lease_expires_at,
        count(*) OVER() AS total_count
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
@@ -122,3 +131,37 @@ WHERE org_id = @org_id AND deleted_at IS NULL AND id = ANY(@ids::uuid[]);
 -- Count how many of the given ids are live tasks in this org (bulk pre-check).
 SELECT count(*) FROM tasks
 WHERE org_id = @org_id AND deleted_at IS NULL AND id = ANY(@ids::uuid[]);
+
+-- Agent claims (ADR-033, FR-AGT-004) ----------------------------------------
+-- A claim is held while lease_expires_at is in the future. Each statement is a
+-- single conditional UPDATE, so two agents racing for a task cannot both win.
+
+-- name: ClaimTask :execrows
+-- Claim (or renew) a task for an agent and assign it. Blocked by another
+-- agent's live lease, or by an assignee who is neither this agent nor the
+-- holder of a lapsed claim (a person, or someone assigned by a person).
+UPDATE tasks
+SET claimed_by = @agent_id, lease_expires_at = @expires_at, assignee_id = @agent_id
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL
+  AND (claimed_by IS NULL OR claimed_by = @agent_id OR lease_expires_at <= now())
+  AND (assignee_id IS NULL OR assignee_id = @agent_id OR assignee_id = claimed_by);
+
+-- name: HeartbeatTask :execrows
+-- Extend a live claim the agent holds; a lapsed or foreign claim matches nothing.
+UPDATE tasks SET lease_expires_at = @expires_at
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL
+  AND claimed_by = @agent_id AND lease_expires_at > now();
+
+-- name: ReleaseTask :execrows
+-- Give a claim back: the task is unassigned again if the agent still holds it.
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = @agent_id THEN NULL ELSE assignee_id END
+WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL AND claimed_by = @agent_id;
+
+-- name: ReleaseExpiredClaims :execrows
+-- Sweeper: clear lapsed claims and the assignment they made.
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
+WHERE org_id = @org_id AND claimed_by IS NOT NULL AND lease_expires_at <= now();

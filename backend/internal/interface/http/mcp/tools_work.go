@@ -185,11 +185,17 @@ func workTools(projects *projectuc.Service, tasks *taskuc.Service) []Tool {
 }
 
 func taskSummary(t *project.Task) map[string]any {
-	return map[string]any{
+	out := map[string]any{
 		"id": t.ID, "project_id": t.ProjectID, "number": t.Number, "title": t.Title,
 		"column_id": t.ColumnID, "assignee_id": t.AssigneeID, "priority": t.Priority,
-		"due_date": dateOrNil(t.DueDate), "updated_at": t.UpdatedAt,
+		"due_date": dateOrNil(t.DueDate), "updated_at": t.UpdatedAt, "version": t.Version,
+		"claimed_by": nil, "lease_expires_at": nil,
 	}
+	// Only a live claim is reported: a lapsed one blocks nobody (ADR-033).
+	if t.ClaimActive(time.Now()) {
+		out["claimed_by"], out["lease_expires_at"] = *t.ClaimedBy, t.LeaseExpiresAt.UTC()
+	}
+	return out
 }
 
 // linkViews renders the other end of each edge. A blocker row names the other

@@ -57,3 +57,11 @@ WHERE org_id = @org_id AND agent_id = @agent_id AND id = @id AND revoked_at IS N
 UPDATE api_keys
 SET revoked_at = now()
 WHERE org_id = @org_id AND agent_id = @agent_id AND revoked_at IS NULL;
+
+-- name: ReleaseAgentClaims :exec
+-- A deleted agent gives back every claim it holds, and the assignments those
+-- claims made, so its tasks are free again at once (ADR-033).
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
+WHERE org_id = @org_id AND claimed_by = @agent_id;

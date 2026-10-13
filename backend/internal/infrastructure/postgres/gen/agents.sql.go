@@ -224,6 +224,25 @@ func (q *Queries) ListAgents(ctx context.Context, orgID uuid.UUID) ([]Agent, err
 	return items, nil
 }
 
+const releaseAgentClaims = `-- name: ReleaseAgentClaims :exec
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
+WHERE org_id = $1 AND claimed_by = $2
+`
+
+type ReleaseAgentClaimsParams struct {
+	OrgID   uuid.UUID   `json:"org_id"`
+	AgentID pgtype.UUID `json:"agent_id"`
+}
+
+// A deleted agent gives back every claim it holds, and the assignments those
+// claims made, so its tasks are free again at once (ADR-033).
+func (q *Queries) ReleaseAgentClaims(ctx context.Context, arg ReleaseAgentClaimsParams) error {
+	_, err := q.db.Exec(ctx, releaseAgentClaims, arg.OrgID, arg.AgentID)
+	return err
+}
+
 const revokeAgentAPIKey = `-- name: RevokeAgentAPIKey :execrows
 UPDATE api_keys
 SET revoked_at = now()

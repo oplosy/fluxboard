@@ -16,6 +16,8 @@ import (
 const (
 	TypeTrashPurge   = "maintenance:trash_purge"
 	TypeAttachmentGC = "maintenance:attachment_gc"
+	// TypeClaimSweep clears lapsed agent claims (ADR-033, FR-AGT-004).
+	TypeClaimSweep = "maintenance:claim_sweep"
 )
 
 // OrgLister enumerates active orgs so a job can run under each tenant.
@@ -42,6 +44,7 @@ func NewMaintenance(tasks *taskuc.Service, orgs OrgLister, logger *slog.Logger) 
 func (m *Maintenance) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeTrashPurge, m.handleTrashPurge)
 	mux.HandleFunc(TypeAttachmentGC, m.handleAttachmentGC)
+	mux.HandleFunc(TypeClaimSweep, m.handleClaimSweep)
 }
 
 // forEachOrg runs fn under every active tenant, logging and continuing past a
@@ -83,6 +86,15 @@ func (m *Maintenance) handleAttachmentGC(ctx context.Context, _ *asynq.Task) err
 	})
 }
 
+// handleClaimSweep releases agent claims whose lease ran out, and the
+// assignment they made, so a crashed agent's task shows as free again. Claims
+// already stop blocking at expiry; this only tidies the board.
+func (m *Maintenance) handleClaimSweep(ctx context.Context, _ *asynq.Task) error {
+	return m.forEachOrg(ctx, TypeClaimSweep, func(orgID string) (int, error) {
+		return m.tasks.ReleaseExpiredClaims(ctx, orgID)
+	})
+}
+
 // ScheduleEntry is one periodic-schedule registration (cron spec + task +
 // enqueue options, e.g. the target queue per 09 §2 priorities).
 type ScheduleEntry struct {
@@ -99,6 +111,7 @@ func Schedule() []ScheduleEntry {
 		{Cron: "0 3 * * *", Task: asynq.NewTask(TypeTrashPurge, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "30 3 * * *", Task: asynq.NewTask(TypeAttachmentGC, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "@every 5s", Task: asynq.NewTask(TypeOutboxDrain, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},
+		{Cron: "@every 1m", Task: asynq.NewTask(TypeClaimSweep, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}}, // ADR-033
 		{Cron: "0 * * * *", Task: asynq.NewTask(TypeUsageAggregate, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 2 * * *", Task: asynq.NewTask(TypeUsagePushStripe, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 4 * * *", Task: asynq.NewTask(TypeBillingReconcile, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},

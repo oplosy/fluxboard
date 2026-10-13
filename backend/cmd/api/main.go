@@ -476,15 +476,15 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
 		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
 		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
-		Automation: automationSvc,
-		Events:     eventBus, Logger: logger,
+		Automation: automationSvc, Concurrency: taskRepo,
+		Events: eventBus, Logger: logger,
 	})
 	taskSvc := taskuc.New(taskuc.Deps{
 		Tasks: taskRepo, Subtasks: subtaskRepo, Labels: labelRepo, Comments: commentRepo,
 		Activity: activityRepo, Attachments: attachmentRepo, Projects: projectRepo,
 		Members: projectMemberRepo, Boards: boardRepo, Columns: columnRepo,
 		Store: objectStore, Entitlements: billingSvc, TimeEntries: timeEntryRepo, Links: linkRepo,
-		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Logger: logger,
+		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo, Logger: logger,
 	})
 	projectHandlers := handlers.NewProjectHandlers(projectSvc, logger)
 	publicFormHandlers := handlers.NewPublicFormHandlers(projectSvc, logger)
