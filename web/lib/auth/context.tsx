@@ -44,6 +44,9 @@ interface AuthContextValue extends AuthState {
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
+/** How long before access-token expiry the proactive refresh fires. */
+const REFRESH_LEAD_MS = 60_000;
+
 function deriveState(token: string | null, loading: boolean): AuthState {
   const claims = decodeAccessClaims(token);
   return {
@@ -74,6 +77,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       active = false;
     };
   }, []);
+
+  // Refresh shortly before the access token expires, so requests (and the SSE
+  // stream) never hit a 401 first. A tab that slept past expiry refreshes as
+  // soon as it becomes visible again.
+  useEffect(() => {
+    const exp = decodeAccessClaims(token)?.exp;
+    if (!exp) return;
+    const delay = Math.max(5_000, exp * 1000 - Date.now() - REFRESH_LEAD_MS);
+    const timer = window.setTimeout(() => void refreshSession(), delay);
+    const onVisible = () => {
+      if (document.visibilityState === 'visible' && exp * 1000 - Date.now() < REFRESH_LEAD_MS) {
+        void refreshSession();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => {
+      window.clearTimeout(timer);
+      document.removeEventListener('visibilitychange', onVisible);
+    };
+  }, [token]);
 
   const adopt = useCallback((tok: TokenResponse) => {
     setAccessToken(tok.access_token);

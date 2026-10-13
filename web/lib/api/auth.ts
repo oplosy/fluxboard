@@ -1,4 +1,4 @@
-import { apiFetch } from './client';
+import { API_BASE, apiFetch } from './client';
 import type {
   Enroll2FAResponse,
   LoginResponse,
@@ -38,6 +38,24 @@ export function requestEmailVerification(email: string): Promise<void> {
   });
 }
 
+/** Minimal account view, available before the email is verified. */
+export interface AuthAccount {
+  id: string;
+  email: string;
+  name: string;
+  email_verified: boolean;
+  has_password: boolean;
+}
+
+export function getAuthAccount(): Promise<AuthAccount> {
+  return apiFetch('/auth/me');
+}
+
+/** Re-sends the verification link to the signed-in caller's own address. */
+export function resendMyVerification(): Promise<void> {
+  return apiFetch('/auth/verify-email/resend', { method: 'POST' });
+}
+
 export function confirmEmail(token: string): Promise<void> {
   return apiFetch('/auth/verify-email/confirm', {
     method: 'POST',
@@ -56,6 +74,32 @@ export function forgotPassword(email: string): Promise<void> {
 
 export function resetPassword(input: { token: string; password: string }): Promise<void> {
   return apiFetch('/auth/password/reset', { method: 'POST', body: input, skipAuthRetry: true });
+}
+
+/** Checks a reset link without consuming it (204 valid, 422 token_invalid). */
+export function validateResetToken(token: string): Promise<void> {
+  return apiFetch('/auth/password/reset/validate', {
+    method: 'POST',
+    body: { token },
+    skipAuthRetry: true,
+  });
+}
+
+// --- OAuth (Google, GitHub) ---
+
+export type OAuthProvider = 'google' | 'github';
+
+/** The sign-in providers the server has credentials for. */
+export function getOAuthProviders(): Promise<{ providers: OAuthProvider[] }> {
+  return apiFetch('/auth/oauth/providers', { skipAuthRetry: true });
+}
+
+/**
+ * Full-page URL that starts a provider sign-in. `next` is the in-app path to
+ * land on afterwards (the server re-sanitizes it).
+ */
+export function oauthStartUrl(provider: OAuthProvider, next: string): string {
+  return `${API_BASE}/auth/oauth/${provider}/start?redirect=${encodeURIComponent(next)}`;
 }
 
 export function changePassword(input: {
