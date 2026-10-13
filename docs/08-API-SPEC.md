@@ -110,6 +110,9 @@ POST   /orgs/{orgId}/projects/{key}/tasks            create (FR-TASK-001)
 GET    /orgs/{orgId}/tasks/{taskId}                  full detail (subtasks, labels, activity head)
 PATCH  /orgs/{orgId}/tasks/{taskId}                  field edits (+version) → 409 version_conflict
 PATCH  /orgs/{orgId}/tasks/{taskId}/position         {column_id, rank, version?}  → 409 rank_conflict | version_conflict
+                                                     → 403 human_approval_required (agent → done column)
+POST   /orgs/{orgId}/tasks/{taskId}/review           {decision: approve|changes, comment?} (people only; comment required for changes)
+PUT    /orgs/{orgId}/projects/{projectId}/columns/{columnId}/role  {role: backlog|todo|in_progress|review|done|""} (LEAD)
 POST   /orgs/{orgId}/tasks/bulk                      {task_ids[], op: move|assign|label, ...}
 DELETE /orgs/{orgId}/tasks/{taskId}                  → trash
 POST   /orgs/{orgId}/tasks/{taskId}/restore
@@ -165,7 +168,12 @@ sends `version` is applied only if the task is still at it; otherwise 409:
 {"error":{"code":"version_conflict","message":"…","details":{"current":{…task…}}}}
 ```
 
-Without `version` the write is unconditional, as before. Task and board-card
+Without `version` the write is unconditional, as before.
+
+Board columns carry `role` (ADR-033 decision 5): the stage set by a lead, else
+inferred from the column name; omitted when none applies. An agent can never
+put a task into the done column (move, bulk move, create): 403
+`human_approval_required`. Task and board-card
 payloads also carry `claimed_by` + `lease_expires_at` while an agent's claim
 is live (omitted otherwise: a lapsed claim blocks nobody).
 
@@ -237,6 +245,13 @@ GET|DELETE /mcp    405 (no standalone stream, no sessions)
   holder), `tasks.heartbeat` (extends a live claim; a lapsed one must be
   claimed again), `tasks.release` (ends the claim, unassigns if still the
   assignee). Task summaries carry `version`, `claimed_by`, `lease_expires_at`.
+  Agent write tools: `tasks.next` (find and, by default, claim the next ready
+  task), `tasks.update` (needs the agent's live claim and `version`; fields
+  and/or `column` backlog|todo|in_progress), `tasks.comment`, `tasks.create`
+  (`subtasks`, `blocked_by`, never into done), `tasks.submit_for_review`
+  (`version`, `summary`: → review column, summary comment, claim ends);
+  `tasks.link` is also open to org write keys. `projects.board` columns carry
+  `role`.
   Write tools that are not idempotent by nature accept `idempotency_key` (or
   the `Idempotency-Key` header): the first successful result is replayed for
   24 h; the same key with other arguments is refused. Business failures come back as `isError: true` tool
