@@ -155,7 +155,7 @@ bound to a different org than the path → 403), scope `write` required for all
 non-GET, rate limit headers per FR-API-002. Session-auth requests share the
 same limiter keyed `rl:api:{orgId}:{userId}`.
 
-## 8b. Governed AI — `/orgs/{orgId}/ai/*` + `/mcp` (ADR-025, FR-AI-001..009)
+## 8b. Governed AI — `/orgs/{orgId}/ai/*` (ADR-025, FR-AI-001..009)
 
 ```
 POST   /orgs/{orgId}/ai/parse             {input} → items[]
@@ -166,13 +166,38 @@ GET    /orgs/{orgId}/projects/{projectId}/ai/digest   live-data report
 GET    /orgs/{orgId}/ai/risks?project_id= open risks
 POST   /orgs/{orgId}/ai/risks/scan        {project_id} (BUSINESS+)
 POST   /orgs/{orgId}/ai/risks/dismiss     {task_id} (204)
-POST   /orgs/{orgId}/mcp                  {tool, params} → {result}
 ```
 
-MCP tools (closed set): `ai.parse`, `ai.plan_draft`, `ai.plan_apply`,
-`ai.digest`, `ai.chat`, `ai.risks_scan`, `ai.risks_list`, `ai.risks_dismiss`.
-POST ⇒ read-scoped keys 403 (v1). Every call: surface flag → monthly meter
-(402 `ai_actions`) → provider → `ai_runs` ledger → `ai.run` audit.
+Every AI call: surface flag → monthly meter (402 `ai_actions`) → provider →
+`ai_runs` ledger → `ai.run` audit.
+
+## 8c. MCP server — `POST /mcp` (ADR-034, FR-AI-007, FR-AGT-001)
+
+```
+POST   /mcp        JSON-RPC 2.0, Streamable HTTP, application/json responses
+GET|DELETE /mcp    405 (no standalone stream, no sessions)
+```
+
+- **Auth:** `Authorization: Bearer fbk_live_…` only; the key's org is the
+  tenant (no org id in the URL). Session tokens → 401. Plan rate limit and
+  usage metering apply as on org routes. A browser `Origin` other than
+  `WEB_ORIGIN` → 403.
+- **Modern (2026-07-28):** `_meta.io.modelcontextprotocol/protocolVersion` +
+  `clientCapabilities` on every request; `MCP-Protocol-Version`, `Mcp-Method`
+  and (tools/call) `Mcp-Name` headers must match the body (400 `-32020`).
+  Unsupported version → 400 `-32022` `{supported, requested}`; unknown method
+  → 404 `-32601`. Methods: `server/discover`, `tools/list`, `tools/call`, `ping`.
+- **Legacy (2025-11-25 / 2025-06-18 / 2025-03-26):** `initialize` negotiates;
+  later requests send `MCP-Protocol-Version` (absent ⇒ 2025-03-26);
+  notifications → 202. Methods: `initialize`, `ping`, `tools/list`, `tools/call`.
+- **Tools:** read — `projects.list`, `projects.board`, `tasks.search`,
+  `tasks.get`, `ai.parse`, `ai.plan_draft`, `ai.digest`, `ai.chat`,
+  `ai.risks_scan`, `ai.risks_list`; write (needs a write-scoped key; hidden
+  from read keys) — `ai.risks_dismiss`. `ai.plan_apply` returns with agent
+  principals (ADR-033). Business failures come back as `isError: true` tool
+  results; unknown tools / malformed arguments as `-32602`; internal errors as
+  `-32603` with no detail.
+- **Client setup:** `claude mcp add --transport http fluxboard https://<host>/api/v1/mcp --header "Authorization: Bearer fbk_live_…"`.
 
 ## 9. Platform Admin — `/admin/*` (separate router; platform_role=admin + TOTP enforced)
 

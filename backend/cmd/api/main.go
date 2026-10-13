@@ -40,6 +40,7 @@ import (
 	stripex "github.com/mesutokul/fluxboard/backend/internal/infrastructure/stripe"
 	httpx "github.com/mesutokul/fluxboard/backend/internal/interface/http"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/http/handlers"
+	"github.com/mesutokul/fluxboard/backend/internal/interface/http/mcp"
 	mw "github.com/mesutokul/fluxboard/backend/internal/interface/http/middleware"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/jobs"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/aesgcm"
@@ -493,6 +494,9 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		MonthlyCap: cfg.AIMonthlyCap, Logger: logger,
 	})
 	aiHandlers := handlers.NewAIHandlers(aiSvc, logger)
+	// MCP server for agents (ADR-034): same usecases as the REST surface.
+	mcpServer := mcp.NewServer(mcp.Config{Version: version, WebOrigin: cfg.WebOrigin, Logger: logger},
+		mcp.Tools(mcp.Deps{AI: aiSvc, Projects: projectSvc, Tasks: taskSvc}))
 	billingHandlers := handlers.NewBillingHandlers(billingSvc, logger)
 	webhookHandlers := handlers.NewWebhookHandlers(billingSvc, stripeGW, logger)
 	eventHandlers := handlers.NewEventHandlers(notifySvc, logger)
@@ -528,6 +532,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		PublicForms:      publicFormHandlers,
 		Automations:      automationHandlers,
 		AI:               aiHandlers,
+		MCP:              mcpServer,
 		Billing:          billingHandlers,
 		Webhooks:         webhookHandlers,
 		Events:           eventHandlers,

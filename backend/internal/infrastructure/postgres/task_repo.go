@@ -346,9 +346,12 @@ func (r *TaskRepo) Search(ctx context.Context, orgID string, f project.SearchFil
 	if err != nil {
 		return nil, fmt.Errorf("task search: label: %w", err)
 	}
+	// A non-user principal — an org API key ("apikey:<id>") — has no project
+	// membership: the nil uuid matches none, so it sees only org-visible
+	// projects (same fallback as ProjectRepo.List).
 	userID, err := parseUUID(f.UserID)
 	if err != nil {
-		return nil, fmt.Errorf("task search: user: %w", err)
+		userID = uuid.Nil
 	}
 	out := &project.SearchResult{}
 	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {

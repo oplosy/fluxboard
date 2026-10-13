@@ -139,6 +139,19 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-AI-004 | M | Risk signals: overdue, capacity overcommit, dependency churn, scope-change frequency. Persisted per (org, task), dismissable, never re-noises. BUSINESS+ gate via entitlement middleware (402 `ai_actions` at cap). |
 | FR-AI-005 | M | Every AI write audit-logged (`severity=ai`, metadata: model, tokens, kind). Org-level master switch + per-surface toggle, enforced server-side (direct API call also 403 when off). |
 | FR-AI-006 | M | Tenant isolation: prompt context org-scoped only. Cross-tenant probe returns 404 like every other surface. `ai_runs`/`ai_risks` are `[T]` with RLS through `TenantPool`. |
-| FR-AI-007 | S | Minimal MCP: `POST /api/v1/mcp` JSON-RPC with ~15 typed tools over HybridAuth (session or `fbk_live_` key). Same RBAC/scope gates as HTTP. Concurrent-connection cap scales with plan tier. |
+| FR-AI-007 | S | MCP server: `POST /api/v1/mcp`, standard MCP over Streamable HTTP (dual-era: 2026-07-28 + 2025-x handshake, ADR-034), authenticated by an `fbk_live_` key whose org scopes the call. Tools carry read/write scope; same tenant/rate-limit/metering chain as HTTP. |
 | FR-AI-008 | S | Token/action metering through the existing usage pipeline (FR-BILL-007): monthly cap, 402 at breach, AI input/output 30-day retention with owner-pool purge job. |
 | FR-AI-009 | M | Plan apply: draft items → tasks in one (project, column). Cheap rules pre-validate (≤ 50 items, title, priority, dates); writes go through taskuc (numbering, ranks, events, automation inherited; CONTRIBUTOR+ enforced); first failure trashes already-created tasks so the board never holds partial state. `Idempotency-Key` required. |
+
+## AGT — Agents (full spec: ADR-033, ADR-034)
+
+| ID | P | Requirement |
+|----|---|-------------|
+| FR-AGT-001 | M | Agents connect with any MCP client to `POST /api/v1/mcp` using one URL and one API key; read tools (`projects.list`, `projects.board`, `tasks.search`, `tasks.get`) and the governed-AI tools are available. |
+| FR-AGT-002 | M | Agent principal: org-owned (team-shared), named, with its own key; assignable, @mentionable, shown as itself in activity/audit. Created/paused/deleted by ADMIN+. Default role CONTRIBUTOR, never OWNER/ADMIN. |
+| FR-AGT-003 | M | `max_agents` per plan (Free 1, Pro 10, Business unlimited); agents are not seats. Creation over the cap → 402 `plan_limit_exceeded` (`limit=max_agents`). Paused agents count; per-org admin override. |
+| FR-AGT-004 | M | `tasks.claim` with a renewable lease (default 30 min, `tasks.heartbeat`); expired leases auto-release; a held task → 409 with the holder. |
+| FR-AGT-005 | M | Task `version` on every agent write; stale → 409 `version_conflict` with the current task. Write tools accept an idempotency key (24 h). |
+| FR-AGT-006 | M | Column roles per project (`backlog`, `todo`, `in_progress`, `review`, `done`); agents move tasks by role. |
+| FR-AGT-007 | M | Agents can move work up to `review` with a result summary; only a human moves to `done` (agent → 403 `human_approval_required`). |
+| FR-AGT-008 | S | Agent write tools: `tasks.next` (ready = unblocked, unclaimed, highest priority), `tasks.update`, `tasks.comment`, `tasks.create` (incl. subtasks), `tasks.link`, `tasks.submit_for_review`. |
