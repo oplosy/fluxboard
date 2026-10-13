@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/admin"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 )
 
@@ -223,6 +224,30 @@ func TestResolveMissDerivesAndCaches(t *testing.T) {
 	got, _ = h.svc.Resolve(context.Background(), "org2")
 	if got.Plan != billing.PlanPro || got.MaxProjects != 50 {
 		t.Fatalf("pro active should resolve Pro: %+v", got)
+	}
+}
+
+type fakeOverrides map[string][]admin.EntitlementOverride
+
+func (f fakeOverrides) List(_ context.Context, orgID string) ([]admin.EntitlementOverride, error) {
+	return f[orgID], nil
+}
+
+func TestResolveAppliesOverrides(t *testing.T) {
+	h := newHarness()
+	h.svc.overs = fakeOverrides{"org1": {
+		{OrgID: "org1", Key: "max_agents", Value: "7"},
+		{OrgID: "org1", Key: "max_projects", Value: "oops"}, // malformed: skipped
+	}}
+	got, err := h.svc.Resolve(context.Background(), "org1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Plan != billing.PlanFree || got.MaxAgents != 7 || got.MaxProjects != 3 {
+		t.Fatalf("override not applied on top of Free: %+v", got)
+	}
+	if cached := h.cache.m["org1"]; cached.MaxAgents != 7 {
+		t.Fatalf("the cached envelope must include overrides: %+v", cached)
 	}
 }
 

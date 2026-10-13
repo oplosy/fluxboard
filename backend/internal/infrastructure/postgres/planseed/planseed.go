@@ -18,6 +18,7 @@ type Plan struct {
 	Name               string
 	MaxMembers         int
 	MaxProjects        int
+	MaxAgents          int
 	MaxStorageBytes    int64
 	APIRatePerMin      int
 	AuditRetentionDays int
@@ -27,9 +28,9 @@ type Plan struct {
 
 // Plans is the catalog.
 var Plans = []Plan{
-	{"free", "Free", 5, 3, 2 << 30, 60, 7, false, 0},
-	{"pro", "Pro", 25, 50, 50 << 30, 300, 30, false, 1200},
-	{"business", "Business", -1, -1, 500 << 30, 1200, 365, true, 4900},
+	{"free", "Free", 5, 3, 1, 2 << 30, 60, 7, false, 0},
+	{"pro", "Pro", 25, 50, 10, 50 << 30, 300, 30, false, 1200},
+	{"business", "Business", -1, -1, -1, 500 << 30, 1200, 365, true, 4900},
 }
 
 // Execer is satisfied by *pgxpool.Pool, *pgx.Conn and pgx.Tx.
@@ -38,13 +39,14 @@ type Execer interface {
 }
 
 const upsert = `
-INSERT INTO plans (code, name, max_members, max_projects, max_storage_bytes,
+INSERT INTO plans (code, name, max_members, max_projects, max_agents, max_storage_bytes,
                    api_rate_per_min, audit_retention_days, metered, monthly_price)
-VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
 ON CONFLICT (code) DO UPDATE SET
   name                 = EXCLUDED.name,
   max_members          = EXCLUDED.max_members,
   max_projects         = EXCLUDED.max_projects,
+  max_agents           = EXCLUDED.max_agents,
   max_storage_bytes    = EXCLUDED.max_storage_bytes,
   api_rate_per_min     = EXCLUDED.api_rate_per_min,
   audit_retention_days = EXCLUDED.audit_retention_days,
@@ -59,7 +61,7 @@ const Currency = "usd"
 func Upsert(ctx context.Context, db Execer) error {
 	for _, p := range Plans {
 		if _, err := db.Exec(ctx, upsert, p.Code, p.Name, p.MaxMembers, p.MaxProjects,
-			p.MaxStorageBytes, p.APIRatePerMin, p.AuditRetentionDays, p.Metered, p.MonthlyPrice); err != nil {
+			p.MaxAgents, p.MaxStorageBytes, p.APIRatePerMin, p.AuditRetentionDays, p.Metered, p.MonthlyPrice); err != nil {
 			return fmt.Errorf("seed plan %q: %w", p.Code, err)
 		}
 	}

@@ -13,20 +13,11 @@ type Deps struct {
 	Tasks    *taskuc.Service
 }
 
-// needsAgentIdentity are tools that create rows authored by the caller. An API
-// key is not a user, so they cannot run over MCP until agents become
-// principals (ADR-033 step 2); listing them would only offer a broken tool.
-var needsAgentIdentity = map[string]bool{"ai.plan_apply": true}
-
 // Tools assembles the server's tool set.
 func Tools(d Deps) []Tool {
 	tools := workTools(d.Projects, d.Tasks)
 	if d.AI != nil {
-		for _, t := range aiTools(d.AI) {
-			if !needsAgentIdentity[t.Name] {
-				tools = append(tools, t)
-			}
-		}
+		tools = append(tools, aiTools(d.AI)...)
 	}
 	return tools
 }

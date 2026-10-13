@@ -257,11 +257,15 @@ func (s *Server) handleLegacy(r *http.Request, req rpcRequest, p requestParams, 
 // --- tools ---------------------------------------------------------------
 
 // list returns the tools the caller may invoke: read-only keys never see write
-// tools (the list may vary by the credential presented, not by connection).
+// tools, org keys never see agent-only tools (the list may vary by the
+// credential presented, not by connection).
 func (s *Server) list(c Caller) []toolDescriptor {
 	out := make([]toolDescriptor, 0, len(s.tools))
 	for i := range s.tools {
 		if s.tools[i].Write && !c.CanWrite {
+			continue
+		}
+		if s.tools[i].AgentOnly && c.AgentID == "" {
 			continue
 		}
 		out = append(out, s.tools[i].descriptor())
@@ -291,6 +295,9 @@ func (s *Server) call(r *http.Request, req rpcRequest, p requestParams, c Caller
 	}
 	if tool.Write && !c.CanWrite {
 		return toolError("This API key is read-only; " + tool.Name + " needs a key with the write scope."), nil
+	}
+	if tool.AgentOnly && c.AgentID == "" {
+		return toolError(tool.Name + " needs an agent's key: create an agent in Settings → Agents and connect with its key."), nil
 	}
 
 	out, err := tool.Call(r.Context(), c, args)
@@ -338,7 +345,7 @@ func callerFrom(r *http.Request) (Caller, bool) {
 	if !ok || tc.OrgID != info.OrgID {
 		return Caller{}, false
 	}
-	return Caller{OrgID: tc.OrgID, UserID: tc.UserID, Role: tc.Role, CanWrite: info.HasWrite()}, true
+	return Caller{OrgID: tc.OrgID, UserID: tc.UserID, AgentID: info.AgentID, Role: tc.Role, CanWrite: info.HasWrite()}, true
 }
 
 func (s *Server) originAllowed(origin string) bool {

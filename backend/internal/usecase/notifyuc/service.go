@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/notify"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/uuidv7"
 )
@@ -302,7 +303,8 @@ func (s *Service) NotifyTargets(ctx context.Context, orgID, actorID string, cat 
 
 // deliver creates in-app rows for opted-in targets, enqueues email outbox rows
 // (rechecked at send), and publishes notification.created per recipient. Pref is
-// read per target; absent ⇒ opt-in default (both channels).
+// read per target; absent ⇒ opt-in default (both channels). Agents get in-app
+// rows only: their address is unroutable (ADR-033).
 func (s *Service) deliver(ctx context.Context, orgID, actorID string, ts []target) {
 	if len(ts) == 0 {
 		return
@@ -319,7 +321,7 @@ func (s *Service) deliver(ctx context.Context, orgID, actorID string, ts []targe
 				CreatedAt: now,
 			})
 		}
-		if s.outbox != nil && notify.WantsChannel(pref, t.cat, notify.ChannelEmail) {
+		if s.outbox != nil && notify.WantsChannel(pref, t.cat, notify.ChannelEmail) && !agent.IsAgentEmail(t.ref.Email) {
 			emails = append(emails, t)
 		}
 	}

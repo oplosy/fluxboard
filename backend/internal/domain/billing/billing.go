@@ -8,6 +8,8 @@ package billing
 import (
 	"encoding/json"
 	"errors"
+	"strconv"
+	"strings"
 	"time"
 )
 
@@ -59,6 +61,7 @@ type Plan struct {
 	MeteredAPIPriceID     string
 	MaxMembers            int
 	MaxProjects           int
+	MaxAgents             int // agents are not seats (ADR-033)
 	MaxStorageBytes       int64
 	APIRatePerMin         int
 	AuditRetentionDays    int
@@ -134,6 +137,7 @@ type Entitlements struct {
 	Status             SubStatus
 	MaxMembers         int
 	MaxProjects        int
+	MaxAgents          int
 	MaxStorageBytes    int64
 	APIRatePerMin      int
 	AuditRetentionDays int
@@ -161,12 +165,40 @@ func DeriveEntitlements(subscribed, free Plan, status SubStatus) Entitlements {
 		Status:             status,
 		MaxMembers:         p.MaxMembers,
 		MaxProjects:        p.MaxProjects,
+		MaxAgents:          p.MaxAgents,
 		MaxStorageBytes:    p.MaxStorageBytes,
 		APIRatePerMin:      p.APIRatePerMin,
 		AuditRetentionDays: p.AuditRetentionDays,
 		Metered:            p.Metered,
 		PastDueWarning:     status == StatusPastDue,
 	}
+}
+
+// ApplyOverride sets one limit from a platform-admin override (FR-ADM-002):
+// key is the limit's JSON name, value an integer (-1 = unlimited). It reports
+// false, leaving e unchanged, for an unknown key or a malformed value.
+func (e *Entitlements) ApplyOverride(key, value string) bool {
+	n, err := strconv.ParseInt(strings.TrimSpace(value), 10, 64)
+	if err != nil || n < -1 {
+		return false
+	}
+	switch key {
+	case "max_members":
+		e.MaxMembers = int(n)
+	case "max_projects":
+		e.MaxProjects = int(n)
+	case "max_agents":
+		e.MaxAgents = int(n)
+	case "max_storage_bytes":
+		e.MaxStorageBytes = n
+	case "api_rate_per_min":
+		e.APIRatePerMin = int(n)
+	case "audit_retention_days":
+		e.AuditRetentionDays = int(n)
+	default:
+		return false
+	}
+	return true
 }
 
 // Allows reports whether current < max (or max is unlimited). Callers pass the

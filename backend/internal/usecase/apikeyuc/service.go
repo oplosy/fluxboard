@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/agent"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/apikey"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/audit"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/uuidv7"
@@ -101,7 +102,8 @@ func (s *Service) Revoke(ctx context.Context, orgID, id, actor string) error {
 
 // ResolveByKey authenticates an inbound key secret: hash → lookup → active check →
 // best-effort last-used touch. Returns domain.ErrUnauthorized for any miss/revoked
-// key so the auth path cannot distinguish "no such key" from "revoked".
+// key so the auth path cannot distinguish "no such key" from "revoked". A paused
+// agent's key is agent.ErrPaused (ADR-033).
 func (s *Service) ResolveByKey(ctx context.Context, plaintext string) (apikey.APIKey, error) {
 	if !apikey.LooksLikeKey(plaintext) {
 		return apikey.APIKey{}, domain.ErrUnauthorized
@@ -116,6 +118,9 @@ func (s *Service) ResolveByKey(ctx context.Context, plaintext string) (apikey.AP
 	}
 	if !k.Active() {
 		return apikey.APIKey{}, domain.ErrUnauthorized
+	}
+	if k.AgentPaused {
+		return apikey.APIKey{}, agent.ErrPaused
 	}
 	if err := s.keys.TouchLastUsed(ctx, hash); err != nil {
 		s.logger.Warn("apikey touch last_used failed", "err", err)

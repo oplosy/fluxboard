@@ -55,6 +55,7 @@ func planFromRow(row gen.Plan) billing.Plan {
 		MeteredAPIPriceID:     derefStr(row.MeteredApiPriceID),
 		MaxMembers:            int(row.MaxMembers),
 		MaxProjects:           int(row.MaxProjects),
+		MaxAgents:             int(row.MaxAgents),
 		MaxStorageBytes:       row.MaxStorageBytes,
 		APIRatePerMin:         int(row.ApiRatePerMin),
 		AuditRetentionDays:    int(row.AuditRetentionDays),

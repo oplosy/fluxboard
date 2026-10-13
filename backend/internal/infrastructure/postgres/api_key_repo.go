@@ -81,7 +81,15 @@ func (r *APIKeyRepo) GetByHash(ctx context.Context, keyHash string) (apikey.APIK
 		}
 		return apikey.APIKey{}, err
 	}
-	return apiKeyFromRow(row), nil
+	k := apiKeyFromRow(gen.ApiKey{
+		ID: row.ID, OrgID: row.OrgID, Prefix: row.Prefix, KeyHash: row.KeyHash,
+		Name: row.Name, Scopes: row.Scopes, CreatedBy: row.CreatedBy,
+		LastUsedAt: row.LastUsedAt, RevokedAt: row.RevokedAt, CreatedAt: row.CreatedAt,
+		AgentID: row.AgentID,
+	})
+	k.AgentRole = derefStr(row.AgentRole)
+	k.AgentPaused = k.AgentID != "" && derefStr(row.AgentStatus) != "active"
+	return k, nil
 }
 
 // Revoke stamps revoked_at on one active key the org owns; ErrNotFound otherwise.
@@ -120,6 +128,7 @@ func apiKeyFromRow(row gen.ApiKey) apikey.APIKey {
 		LastUsedAt: tsPtr(row.LastUsedAt),
 		RevokedAt:  tsPtr(row.RevokedAt),
 		CreatedAt:  row.CreatedAt,
+		AgentID:    derefStr(uuidStrPtr(row.AgentID)),
 	}
 }
 

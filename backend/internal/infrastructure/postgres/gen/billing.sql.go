@@ -16,7 +16,7 @@ const getPlan = `-- name: GetPlan :one
 
 SELECT code, name, stripe_product_id, seat_price_id, metered_storage_price_id,
        metered_api_price_id, max_members, max_projects, max_storage_bytes,
-       api_rate_per_min, audit_retention_days, metered, monthly_price
+       api_rate_per_min, audit_retention_days, metered, monthly_price, max_agents
 FROM plans
 WHERE code = $1
 `
@@ -42,6 +42,7 @@ func (q *Queries) GetPlan(ctx context.Context, code string) (Plan, error) {
 		&i.AuditRetentionDays,
 		&i.Metered,
 		&i.MonthlyPrice,
+		&i.MaxAgents,
 	)
 	return i, err
 }
@@ -163,7 +164,7 @@ func (q *Queries) ListInvoicesByOrg(ctx context.Context, orgID uuid.UUID) ([]Inv
 const listPlans = `-- name: ListPlans :many
 SELECT code, name, stripe_product_id, seat_price_id, metered_storage_price_id,
        metered_api_price_id, max_members, max_projects, max_storage_bytes,
-       api_rate_per_min, audit_retention_days, metered, monthly_price
+       api_rate_per_min, audit_retention_days, metered, monthly_price, max_agents
 FROM plans
 ORDER BY max_projects
 `
@@ -191,6 +192,7 @@ func (q *Queries) ListPlans(ctx context.Context) ([]Plan, error) {
 			&i.AuditRetentionDays,
 			&i.Metered,
 			&i.MonthlyPrice,
+			&i.MaxAgents,
 		); err != nil {
 			return nil, err
 		}

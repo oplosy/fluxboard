@@ -57,6 +57,13 @@ const (
 	ActionAPIKeyCreate Action = "apikey.create"
 	ActionAPIKeyRevoke Action = "apikey.revoke"
 
+	// Agents (ADR-033, FR-AGT-002).
+	ActionAgentCreate    Action = "agent.create"
+	ActionAgentUpdate    Action = "agent.update"
+	ActionAgentDelete    Action = "agent.delete"
+	ActionAgentKeyCreate Action = "agent.key_create"
+	ActionAgentKeyRevoke Action = "agent.key_revoke"
+
 	// Governed AI layer (ADR-025, FR-AI-005). Every AI write logs ai.run with
 	// model+tokens in metadata; risk dismissals log ai.risk_dismiss.
 	ActionAIRun         Action = "ai.run"

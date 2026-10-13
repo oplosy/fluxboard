@@ -15,6 +15,7 @@ import (
 	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/admin"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/billing"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/notify"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/uuidv7"
@@ -35,10 +36,13 @@ type Deps struct {
 	Gateway  billing.StripeGateway
 	Cache    billing.EntitlementCache
 	Seats    billing.SeatCounter // billable members = Stripe seat quantity (B02)
-	Bus      notify.EventBus     // realtime billing.status_changed; nil ⇒ no publish
-	Logger   *slog.Logger
-	Now      func() time.Time // injectable for tests; defaults to time.Now
-	BaseURL  string           // public app base, for Checkout/Portal return URLs
+	// Overrides are platform-admin per-org limits applied on top of the plan
+	// (FR-ADM-002); nil ⇒ plan limits only.
+	Overrides OverrideLister
+	Bus       notify.EventBus // realtime billing.status_changed; nil ⇒ no publish
+	Logger    *slog.Logger
+	Now       func() time.Time // injectable for tests; defaults to time.Now
+	BaseURL   string           // public app base, for Checkout/Portal return URLs
 }
 
 // Service implements the billing application logic.
@@ -52,6 +56,7 @@ type Service struct {
 	gw       billing.StripeGateway
 	cache    billing.EntitlementCache
 	seats    billing.SeatCounter
+	overs    OverrideLister
 	bus      notify.EventBus
 	logger   *slog.Logger
 	now      func() time.Time
@@ -71,8 +76,13 @@ func New(d Deps) *Service {
 	return &Service{
 		plans: d.Plans, subs: d.Subs, invoices: d.Invoices, events: d.Events,
 		webhooks: d.Webhooks, usage: d.Usage, gw: d.Gateway, cache: d.Cache,
-		seats: d.Seats, bus: d.Bus, logger: logger, now: now, baseURL: d.BaseURL,
+		seats: d.Seats, overs: d.Overrides, bus: d.Bus, logger: logger, now: now, baseURL: d.BaseURL,
 	}
+}
+
+// OverrideLister lists an org's entitlement overrides (admin.OverrideRepository).
+type OverrideLister interface {
+	List(ctx context.Context, orgID string) ([]admin.EntitlementOverride, error)
 }
 
 func newID() string { return uuidv7.New().String() }
@@ -127,11 +137,32 @@ func (s *Service) Resolve(ctx context.Context, orgID string) (billing.Entitlemen
 		}
 		ent = billing.DeriveEntitlements(*subscribed, *free, sub.Status)
 	}
+	if err := s.applyOverrides(ctx, orgID, &ent); err != nil {
+		return billing.Entitlements{}, err
+	}
 
 	if err := s.cache.Set(ctx, orgID, ent, entTTL); err != nil {
 		s.logger.WarnContext(ctx, "entitlement cache set failed", "org", orgID, "err", err)
 	}
 	return ent, nil
+}
+
+// applyOverrides layers the org's admin overrides onto ent. A malformed or
+// unknown override is logged and skipped, never fatal.
+func (s *Service) applyOverrides(ctx context.Context, orgID string, ent *billing.Entitlements) error {
+	if s.overs == nil {
+		return nil
+	}
+	os, err := s.overs.List(ctx, orgID)
+	if err != nil {
+		return fmt.Errorf("load entitlement overrides: %w", err)
+	}
+	for _, o := range os {
+		if !ent.ApplyOverride(o.Key, o.Value) {
+			s.logger.WarnContext(ctx, "ignoring entitlement override", "org", orgID, "key", o.Key)
+		}
+	}
+	return nil
 }
 
 // Summary returns the billing page snapshot for an org. FR-BILL-001.
