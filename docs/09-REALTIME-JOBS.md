@@ -55,6 +55,7 @@ purges. Worker: `cmd/worker`, concurrency 10, Prometheus metrics exported.
 | `stats:rollup` | nightly 03:00 | recomputes yesterday's `project_stats_daily` rows (UPSERT) |
 | `gc:orphan_uploads` | nightly | deletes MinIO objects for `attachments.status='pending'` older than 24 h, then rows |
 | `gc:trash_purge` | nightly | hard-deletes tasks with `deleted_at < now()-30d` (+ MinIO objects) |
+| `maintenance:claim_sweep` | every 1 min | clears agent claims whose lease ran out and the assignment they made (ADR-033); lapsed claims already block nobody, this tidies the board |
 | `org:hard_delete` | scheduled at soft-delete +14 d | guarded by `purge_after <= now()` re-check; cancels if restored |
 | `audit:retention` | nightly | per-org delete older than plan retention (privileged role — app role lacks DELETE) |
 | `billing:reconcile` | nightly 04:00 | 06 §8; pure read+heal, naturally idempotent |

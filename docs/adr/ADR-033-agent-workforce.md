@@ -84,6 +84,28 @@ themselves: pick a task, do it, report, hand over. Today that cannot work:
 - **MCP.** `ai.plan_apply` is agent-only: listed for and callable by an
   agent's key, hidden from org keys.
 
+## Implementation notes (step 3)
+
+- **Version.** `tasks.version` is bumped by a `BEFORE UPDATE` trigger whenever
+  any column other than `rank`, `updated_at`, `version` and the claim columns
+  changes, so every writer counts (REST, bulk, automations, agents) and a
+  caller can never set it. A rank-only reorder and lease renewals do not bump
+  it: an agent's edit should not fail because a card was dragged within its
+  column. REST `PATCH /tasks/{id}` and `/position` take an optional `version`;
+  the web task editors send it, so a person can no longer silently overwrite
+  an agent's change (409 → the latest is shown).
+- **Claim rules** (one conditional `UPDATE`, so two agents racing for a task
+  cannot both win): a claim succeeds when no other agent holds a live lease
+  and the assignee is empty, the caller, or the holder of a lapsed claim. A
+  claim assigns the task to the agent. Heartbeat extends only a live claim
+  the caller holds; release clears the claim and the agent's assignment.
+  Lease: default 30 min, 1–240. A lapsed claim is inert; the
+  `maintenance:claim_sweep` job (every minute) clears it and the assignment it
+  made. Deleting an agent releases its claims at once.
+- **Idempotency.** The MCP server adds key-based replay (Redis, 24 h) to write
+  tools that are not idempotent by nature; tools idempotent by design (claim,
+  heartbeat, `ai.plan_apply` with its own key) are left alone.
+
 ## Rejected
 
 - **Agents as members/seats:** bills an automated worker like a person and
