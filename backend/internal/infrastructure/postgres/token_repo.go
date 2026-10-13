@@ -64,6 +64,39 @@ func (r *TokenRepo) Consume(ctx context.Context, purpose auth.TokenPurpose, hash
 		}
 		return nil, fmt.Errorf("ott consume: %w", err)
 	}
+	return ottFromRow(row), nil
+}
+
+// Peek returns a still-usable token without consuming it.
+func (r *TokenRepo) Peek(ctx context.Context, purpose auth.TokenPurpose, hash []byte) (*auth.OneTimeToken, error) {
+	row, err := r.q.GetActiveOneTimeToken(ctx, gen.GetActiveOneTimeTokenParams{
+		Purpose:   string(purpose),
+		TokenHash: hash,
+	})
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return nil, domain.ErrNotFound // missing / expired / already used
+		}
+		return nil, fmt.Errorf("ott peek: %w", err)
+	}
+	return ottFromRow(row), nil
+}
+
+// InvalidateAll retires every outstanding token of purpose for the user.
+func (r *TokenRepo) InvalidateAll(ctx context.Context, userID string, purpose auth.TokenPurpose) error {
+	uid, err := parseUUID(userID)
+	if err != nil {
+		return fmt.Errorf("ott invalidate: %w", err)
+	}
+	if err := r.q.InvalidateUserOneTimeTokens(ctx, gen.InvalidateUserOneTimeTokensParams{
+		UserID: uid, Purpose: string(purpose),
+	}); err != nil {
+		return fmt.Errorf("ott invalidate: %w", err)
+	}
+	return nil
+}
+
+func ottFromRow(row gen.OneTimeToken) *auth.OneTimeToken {
 	var payload map[string]any
 	if len(row.Payload) > 0 {
 		_ = json.Unmarshal(row.Payload, &payload)
@@ -77,5 +110,5 @@ func (r *TokenRepo) Consume(ctx context.Context, purpose auth.TokenPurpose, hash
 		ExpiresAt: row.ExpiresAt,
 		UsedAt:    tsPtr(row.UsedAt),
 		CreatedAt: row.CreatedAt,
-	}, nil
+	}
 }

@@ -27,3 +27,28 @@ var (
 	// (with a Retry-After header set by the HTTP layer).
 	ErrRateLimited = errors.New("rate limited")
 )
+
+// CodedError refines a sentinel with a stable machine-readable Code (rendered as
+// the envelope `code`, e.g. "email_taken") and, for input problems, the request
+// Field it concerns. Kind decides the HTTP status; Message is user-safe. Clients
+// branch on Code, never on Message.
+type CodedError struct {
+	Kind    error
+	Code    string
+	Field   string
+	Message string
+	Details map[string]any
+}
+
+func (e *CodedError) Error() string { return e.Message }
+func (e *CodedError) Unwrap() error { return e.Kind }
+
+// NewCodedError builds a CodedError not tied to a single request field.
+func NewCodedError(kind error, code, message string) *CodedError {
+	return &CodedError{Kind: kind, Code: code, Message: message}
+}
+
+// NewFieldError builds a validation CodedError for one request field.
+func NewFieldError(field, code, message string) *CodedError {
+	return &CodedError{Kind: ErrValidation, Code: code, Field: field, Message: message}
+}

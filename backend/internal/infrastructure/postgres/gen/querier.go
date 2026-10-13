@@ -124,6 +124,9 @@ type Querier interface {
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
 	// to 401 rather than a silent miss.
 	GetAPIKeyByHash(ctx context.Context, keyHash string) (ApiKey, error)
+	// Read-only validity check: lets a flow validate its input (e.g. the new
+	// password) before burning the single-use token with ConsumeOneTimeToken.
+	GetActiveOneTimeToken(ctx context.Context, arg GetActiveOneTimeTokenParams) (OneTimeToken, error)
 	GetActiveSprint(ctx context.Context, arg GetActiveSprintParams) (Sprint, error)
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (Attachment, error)
 	GetAutomationRule(ctx context.Context, arg GetAutomationRuleParams) (AutomationRule, error)
@@ -180,6 +183,9 @@ type Querier interface {
 	// the tenant tx (webhook_repo) and on the plain pool (processed_event_repo).
 	InsertProcessedEvent(ctx context.Context, arg InsertProcessedEventParams) (int64, error)
 	InsertSlugHistory(ctx context.Context, arg InsertSlugHistoryParams) error
+	// Retires every outstanding token of one purpose for a user, so older links
+	// from earlier emails stop working once one of them has been used.
+	InvalidateUserOneTimeTokens(ctx context.Context, arg InvalidateUserOneTimeTokensParams) error
 	// Most recent recorded value for a metric on/before a day (point-in-time
 	// dimensions: seats, storage). ErrNoRows ⇒ caller treats as 0.
 	LatestUsageValue(ctx context.Context, arg LatestUsageValueParams) (int64, error)

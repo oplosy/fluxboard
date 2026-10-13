@@ -8,7 +8,6 @@ import (
 	"encoding/json"
 	"errors"
 	"log/slog"
-	"net"
 	"net/http"
 	"strconv"
 	"time"
@@ -17,6 +16,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/auth"
 	mw "github.com/mesutokul/fluxboard/backend/internal/interface/http/middleware"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/http/response"
+	"github.com/mesutokul/fluxboard/backend/internal/pkg/reqmeta"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/authuc"
 )
 
@@ -38,7 +38,7 @@ type AuthHandlers struct {
 // AuthConfig carries the collaborators for the auth surface.
 type AuthConfig struct {
 	Service   *authuc.Service
-	States    auth.OAuthStateStore // nil when Google OAuth is unconfigured
+	States    auth.OAuthStateStore // nil when no OAuth provider is configured
 	Logger    *slog.Logger
 	WebOrigin string
 	// CookieSecure should be true in prod (HTTPS); false in local dev over http
@@ -60,26 +60,24 @@ type registerReq struct {
 	Name     string `json:"name"`
 }
 
-// Register creates an account. The response is identical whether or not the
-// email was already taken (no enumeration, docs/04-AUTH.md §6).
+// Register creates an account and mails the verification link. Field problems
+// (invalid email, weak password, email already registered — ADR-032) come back
+// as coded errors with details.fields for inline form messages.
 func (h *AuthHandlers) Register(w http.ResponseWriter, r *http.Request) {
 	var req registerReq
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	res, err := h.svc.Register(r.Context(), authuc.RegisterInput{
+	if _, err := h.svc.Register(r.Context(), authuc.RegisterInput{
 		Email: req.Email, Password: req.Password, Name: req.Name,
-	})
-	if err != nil {
+	}); err != nil {
 		response.Error(w, err)
 		return
 	}
 	// The verification link is sent by the usecase via the mailer (dev builds
-	// log it when SMTP is unconfigured). Response is identical regardless of
-	// whether an account was created (no enumeration).
-	_ = res
+	// log it when SMTP is unconfigured).
 	response.JSON(w, http.StatusAccepted, map[string]string{
-		"message": "If the email is valid, a verification link has been sent.",
+		"message": "Account created. Check your email for the verification link.",
 	})
 }
 
@@ -134,16 +132,22 @@ func (h *AuthHandlers) writeSession(w http.ResponseWriter, t *authuc.Tokens) {
 	})
 }
 
-// writeAuthError adds a Retry-After header for throttled logins, then renders
-// the standard error envelope.
+// writeAuthError renders throttled logins with a Retry-After header and
+// details.retry_after (the header is not readable cross-origin), and everything
+// else as the standard error envelope.
 func writeAuthError(w http.ResponseWriter, err error) {
 	var rle *authuc.RateLimitError
 	if errors.As(err, &rle) {
-		secs := int(rle.RetryAfter.Seconds())
+		secs := int(rle.RetryAfter.Seconds() + 0.999)
 		if secs < 1 {
 			secs = 1
 		}
 		w.Header().Set("Retry-After", strconv.Itoa(secs))
+		response.Error(w, &domain.CodedError{
+			Kind: domain.ErrRateLimited, Code: "rate_limited", Message: rle.Error(),
+			Details: map[string]any{"retry_after": secs},
+		})
+		return
 	}
 	response.Error(w, err)
 }
@@ -252,19 +256,10 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, v any) bool {
 	return true
 }
 
-// clientIP extracts a best-effort client IP for the session row. Trusts
-// X-Forwarded-For's first hop when present (dev/behind-proxy); otherwise
-// RemoteAddr. Returns "" when unparseable (stored as NULL).
+// clientIP is the client address resolved once by the ClientMeta middleware,
+// which only honours X-Forwarded-For hops appended by trusted proxies (a
+// client-supplied header must not dodge the per-IP login throttle). "" when
+// unknown (stored as NULL).
 func clientIP(r *http.Request) string {
-	if xff := r.Header.Get("X-Forwarded-For"); xff != "" {
-		if host, _, err := net.SplitHostPort(xff); err == nil {
-			return host
-		}
-		return xff
-	}
-	host, _, err := net.SplitHostPort(r.RemoteAddr)
-	if err != nil {
-		return ""
-	}
-	return host
+	return reqmeta.From(r.Context()).IP
 }

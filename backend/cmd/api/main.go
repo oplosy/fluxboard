@@ -33,6 +33,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/casbinx"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/mailer"
 	miniox "github.com/mesutokul/fluxboard/backend/internal/infrastructure/minio"
+	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/oauthgithub"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/oauthgoogle"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/postgres"
 	redisx "github.com/mesutokul/fluxboard/backend/internal/infrastructure/redis"
@@ -230,6 +231,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		return nil, err
 	}
 	google := loadGoogleProvider(cfg, logger)
+	githubProvider := loadGitHubProvider(cfg, logger)
 
 	authSvc := authuc.New(authuc.Deps{
 		Users:    userRepo,
@@ -244,11 +246,12 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Verifier: verifier,
 		Cipher:   cipher,
 		Google:   google,
+		GitHub:   githubProvider,
 		Observer: obs,
 		Audit:    auditRepo,
 	})
 	var states auth.OAuthStateStore
-	if google != nil {
+	if google != nil || githubProvider != nil {
 		states = oauthStates
 	}
 	authHandlers := handlers.NewAuthHandlers(handlers.AuthConfig{
@@ -513,36 +516,37 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	}
 
 	a.handler = httpx.NewRouter(httpx.Deps{
-		Logger:         logger,
-		WebOrigin:      cfg.WebOrigin,
-		Health:         httpx.Health{DB: pool, Redis: redisPinger{rdb}, Migrations: postgres.SchemaVersion{Pool: pool, Want: schemaWant}},
-		MetricsHTTP:    promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
-		Auth:           authHandlers,
-		User:           userHandlers,
-		Orgs:           orgHandlers,
-		Projects:       projectHandlers,
-		Tasks:          taskHandlers,
-		PublicForms:    publicFormHandlers,
-		Automations:    automationHandlers,
-		AI:             aiHandlers,
-		Billing:        billingHandlers,
-		Webhooks:       webhookHandlers,
-		Events:         eventHandlers,
-		Notifications:  notificationHandlers,
-		APIKeys:        apiKeyHandlers,
-		AuditView:      auditHandlers,
-		Analytics:      analyticsHandlers,
-		Admin:          adminHandlers,
-		OpenAPI:        handlers.NewOpenAPIHandlers(),
-		DevDocs:        !cfg.IsProd(),
-		Authenticator:  authenticator,
-		Tenant:         tenantGuard,
-		Entitlement:    entitlementGuard,
-		AuthThrottle:   &mw.AuthThrottle{Limiter: authThrottleLimiter, Logger: logger},
-		RateLimit:      rateLimiter,
-		PlatformAdmin:  platformGuard,
-		APIKeyResolver: apiKeyResolver,
-		HTTPMetrics:    httpMetrics,
+		Logger:           logger,
+		WebOrigin:        cfg.WebOrigin,
+		Health:           httpx.Health{DB: pool, Redis: redisPinger{rdb}, Migrations: postgres.SchemaVersion{Pool: pool, Want: schemaWant}},
+		MetricsHTTP:      promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
+		Auth:             authHandlers,
+		User:             userHandlers,
+		Orgs:             orgHandlers,
+		Projects:         projectHandlers,
+		Tasks:            taskHandlers,
+		PublicForms:      publicFormHandlers,
+		Automations:      automationHandlers,
+		AI:               aiHandlers,
+		Billing:          billingHandlers,
+		Webhooks:         webhookHandlers,
+		Events:           eventHandlers,
+		Notifications:    notificationHandlers,
+		APIKeys:          apiKeyHandlers,
+		AuditView:        auditHandlers,
+		Analytics:        analyticsHandlers,
+		Admin:            adminHandlers,
+		OpenAPI:          handlers.NewOpenAPIHandlers(),
+		DevDocs:          !cfg.IsProd(),
+		Authenticator:    authenticator,
+		Tenant:           tenantGuard,
+		Entitlement:      entitlementGuard,
+		AuthThrottle:     &mw.AuthThrottle{Limiter: authThrottleLimiter, Logger: logger},
+		RateLimit:        rateLimiter,
+		PlatformAdmin:    platformGuard,
+		APIKeyResolver:   apiKeyResolver,
+		HTTPMetrics:      httpMetrics,
+		TrustedProxyHops: cfg.TrustedProxyHops,
 	})
 
 	return a, nil
@@ -595,13 +599,25 @@ func loadTOTPCipher(cfg *config.Config, logger *slog.Logger) (authuc.SecretCiphe
 }
 
 // loadGoogleProvider builds the Google OAuth provider, or a nil interface when
-// client credentials are unset (Google login routes then 403).
+// client credentials are unset (Google sign-in is then hidden and its routes
+// bounce back to /login).
 func loadGoogleProvider(cfg *config.Config, logger *slog.Logger) auth.OAuthProvider {
 	if cfg.GoogleClientID == "" || cfg.GoogleClientSecret == "" {
 		logger.Warn("GOOGLE_CLIENT_ID/GOOGLE_CLIENT_SECRET not set; Google OAuth is disabled")
 		return nil
 	}
 	return oauthgoogle.New(cfg.GoogleClientID, cfg.GoogleClientSecret, cfg.GoogleRedirectURL)
+}
+
+// loadGitHubProvider builds the GitHub OAuth provider, or a nil interface when
+// client credentials are unset (GitHub sign-in is then hidden and its routes
+// bounce back to /login).
+func loadGitHubProvider(cfg *config.Config, logger *slog.Logger) auth.OAuthProvider {
+	if cfg.GitHubClientID == "" || cfg.GitHubClientSecret == "" {
+		logger.Warn("GITHUB_CLIENT_ID/GITHUB_CLIENT_SECRET not set; GitHub OAuth is disabled")
+		return nil
+	}
+	return oauthgithub.New(cfg.GitHubClientID, cfg.GitHubClientSecret, cfg.GitHubRedirectURL)
 }
 
 // loadObjectStore builds the MinIO object store, or a nil interface when

@@ -68,3 +68,55 @@ func (q *Queries) CreateOneTimeToken(ctx context.Context, arg CreateOneTimeToken
 	)
 	return err
 }
+
+const getActiveOneTimeToken = `-- name: GetActiveOneTimeToken :one
+SELECT id, purpose, user_id, token_hash, payload, expires_at, used_at, created_at
+FROM one_time_tokens
+WHERE purpose = $1
+  AND token_hash = $2
+  AND used_at IS NULL
+  AND expires_at > now()
+`
+
+type GetActiveOneTimeTokenParams struct {
+	Purpose   string `json:"purpose"`
+	TokenHash []byte `json:"token_hash"`
+}
+
+// Read-only validity check: lets a flow validate its input (e.g. the new
+// password) before burning the single-use token with ConsumeOneTimeToken.
+func (q *Queries) GetActiveOneTimeToken(ctx context.Context, arg GetActiveOneTimeTokenParams) (OneTimeToken, error) {
+	row := q.db.QueryRow(ctx, getActiveOneTimeToken, arg.Purpose, arg.TokenHash)
+	var i OneTimeToken
+	err := row.Scan(
+		&i.ID,
+		&i.Purpose,
+		&i.UserID,
+		&i.TokenHash,
+		&i.Payload,
+		&i.ExpiresAt,
+		&i.UsedAt,
+		&i.CreatedAt,
+	)
+	return i, err
+}
+
+const invalidateUserOneTimeTokens = `-- name: InvalidateUserOneTimeTokens :exec
+UPDATE one_time_tokens
+SET used_at = now()
+WHERE user_id = $1
+  AND purpose = $2
+  AND used_at IS NULL
+`
+
+type InvalidateUserOneTimeTokensParams struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Purpose string    `json:"purpose"`
+}
+
+// Retires every outstanding token of one purpose for a user, so older links
+// from earlier emails stop working once one of them has been used.
+func (q *Queries) InvalidateUserOneTimeTokens(ctx context.Context, arg InvalidateUserOneTimeTokensParams) error {
+	_, err := q.db.Exec(ctx, invalidateUserOneTimeTokens, arg.UserID, arg.Purpose)
+	return err
+}

@@ -33,6 +33,16 @@ type Config struct {
 	GoogleClientSecret string `envconfig:"GOOGLE_CLIENT_SECRET" secret:"true"`
 	GoogleRedirectURL  string `envconfig:"GOOGLE_REDIRECT_URL" default:"http://localhost:8080/api/v1/auth/oauth/google/callback"`
 
+	// GitHub OAuth App (PKCE). Empty client id => GitHub sign-in is hidden/off.
+	GitHubClientID     string `envconfig:"GITHUB_CLIENT_ID"`
+	GitHubClientSecret string `envconfig:"GITHUB_CLIENT_SECRET" secret:"true"`
+	GitHubRedirectURL  string `envconfig:"GITHUB_REDIRECT_URL" default:"http://localhost:8080/api/v1/auth/oauth/github/callback"`
+
+	// TrustedProxyHops is the number of reverse proxies in front of the API that
+	// append to X-Forwarded-For (1 behind a single Caddy/nginx/ALB). 0 ignores
+	// the header, so a client cannot forge its IP to dodge per-IP throttles.
+	TrustedProxyHops int `envconfig:"TRUSTED_PROXY_HOPS" default:"0"`
+
 	// Billing (Phase 4). StripeMode selects the gateway: "stub" (dev fake, no
 	// external calls; webhook signatures are a shared-secret HMAC of the body)
 	// or "live" (real stripe-go against the test/prod API). In stub mode
@@ -105,6 +115,12 @@ func (c *Config) ValidateAPI() error {
 	if c.GoogleClientID != "" && !strings.HasPrefix(c.GoogleRedirectURL, "https://") {
 		errs = append(errs, fmt.Errorf("GOOGLE_REDIRECT_URL must be an https URL, got %q", c.GoogleRedirectURL))
 	}
+	if c.GitHubClientID != "" && !strings.HasPrefix(c.GitHubRedirectURL, "https://") {
+		errs = append(errs, fmt.Errorf("GITHUB_REDIRECT_URL must be an https URL, got %q", c.GitHubRedirectURL))
+	}
+	if c.TrustedProxyHops < 0 {
+		errs = append(errs, fmt.Errorf("TRUSTED_PROXY_HOPS must be >= 0, got %d", c.TrustedProxyHops))
+	}
 	return prodErr(errs)
 }
 
@@ -168,6 +184,8 @@ func (c *Config) String() string {
 	fmt.Fprintf(&b, "JWTPrivateKeyPEM=%s TOTPEncKey=%s ", mask(c.JWTPrivateKeyPEM), mask(c.TOTPEncKey))
 	fmt.Fprintf(&b, "GoogleClientID=%s GoogleClientSecret=%s GoogleRedirectURL=%s ",
 		c.GoogleClientID, mask(c.GoogleClientSecret), c.GoogleRedirectURL)
+	fmt.Fprintf(&b, "GitHubClientID=%s GitHubClientSecret=%s GitHubRedirectURL=%s TrustedProxyHops=%d ",
+		c.GitHubClientID, mask(c.GitHubClientSecret), c.GitHubRedirectURL, c.TrustedProxyHops)
 	fmt.Fprintf(&b, "StripeMode=%s StripeSecretKey=%s StripeWebhookSecret=%s StripePriceSeed=%t ",
 		c.StripeMode, mask(c.StripeSecretKey), mask(c.StripeWebhookSecret), c.StripePriceSeed)
 	fmt.Fprintf(&b, "MinIOEndpoint=%s MinIOAccessKey=%s MinIOSecretKey=%s MinIOBucket=%s MinIOUseSSL=%t ",

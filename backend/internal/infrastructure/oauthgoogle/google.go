@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"time"
 
 	"golang.org/x/oauth2"
 	"golang.org/x/oauth2/google"
@@ -18,9 +19,13 @@ import (
 // userinfoEndpoint is Google's OpenID Connect userinfo URL.
 const userinfoEndpoint = "https://openidconnect.googleapis.com/v1/userinfo"
 
+// httpTimeout bounds each call to Google so a slow IdP cannot pin a request.
+const httpTimeout = 10 * time.Second
+
 // Provider is a configured Google OAuth client.
 type Provider struct {
-	cfg *oauth2.Config
+	cfg  *oauth2.Config
+	http *http.Client
 }
 
 // New builds a Provider from client credentials and the registered redirect URL.
@@ -31,7 +36,7 @@ func New(clientID, clientSecret, redirectURL string) *Provider {
 		RedirectURL:  redirectURL,
 		Endpoint:     google.Endpoint,
 		Scopes:       []string{"openid", "email", "profile"},
-	}}
+	}, http: &http.Client{Timeout: httpTimeout}}
 }
 
 var _ auth.OAuthProvider = (*Provider)(nil)
@@ -46,6 +51,7 @@ func (p *Provider) AuthCodeURL(state, codeChallenge string) string {
 
 // Exchange swaps code+verifier for a token and fetches the verified profile.
 func (p *Provider) Exchange(ctx context.Context, code, codeVerifier string) (auth.OAuthUser, error) {
+	ctx = context.WithValue(ctx, oauth2.HTTPClient, p.http)
 	tok, err := p.cfg.Exchange(ctx, code, oauth2.SetAuthURLParam("code_verifier", codeVerifier))
 	if err != nil {
 		return auth.OAuthUser{}, fmt.Errorf("google exchange: %w", err)

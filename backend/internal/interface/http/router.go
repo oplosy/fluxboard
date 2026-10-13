@@ -45,6 +45,9 @@ type Deps struct {
 	PlatformAdmin  *mw.PlatformAdminGuard // nil ⇒ /admin surface disabled
 	APIKeyResolver mw.APIKeyResolver      // nil ⇒ API-key auth path disabled (session only)
 	HTTPMetrics    mw.HTTPMetrics         // nil ⇒ no request-duration histogram (tests)
+	// TrustedProxyHops is how many reverse proxies in front of the API append to
+	// X-Forwarded-For; 0 ignores the header (direct exposure, local dev).
+	TrustedProxyHops int
 }
 
 // NewRouter assembles the router. Infrastructure middleware wrap every route;
@@ -58,7 +61,7 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(mw.Logger(d.Logger))
 	r.Use(mw.Recoverer)
 	r.Use(mw.CORS(d.WebOrigin))
-	r.Use(mw.ClientMeta) // stash client IP/UA for audit enrichment (pkg/reqmeta)
+	r.Use(mw.ClientMeta(d.TrustedProxyHops)) // stash client IP/UA for audit + throttles (pkg/reqmeta)
 	if d.HTTPMetrics != nil {
 		r.Use(mw.Metrics(d.HTTPMetrics)) // request-duration histogram (10 §5)
 	}
@@ -119,18 +122,24 @@ func NewRouter(d Deps) http.Handler {
 			a.With(throttle("register")).Post("/register", d.Auth.Register)
 			a.Post("/login", d.Auth.Login)
 			a.Post("/refresh", d.Auth.Refresh)
-			a.Post("/2fa/verify", d.Auth.Verify2FA)
+			a.With(throttle("2fa_verify")).Post("/2fa/verify", d.Auth.Verify2FA)
 			a.With(throttle("verify_email")).Post("/verify-email/request", d.Auth.VerifyEmailRequest)
 			a.Post("/verify-email/confirm", d.Auth.VerifyEmailConfirm)
 			a.With(throttle("password_forgot")).Post("/password/forgot", d.Auth.PasswordForgot)
 			a.With(throttle("password_reset")).Post("/password/reset", d.Auth.PasswordReset)
-			a.Get("/oauth/google/start", d.Auth.OAuthGoogleStart)
-			a.Get("/oauth/google/callback", d.Auth.OAuthGoogleCallback)
+			a.With(throttle("password_reset_check")).Post("/password/reset/validate", d.Auth.PasswordResetValidate)
+			// OAuth (Google, GitHub). The provider path segment keeps the
+			// registered Google callback URL (/oauth/google/callback) valid.
+			a.Get("/oauth/providers", d.Auth.OAuthProviders)
+			a.With(throttle("oauth_start")).Get("/oauth/{provider}/start", d.Auth.OAuthStart)
+			a.Get("/oauth/{provider}/callback", d.Auth.OAuthCallback)
 
 			// Authenticated auth endpoints.
 			a.Group(func(pr chi.Router) {
 				pr.Use(d.Authenticator.Authenticate)
 				pr.Use(mw.RejectImpersonationWrite) // FR-ADM-003: no self-account mutation under an impersonation token
+				pr.Get("/me", d.Auth.AuthMe)        // reachable before email verification
+				pr.With(throttle("verify_email")).Post("/verify-email/resend", d.Auth.VerifyEmailResendSelf)
 				pr.Post("/logout", d.Auth.Logout)
 				pr.Post("/logout-all", d.Auth.LogoutAll)
 				pr.Post("/password/change", d.Auth.PasswordChange)

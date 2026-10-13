@@ -1,6 +1,10 @@
 package argon2x
 
-import "testing"
+import (
+	"errors"
+	"strings"
+	"testing"
+)
 
 // TestParams is the regression guard from docs/04-AUTH.md §6 checklist: a silent
 // downgrade of Argon2id parameters is a security incident, so pin them here.
@@ -40,21 +44,31 @@ func TestHashVerifyRoundTrip(t *testing.T) {
 func TestCheckPolicy(t *testing.T) {
 	cases := []struct {
 		name, pw, email string
-		wantErr         bool
+		wantCode        string // "" => accepted
 	}{
-		{"ok", "a-strong-passphrase-123", "user@example.com", false},
-		{"too short", "short", "user@example.com", true},
-		{"breached", "password123", "user@example.com", true},
-		{"equals local part", "user", "user@example.com", true},
+		{"ok", "a-strong-passphrase-123", "user@example.com", ""},
+		{"too short", "short", "user@example.com", CodeTooShort},
+		{"too long", strings.Repeat("a", 129), "user@example.com", CodeTooLong},
+		{"length counts runes not bytes", "şifreğüçöıŞİ", "user@example.com", ""},
+		{"breached", "password1234", "user@example.com", CodeBreached},
+		{"equals local part", "longusername", "longusername@example.com", CodeMatchesEmail},
+		{"equals whole email", "me@example.com", "me@example.com", CodeMatchesEmail},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
 			err := CheckPolicy(c.pw, c.email)
-			if (err != nil) != c.wantErr {
-				t.Fatalf("CheckPolicy(%q) err=%v wantErr=%v", c.pw, err, c.wantErr)
+			if c.wantCode == "" {
+				if err != nil {
+					t.Fatalf("CheckPolicy(%q) = %v, want nil", c.pw, err)
+				}
+				return
 			}
-			if err != nil && !IsPolicyError(err) {
-				t.Fatalf("expected PolicyError, got %T", err)
+			var pe PolicyError
+			if !errors.As(err, &pe) {
+				t.Fatalf("expected PolicyError, got %T (%v)", err, err)
+			}
+			if pe.Code != c.wantCode {
+				t.Fatalf("code = %q, want %q", pe.Code, c.wantCode)
 			}
 		})
 	}

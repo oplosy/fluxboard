@@ -37,11 +37,33 @@ func JSON(w http.ResponseWriter, status int, v any) {
 }
 
 // Error maps err to the standard envelope + status. Internal errors never leak
-// their message. 401s carry a WWW-Authenticate: Bearer challenge.
+// their message. 401s carry a WWW-Authenticate: Bearer challenge. A
+// domain.CodedError refines the code and, when it names a field, adds
+// details.fields = {field: message} for inline form errors.
 func Error(w http.ResponseWriter, err error) {
 	status, code := statusFor(err)
 
 	msg := err.Error()
+	var details map[string]any
+	var ce *domain.CodedError
+	if status != http.StatusInternalServerError && errors.As(err, &ce) {
+		if ce.Code != "" {
+			code = ce.Code
+		}
+		msg = ce.Message
+		if len(ce.Details) > 0 {
+			details = make(map[string]any, len(ce.Details)+1)
+			for k, v := range ce.Details {
+				details[k] = v
+			}
+		}
+		if ce.Field != "" {
+			if details == nil {
+				details = map[string]any{}
+			}
+			details["fields"] = map[string]string{ce.Field: ce.Message}
+		}
+	}
 	if status == http.StatusInternalServerError {
 		msg = "internal server error"
 	}
@@ -52,6 +74,7 @@ func Error(w http.ResponseWriter, err error) {
 	JSON(w, status, Envelope{Error: ErrorBody{
 		Code:      code,
 		Message:   msg,
+		Details:   details,
 		RequestID: w.Header().Get("X-Request-ID"),
 	}})
 }
@@ -92,6 +115,7 @@ func AuthThrottled(w http.ResponseWriter, retryAfterSecs int) {
 	JSON(w, http.StatusTooManyRequests, Envelope{Error: ErrorBody{
 		Code:      "rate_limited",
 		Message:   "too many requests; please try again later",
+		Details:   map[string]any{"retry_after": retryAfterSecs},
 		RequestID: w.Header().Get("X-Request-ID"),
 	}})
 }
