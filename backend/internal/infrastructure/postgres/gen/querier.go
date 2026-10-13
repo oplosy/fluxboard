@@ -23,6 +23,13 @@ type Querier interface {
 	// distinct rank, so the repo issues per-task MoveTask calls instead of a set-based
 	// UPDATE (the (column_id, rank) unique index forbids sharing a rank).
 	BulkAssignTasks(ctx context.Context, arg BulkAssignTasksParams) (int64, error)
+	// Agent claims (ADR-033, FR-AGT-004) ----------------------------------------
+	// A claim is held while lease_expires_at is in the future. Each statement is a
+	// single conditional UPDATE, so two agents racing for a task cannot both win.
+	// Claim (or renew) a task for an agent and assign it. Blocked by another
+	// agent's live lease, or by an assignee who is neither this agent nor the
+	// holder of a lapsed claim (a person, or someone assigned by a person).
+	ClaimTask(ctx context.Context, arg ClaimTaskParams) (int64, error)
 	// Removes the org logo (empty-string logo_key in UpdateProfile). A separate
 	// query because coalesce() above cannot express "set NULL".
 	ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
@@ -183,6 +190,8 @@ type Querier interface {
 	GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) (GetTrashedTaskRow, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
+	// Extend a live claim the agent holds; a lapsed or foreign claim matches nothing.
+	HeartbeatTask(ctx context.Context, arg HeartbeatTaskParams) (int64, error)
 	// Notifications — Phase 5 (docs/09-REALTIME-JOBS.md §3, FR-NTF-002). notifications
 	// [T]: cursor pagination by created_at DESC; unread = read_at IS NULL.
 	InsertNotification(ctx context.Context, arg InsertNotificationParams) error
@@ -308,6 +317,13 @@ type Querier interface {
 	NextTaskNumber(ctx context.Context, arg NextTaskNumberParams) (int32, error)
 	// Hard-delete tasks trashed before the cutoff (nightly purge job, per-tenant).
 	PurgeExpiredTrash(ctx context.Context, arg PurgeExpiredTrashParams) (int64, error)
+	// A deleted agent gives back every claim it holds, and the assignments those
+	// claims made, so its tasks are free again at once (ADR-033).
+	ReleaseAgentClaims(ctx context.Context, arg ReleaseAgentClaimsParams) error
+	// Sweeper: clear lapsed claims and the assignment they made.
+	ReleaseExpiredClaims(ctx context.Context, orgID uuid.UUID) (int64, error)
+	// Give a claim back: the task is unassigned again if the agent still holds it.
+	ReleaseTask(ctx context.Context, arg ReleaseTaskParams) (int64, error)
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) (int64, error)
 	RestoreOrg(ctx context.Context, id uuid.UUID) error
 	// Restore only succeeds if the original (column_id, rank) slot is still free;

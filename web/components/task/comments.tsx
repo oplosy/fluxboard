@@ -7,6 +7,7 @@ import { addComment, deleteComment, editComment, listComments } from '@/lib/api/
 import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
 import { useOrgMembers, memberName } from '@/lib/org/use-members';
+import { useOrgAgents } from '@/lib/org/use-agents';
 import { useToast } from '@/components/ui/toast';
 import { useNow } from '@/lib/use-now';
 import { MentionInput } from './mention-input';
@@ -22,6 +23,7 @@ export function Comments({ taskId, canComment }: { taskId: string; canComment: b
   const { orgId, isAdmin } = useOrg();
   const { userId } = useAuth();
   const { byId } = useOrgMembers();
+  const { names: agentNames } = useOrgAgents();
   const { toast } = useToast();
   const qc = useQueryClient();
   const key = ['comments', orgId, taskId] as const;
@@ -75,7 +77,7 @@ export function Comments({ taskId, canComment }: { taskId: string; canComment: b
           return (
             <li key={c.id} className="text-sm">
               <div className="flex items-center gap-2">
-                <span className="font-medium">{memberName(byId, c.author_id)}</span>
+                <span className="font-medium">{memberName(byId, c.author_id, agentNames)}</span>
                 <span className="text-xs text-muted-foreground">
                   {new Date(c.created_at).toLocaleString()}
                 </span>

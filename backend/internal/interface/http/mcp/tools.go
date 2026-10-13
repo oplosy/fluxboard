@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"math"
 	"strings"
+	"time"
 
 	"github.com/google/uuid"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 )
 
@@ -175,6 +177,21 @@ func toolErrorMessage(err error) (string, bool) {
 	var ae *ArgError
 	if errors.As(err, &ae) {
 		return "Invalid arguments: " + ae.Msg, true
+	}
+	var cc *project.ClaimConflict
+	if errors.As(err, &cc) {
+		msg := "Task is held by " + cc.HolderID
+		if cc.LeaseExpiresAt != nil {
+			msg += " (claim lease until " + cc.LeaseExpiresAt.UTC().Format(time.RFC3339) + ")"
+		} else {
+			msg += " (assignee)"
+		}
+		return msg + ". Pick another task.", true
+	}
+	var vc *project.VersionConflict
+	if errors.As(err, &vc) && vc.Current != nil {
+		return fmt.Sprintf("Version conflict: the task is now at version %d. Re-read it with tasks.get and retry.",
+			vc.Current.Version), true
 	}
 	var ce *domain.CodedError
 	if errors.As(err, &ce) && ce.Message != "" {

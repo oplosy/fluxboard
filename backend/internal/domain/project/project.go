@@ -205,6 +205,11 @@ type Task struct {
 	CreatedBy   string
 	CreatedAt   time.Time
 	UpdatedAt   time.Time
+	// Version increases on every content change (FR-AGT-005).
+	Version int64
+	// ClaimedBy/LeaseExpiresAt: an agent's claim (FR-AGT-004); see ClaimActive.
+	ClaimedBy      *string
+	LeaseExpiresAt *time.Time
 }
 
 // Subtask is a flat one-level checklist item under a task (FR-TASK-003).

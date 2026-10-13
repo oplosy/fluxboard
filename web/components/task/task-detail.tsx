@@ -3,12 +3,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Trash2 } from 'lucide-react';
+import { Bot, Trash2 } from 'lucide-react';
 
-import { getTask, listTaskLabels, attachLabel, detachLabel, trashTask, updateTask } from '@/lib/api/tasks';
+import { conflictCurrent, getTask, listTaskLabels, attachLabel, detachLabel, trashTask, updateTask } from '@/lib/api/tasks';
 import { listLabels } from '@/lib/api/labels';
 import { useOrg } from '@/lib/org/context';
 import { useOrgMembers } from '@/lib/org/use-members';
+import { claimLive, useOrgAgents } from '@/lib/org/use-agents';
 import { useToast } from '@/components/ui/toast';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import type { Priority, Task, UpdateTaskInput } from '@/lib/api/types';
@@ -22,8 +23,11 @@ import { ActivityTimeline } from './activity-timeline';
 
 // Full task detail (FR-TASK-001/002). Inline-edits every field; UpdateTask
 // replaces the whole field set, so each change is merged onto the current task
-// and sent as a unit. Subtasks/comments/attachments/activity manage their own
-// queries. A GUEST sees a read-only view (the server enforces the same).
+// and sent as a unit, with the version it was read at: if someone (an agent,
+// say) changed the task meanwhile, the server refuses it and we show the
+// latest instead of overwriting their work (FR-AGT-005). Subtasks/comments/
+// attachments/activity manage their own queries. A GUEST sees a read-only view
+// (the server enforces the same).
 function toInput(t: Task, patch: Partial<UpdateTaskInput>): UpdateTaskInput {
   return {
     title: t.title,
@@ -32,9 +36,11 @@ function toInput(t: Task, patch: Partial<UpdateTaskInput>): UpdateTaskInput {
     priority: t.priority as Priority,
     start_date: t.start_date ?? null,
     due_date: t.due_date ?? null,
+    version: t.version,
     ...patch,
   };
 }
+
 
 function dateInputValue(iso?: string): string {
   if (!iso) return '';
@@ -52,6 +58,7 @@ export function TaskDetail({
 }) {
   const { orgId, slug, role } = useOrg();
   const { members } = useOrgMembers();
+  const { agents, names: agentNames } = useOrgAgents();
   const { toast } = useToast();
   const router = useRouter();
   const qc = useQueryClient();
@@ -76,7 +83,21 @@ export function TaskDetail({
       qc.invalidateQueries({ queryKey: ['board', projectId] });
       qc.invalidateQueries({ queryKey: ['activity', orgId, taskId] });
     },
-    onError: () => toast({ title: 'Couldn’t save changes', variant: 'error' }),
+    onError: (err) => {
+      const current = conflictCurrent(err);
+      if (current) {
+        qc.setQueryData(taskKey, current);
+        qc.invalidateQueries({ queryKey: ['board', projectId] });
+        qc.invalidateQueries({ queryKey: ['activity', orgId, taskId] });
+        toast({
+          title: 'This task just changed',
+          description: 'Someone else updated it, so your edit wasn’t saved. The latest version is shown — apply your change again.',
+          variant: 'error',
+        });
+        return;
+      }
+      toast({ title: 'Couldn’t save changes', variant: 'error' });
+    },
   });
 
   const attach = useMutation({
@@ -195,12 +216,32 @@ export function TaskDetail({
                   {m.name || m.email}
                 </option>
               ))}
+              {agents.length > 0 ? (
+                <optgroup label="Agents">
+                  {agents.map((a) => (
+                    <option key={a.id} value={a.id}>
+                      {a.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ) : null}
             </select>
           ) : (
             <span className="text-sm">
-              {members.find((m) => m.user_id === task.assignee_id)?.name ?? 'Unassigned'}
+              {members.find((m) => m.user_id === task.assignee_id)?.name ??
+                (task.assignee_id ? agentNames.get(task.assignee_id) : undefined) ??
+                'Unassigned'}
             </span>
           )}
+          {claimLive(task) ? (
+            <p className="mt-2 flex items-start gap-1.5 text-xs text-muted-foreground">
+              <Bot className="mt-px h-3.5 w-3.5 shrink-0 text-primary" aria-hidden />
+              <span>
+                {agentNames.get(task.claimed_by as string) ?? 'An agent'} is working on this until{' '}
+                {new Date(task.lease_expires_at as string).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}.
+              </span>
+            </p>
+          ) : null}
         </Field>
 
         <Field label="Priority">

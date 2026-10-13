@@ -413,24 +413,27 @@ type Subtask struct {
 }
 
 type Task struct {
-	ID           uuid.UUID          `json:"id"`
-	OrgID        uuid.UUID          `json:"org_id"`
-	ProjectID    uuid.UUID          `json:"project_id"`
-	ColumnID     uuid.UUID          `json:"column_id"`
-	Number       int32              `json:"number"`
-	Title        string             `json:"title"`
-	Description  string             `json:"description"`
-	AssigneeID   pgtype.UUID        `json:"assignee_id"`
-	Priority     string             `json:"priority"`
-	DueDate      pgtype.Timestamptz `json:"due_date"`
-	Rank         string             `json:"rank"`
-	CreatedBy    uuid.UUID          `json:"created_by"`
-	CreatedAt    time.Time          `json:"created_at"`
-	UpdatedAt    time.Time          `json:"updated_at"`
-	DeletedAt    pgtype.Timestamptz `json:"deleted_at"`
-	SearchVector interface{}        `json:"search_vector"`
-	SprintID     pgtype.UUID        `json:"sprint_id"`
-	StartDate    pgtype.Timestamptz `json:"start_date"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	DeletedAt      pgtype.Timestamptz `json:"deleted_at"`
+	SearchVector   interface{}        `json:"search_vector"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 type TaskActivity struct {

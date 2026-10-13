@@ -49,14 +49,20 @@ type taskResp struct {
 	CreatedBy   string     `json:"created_by"`
 	CreatedAt   time.Time  `json:"created_at"`
 	UpdatedAt   time.Time  `json:"updated_at"`
+	Version     int64      `json:"version"`
+	// Set only while an agent's claim is live (ADR-033).
+	ClaimedBy      *string    `json:"claimed_by,omitempty"`
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 }
 
 func toTaskResp(t *project.Task) taskResp {
+	claimedBy, lease := liveClaim(t)
 	return taskResp{
 		ID: t.ID, ProjectID: t.ProjectID, ColumnID: t.ColumnID, Number: t.Number,
 		Title: t.Title, Description: t.Description, AssigneeID: t.AssigneeID,
 		Priority: string(t.Priority), StartDate: t.StartDate, DueDate: t.DueDate, Rank: t.Rank,
 		CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
+		Version: t.Version, ClaimedBy: claimedBy, LeaseExpiresAt: lease,
 	}
 }
 
@@ -188,6 +194,9 @@ type updateTaskReq struct {
 	Priority    string     `json:"priority"`
 	StartDate   *time.Time `json:"start_date"`
 	DueDate     *time.Time `json:"due_date"`
+	// Version, when sent, is the version the client read; a task that changed
+	// since → 409 version_conflict with the current task (FR-AGT-005).
+	Version *int64 `json:"version"`
 }
 
 // UpdateTask edits a task's fields (CONTRIBUTOR+).
@@ -204,9 +213,10 @@ func (h *TaskHandlers) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	t, err := h.svc.UpdateTask(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "taskId"), taskuc.UpdateTaskInput{
 		Title: req.Title, Description: req.Description, AssigneeID: req.AssigneeID,
 		Priority: project.Priority(req.Priority), StartDate: req.StartDate, DueDate: req.DueDate,
+		IfVersion: req.Version,
 	}, tc.Role)
 	if err != nil {
-		response.Error(w, err)
+		taskError(w, err)
 		return
 	}
 	response.JSON(w, http.StatusOK, toTaskResp(t))

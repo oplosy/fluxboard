@@ -32,6 +32,17 @@ func (s *IdempotencyStore) Get(ctx context.Context, key string) (string, error) 
 	return v, nil
 }
 
+// SetNX stores val under key for ttl only if the key is absent; it reports
+// whether it did.
+func (s *IdempotencyStore) SetNX(ctx context.Context, key, val string, ttl time.Duration) (bool, error) {
+	return s.rdb.SetNX(ctx, key, val, ttl).Result()
+}
+
+// Del removes key.
+func (s *IdempotencyStore) Del(ctx context.Context, key string) error {
+	return s.rdb.Del(ctx, key).Err()
+}
+
 // Set stores val under key for ttl.
 func (s *IdempotencyStore) Set(ctx context.Context, key, val string, ttl time.Duration) error {
 	return s.rdb.Set(ctx, key, val, ttl).Err()

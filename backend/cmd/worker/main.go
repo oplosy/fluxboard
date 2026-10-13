@@ -72,8 +72,10 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	tenantPool := postgres.NewTenantPool(pool)
+	taskRepo := postgres.NewTaskRepo(tenantPool)
 	taskSvc := taskuc.New(taskuc.Deps{
-		Tasks:       postgres.NewTaskRepo(tenantPool),
+		Tasks:       taskRepo,
+		Concurrency: taskRepo, // lapsed-claim sweeper (ADR-033)
 		Subtasks:    postgres.NewSubtaskRepo(tenantPool),
 		Labels:      postgres.NewLabelRepo(tenantPool),
 		Comments:    postgres.NewCommentRepo(tenantPool),

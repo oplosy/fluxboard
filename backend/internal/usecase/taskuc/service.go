@@ -57,8 +57,11 @@ type Deps struct {
 	Events       notify.EventBus      // realtime publish; nil ⇒ no SSE events
 	Notifier     Notifier             // notification fan-out; nil ⇒ no fan-out
 	Automation   automation.Evaluator // automation rules; nil ⇒ no evaluation
-	Logger       *slog.Logger
-	Now          func() time.Time // injectable for tests; defaults to time.Now
+	// Concurrency backs version-checked writes and agent claims (ADR-033); nil ⇒
+	// a version on a write is refused and claims are unavailable.
+	Concurrency project.ConcurrencyRepository
+	Logger      *slog.Logger
+	Now         func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // Service implements the task application logic.
@@ -80,6 +83,7 @@ type Service struct {
 	events       notify.EventBus
 	notifier     Notifier
 	automation   automation.Evaluator
+	conc         project.ConcurrencyRepository
 	logger       *slog.Logger
 	now          func() time.Time
 }
@@ -99,8 +103,8 @@ func New(d Deps) *Service {
 		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, projects: d.Projects,
 		members: d.Members, boards: d.Boards, columns: d.Columns, store: d.Store,
 		entitlements: d.Entitlements, events: d.Events, notifier: d.Notifier,
-		automation: d.Automation,
-		logger:     logger, now: now,
+		automation: d.Automation, conc: d.Concurrency,
+		logger: logger, now: now,
 	}
 }
 
@@ -246,6 +250,9 @@ type UpdateTaskInput struct {
 	Priority    project.Priority
 	StartDate   *time.Time
 	DueDate     *time.Time
+	// IfVersion, when set, is the version the caller read: a task that changed
+	// since is refused with *project.VersionConflict (FR-AGT-005).
+	IfVersion *int64
 }
 
 // UpdateTask edits a task's fields and records each change (CONTRIBUTOR+).
@@ -275,7 +282,7 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 	t.Priority = in.Priority
 	t.StartDate = in.StartDate
 	t.DueDate = in.DueDate
-	if err := s.tasks.Update(ctx, orgID, t); err != nil {
+	if err := s.writeTask(ctx, orgID, t, in.IfVersion); err != nil {
 		return nil, err
 	}
 	fields := make([]string, 0, len(changes))

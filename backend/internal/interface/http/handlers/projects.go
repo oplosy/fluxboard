@@ -81,6 +81,10 @@ type taskCardResp struct {
 	SprintID     *string     `json:"sprint_id,omitempty"`
 	CreatedAt    time.Time   `json:"created_at"`
 	Rank         string      `json:"rank"`
+	Version      int64       `json:"version"`
+	// Set only while an agent's claim is live (ADR-033).
+	ClaimedBy      *string    `json:"claimed_by,omitempty"`
+	LeaseExpiresAt *time.Time `json:"lease_expires_at,omitempty"`
 }
 
 type boardColumnResp struct {
@@ -302,7 +306,9 @@ func (h *ProjectHandlers) GetBoard(w http.ResponseWriter, r *http.Request) {
 				SubtaskTotal: cv.Subtasks[t.ID].Total, SubtaskDone: cv.Subtasks[t.ID].Done,
 				SprintID:  t.SprintID,
 				CreatedAt: t.CreatedAt,
+				Version:   t.Version,
 			}
+			card.ClaimedBy, card.LeaseExpiresAt = liveClaim(&t)
 			for _, l := range cv.Labels[t.ID] {
 				ll := l
 				card.Labels = append(card.Labels, toLabelResp(&ll))
@@ -396,6 +402,7 @@ func (h *ProjectHandlers) DeleteColumn(w http.ResponseWriter, r *http.Request) {
 type positionReq struct {
 	ColumnID string `json:"column_id"`
 	Rank     string `json:"rank"`
+	Version  *int64 `json:"version"` // optional; stale → 409 version_conflict (FR-AGT-005)
 }
 
 // MoveTask relocates a task on the board (CONTRIBUTOR+, FR-PROJ-005). A rank
@@ -410,8 +417,8 @@ func (h *ProjectHandlers) MoveTask(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	if err := h.svc.MoveTask(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "taskId"), req.ColumnID, req.Rank, tc.Role); err != nil {
-		response.Error(w, err)
+	if err := h.svc.MoveTask(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "taskId"), req.ColumnID, req.Rank, req.Version, tc.Role); err != nil {
+		taskError(w, err)
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)

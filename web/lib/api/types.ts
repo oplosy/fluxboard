@@ -240,6 +240,11 @@ export interface TaskCard {
   sprint_id?: string | null;
   created_at: string;
   rank: string;
+  /** Increases on every content change; send it back to refuse stale writes. */
+  version: number;
+  /** The agent working on it, while its claim is live (ADR-033). */
+  claimed_by?: string | null;
+  lease_expires_at?: string | null;
 }
 
 /** One column with its cards in the board projection. */
@@ -272,6 +277,8 @@ export interface UpdateTaskInput {
   priority: Priority;
   start_date?: string | null;
   due_date?: string | null;
+  /** The version the edit is based on; a newer task → 409 version_conflict. */
+  version?: number;
 }
 
 /** A subtask (GET .../tasks/{taskId}/subtasks -> { subtasks: [...] }). */
@@ -463,6 +470,11 @@ export interface Task {
   created_by: string;
   created_at: string;
   updated_at: string;
+  /** Increases on every content change; send it back to refuse stale writes. */
+  version: number;
+  /** The agent working on it, while its claim is live (ADR-033). */
+  claimed_by?: string | null;
+  lease_expires_at?: string | null;
 }
 
 /** An in-app notification row (GET /orgs/{id}/notifications -> { notifications }). */

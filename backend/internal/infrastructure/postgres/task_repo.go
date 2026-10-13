@@ -21,7 +21,10 @@ type TaskRepo struct{ tp *TenantPool }
 // NewTaskRepo builds a TaskRepo over the tenant pool.
 func NewTaskRepo(tp *TenantPool) *TaskRepo { return &TaskRepo{tp: tp} }
 
-var _ project.TaskRepository = (*TaskRepo)(nil)
+var (
+	_ project.TaskRepository        = (*TaskRepo)(nil)
+	_ project.ConcurrencyRepository = (*TaskRepo)(nil)
+)
 
 // taskFrom builds a domain Task from the shared 15-column projection. sqlc emits
 // a distinct row struct per query (GetTaskRow, ListTasksByColumnRow, …) because
@@ -41,6 +44,12 @@ func taskFrom(
 		Rank:     rankv, CreatedBy: createdBy.String(),
 		CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}
+}
+
+// withClaim adds the version and claim columns to a task built by taskFrom.
+func withClaim(t project.Task, version int64, claimedBy pgtype.UUID, lease pgtype.Timestamptz) project.Task {
+	t.Version, t.ClaimedBy, t.LeaseExpiresAt = version, uuidStrPtr(claimedBy), tsPtr(lease)
+	return t
 }
 
 // Create assigns the per-project task number from the project counter and
@@ -105,9 +114,9 @@ func (r *TaskRepo) Get(ctx context.Context, orgID, id string) (*project.Task, er
 			}
 			return err
 		}
-		t := taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number, row.Title,
+		t := withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number, row.Title,
 			row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
-			row.CreatedBy, row.CreatedAt, row.UpdatedAt)
+			row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt)
 		out = &t
 		return nil
 	})
@@ -130,9 +139,9 @@ func (r *TaskRepo) ListByColumn(ctx context.Context, orgID, columnID string) ([]
 			return err
 		}
 		for _, row := range rows {
-			out = append(out, taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
+			out = append(out, withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
 				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
-				row.CreatedBy, row.CreatedAt, row.UpdatedAt))
+				row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt))
 		}
 		return nil
 	})
@@ -152,9 +161,9 @@ func (r *TaskRepo) ListByProject(ctx context.Context, orgID, projectID string) (
 			return err
 		}
 		for _, row := range rows {
-			out = append(out, taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
+			out = append(out, withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
 				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
-				row.CreatedBy, row.CreatedAt, row.UpdatedAt))
+				row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt))
 		}
 		return nil
 	})
@@ -162,6 +171,15 @@ func (r *TaskRepo) ListByProject(ctx context.Context, orgID, projectID string) (
 }
 
 func (r *TaskRepo) Update(ctx context.Context, orgID string, t *project.Task) error {
+	return r.update(ctx, orgID, t, nil)
+}
+
+// UpdateIfVersion is Update guarded by the task's version (FR-AGT-005).
+func (r *TaskRepo) UpdateIfVersion(ctx context.Context, orgID string, t *project.Task, version int64) error {
+	return r.update(ctx, orgID, t, &version)
+}
+
+func (r *TaskRepo) update(ctx context.Context, orgID string, t *project.Task, ifVersion *int64) error {
 	tid, err := parseUUID(t.ID)
 	if err != nil {
 		return fmt.Errorf("task update: %w", err)
@@ -175,18 +193,28 @@ func (r *TaskRepo) Update(ctx context.Context, orgID string, t *project.Task) er
 		n, err := q.UpdateTask(ctx, gen.UpdateTaskParams{
 			Title: t.Title, Description: t.Description, AssigneeID: assignee,
 			Priority: string(t.Priority), StartDate: nullTS(t.StartDate), DueDate: nullTS(t.DueDate), OrgID: oid, ID: tid,
+			IfVersion: ifVersion,
 		})
 		if err != nil {
 			return err
 		}
 		if n == 0 {
-			return domain.ErrNotFound
+			return missOrStale(ctx, q, oid, tid, ifVersion)
 		}
 		return nil
 	})
 }
 
 func (r *TaskRepo) Move(ctx context.Context, orgID, id, columnID, rank string) error {
+	return r.move(ctx, orgID, id, columnID, rank, nil)
+}
+
+// MoveIfVersion is Move guarded by the task's version (FR-AGT-005).
+func (r *TaskRepo) MoveIfVersion(ctx context.Context, orgID, id, columnID, rank string, version int64) error {
+	return r.move(ctx, orgID, id, columnID, rank, &version)
+}
+
+func (r *TaskRepo) move(ctx context.Context, orgID, id, columnID, rank string, ifVersion *int64) error {
 	tid, err := parseUUID(id)
 	if err != nil {
 		return fmt.Errorf("task move: id: %w", err)
@@ -197,12 +225,12 @@ func (r *TaskRepo) Move(ctx context.Context, orgID, id, columnID, rank string) e
 	}
 	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
 		oid, _ := parseUUID(orgID)
-		n, err := q.MoveTask(ctx, gen.MoveTaskParams{ColumnID: cid, Rank: rank, OrgID: oid, ID: tid})
+		n, err := q.MoveTask(ctx, gen.MoveTaskParams{ColumnID: cid, Rank: rank, OrgID: oid, ID: tid, IfVersion: ifVersion})
 		if err != nil {
 			return err
 		}
 		if n == 0 {
-			return domain.ErrNotFound
+			return missOrStale(ctx, q, oid, tid, ifVersion)
 		}
 		return nil
 	})
@@ -210,6 +238,90 @@ func (r *TaskRepo) Move(ctx context.Context, orgID, id, columnID, rank string) e
 		return domain.ErrConflict // rank already taken in that column (concurrent move)
 	}
 	return err
+}
+
+// missOrStale explains a conditional write that matched no row: the task is
+// gone (ErrNotFound) or, when a version was given, it moved on (ErrVersionConflict).
+func missOrStale(ctx context.Context, q *gen.Queries, orgID, id uuid.UUID, ifVersion *int64) error {
+	if ifVersion == nil {
+		return domain.ErrNotFound
+	}
+	if _, err := q.GetTask(ctx, gen.GetTaskParams{OrgID: orgID, ID: id}); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ErrNotFound
+		}
+		return err
+	}
+	return project.ErrVersionConflict
+}
+
+// ---- Claims (ADR-033, FR-AGT-004) -----------------------------------------
+
+// Claim claims or renews a task for an agent; false when someone else holds it.
+func (r *TaskRepo) Claim(ctx context.Context, orgID, id, agentID string, expiresAt time.Time) (bool, error) {
+	return r.claimOp(ctx, orgID, id, agentID, func(q *gen.Queries, oid, tid, aid uuid.UUID) (int64, error) {
+		return q.ClaimTask(ctx, gen.ClaimTaskParams{OrgID: oid, ID: tid, AgentID: pgUUIDOf(aid), ExpiresAt: tsVal(expiresAt)})
+	})
+}
+
+// Heartbeat extends a live claim the agent holds.
+func (r *TaskRepo) Heartbeat(ctx context.Context, orgID, id, agentID string, expiresAt time.Time) (bool, error) {
+	return r.claimOp(ctx, orgID, id, agentID, func(q *gen.Queries, oid, tid, aid uuid.UUID) (int64, error) {
+		return q.HeartbeatTask(ctx, gen.HeartbeatTaskParams{OrgID: oid, ID: tid, AgentID: pgUUIDOf(aid), ExpiresAt: tsVal(expiresAt)})
+	})
+}
+
+// Release drops the agent's claim and the assignment it made.
+func (r *TaskRepo) Release(ctx context.Context, orgID, id, agentID string) (bool, error) {
+	return r.claimOp(ctx, orgID, id, agentID, func(q *gen.Queries, oid, tid, aid uuid.UUID) (int64, error) {
+		return q.ReleaseTask(ctx, gen.ReleaseTaskParams{OrgID: oid, ID: tid, AgentID: pgUUIDOf(aid)})
+	})
+}
+
+// ReleaseExpired clears the org's lapsed claims (sweeper job).
+func (r *TaskRepo) ReleaseExpired(ctx context.Context, orgID string) (int, error) {
+	var n int64
+	err := r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		var err error
+		n, err = q.ReleaseExpiredClaims(ctx, oid)
+		return err
+	})
+	return int(n), err
+}
+
+// claimOp runs one conditional claim statement. A missing task is
+// domain.ErrNotFound; a statement that matched nothing on a live task is false.
+func (r *TaskRepo) claimOp(ctx context.Context, orgID, id, agentID string,
+	op func(q *gen.Queries, oid, tid, aid uuid.UUID) (int64, error)) (bool, error) {
+	tid, err := parseUUID(id)
+	if err != nil {
+		return false, domain.ErrNotFound
+	}
+	aid, err := parseUUID(agentID)
+	if err != nil {
+		return false, fmt.Errorf("task claim: agent: %w", err)
+	}
+	ok := false
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		n, err := op(q, oid, tid, aid)
+		if err != nil {
+			return err
+		}
+		if n > 0 {
+			ok = true
+			return nil
+		}
+		if _, err := q.GetTask(ctx, gen.GetTaskParams{OrgID: oid, ID: tid}); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return domain.ErrNotFound
+			}
+			return err
+		}
+		return nil
+	})
+	return ok, err
 }
 
 // ---- Trash (FR-TASK-009) --------------------------------------------------
@@ -277,6 +389,7 @@ func (r *TaskRepo) GetTrashed(ctx context.Context, orgID, id string) (*project.T
 			SprintID: uuidStrPtr(row.SprintID),
 			Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
 			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+			Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 		}
 		out = &t
 		return nil
@@ -305,6 +418,7 @@ func (r *TaskRepo) ListTrashed(ctx context.Context, orgID, projectID string) ([]
 				SprintID: uuidStrPtr(row.SprintID),
 				Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
 				CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+				Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 			})
 		}
 		return nil
@@ -374,6 +488,7 @@ func (r *TaskRepo) Search(ctx context.Context, orgID string, f project.SearchFil
 				SprintID: uuidStrPtr(row.SprintID),
 				Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
 				CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
+				Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 			})
 		}
 		return nil

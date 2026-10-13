@@ -108,8 +108,8 @@ GET    /orgs/{orgId}/projects/{key}/analytics        rollup data (FR-AN-001)
 GET    /orgs/{orgId}/projects/{key}/tasks            ?column=&assignee=&label=&priority=&q=&cursor=
 POST   /orgs/{orgId}/projects/{key}/tasks            create (FR-TASK-001)
 GET    /orgs/{orgId}/tasks/{taskId}                  full detail (subtasks, labels, activity head)
-PATCH  /orgs/{orgId}/tasks/{taskId}                  field edits (+expected_updated_at)
-PATCH  /orgs/{orgId}/tasks/{taskId}/position         {column_id, rank}  → 409 rank_conflict
+PATCH  /orgs/{orgId}/tasks/{taskId}                  field edits (+version) → 409 version_conflict
+PATCH  /orgs/{orgId}/tasks/{taskId}/position         {column_id, rank, version?}  → 409 rank_conflict | version_conflict
 POST   /orgs/{orgId}/tasks/bulk                      {task_ids[], op: move|assign|label, ...}
 DELETE /orgs/{orgId}/tasks/{taskId}                  → trash
 POST   /orgs/{orgId}/tasks/{taskId}/restore
@@ -154,6 +154,20 @@ API-key requests: org inferred from key (no `{orgId}` mismatch allowed — key
 bound to a different org than the path → 403), scope `write` required for all
 non-GET, rate limit headers per FR-API-002. Session-auth requests share the
 same limiter keyed `rl:api:{orgId}:{userId}`.
+
+### Task versions and claims (ADR-033, FR-AGT-004/005)
+
+Every task carries `version`, bumped by the database on each content change
+(not on a rank-only reorder, nor on claim/lease bookkeeping). A write that
+sends `version` is applied only if the task is still at it; otherwise 409:
+
+```json
+{"error":{"code":"version_conflict","message":"…","details":{"current":{…task…}}}}
+```
+
+Without `version` the write is unconditional, as before. Task and board-card
+payloads also carry `claimed_by` + `lease_expires_at` while an agent's claim
+is live (omitted otherwise: a lapsed claim blocks nobody).
 
 ## 8a. Agents (ADR-033, FR-AGT-002/003)
 
@@ -217,7 +231,15 @@ GET|DELETE /mcp    405 (no standalone stream, no sessions)
   `tasks.get`, `ai.parse`, `ai.plan_draft`, `ai.digest`, `ai.chat`,
   `ai.risks_scan`, `ai.risks_list`; write (needs a write-scoped key; hidden
   from read keys) — `ai.risks_dismiss`; agent-only (an agent's key, hidden
-  from org keys) — `ai.plan_apply`. Business failures come back as `isError: true` tool
+  from org keys) — `ai.plan_apply`, `tasks.claim` (assigns the task to the
+  agent with a lease, default 30 min, 1–240; renewing its own claim is fine;
+  another agent's live claim or a person's assignment → tool error naming the
+  holder), `tasks.heartbeat` (extends a live claim; a lapsed one must be
+  claimed again), `tasks.release` (ends the claim, unassigns if still the
+  assignee). Task summaries carry `version`, `claimed_by`, `lease_expires_at`.
+  Write tools that are not idempotent by nature accept `idempotency_key` (or
+  the `Idempotency-Key` header): the first successful result is replayed for
+  24 h; the same key with other arguments is refused. Business failures come back as `isError: true` tool
   results; unknown tools / malformed arguments as `-32602`; internal errors as
   `-32603` with no detail.
 - **Client setup:** `claude mcp add --transport http fluxboard https://<host>/api/v1/mcp --header "Authorization: Bearer fbk_live_…"`.

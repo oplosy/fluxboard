@@ -38,6 +38,41 @@ func (q *Queries) BulkAssignTasks(ctx context.Context, arg BulkAssignTasksParams
 	return result.RowsAffected(), nil
 }
 
+const claimTask = `-- name: ClaimTask :execrows
+
+UPDATE tasks
+SET claimed_by = $1, lease_expires_at = $2, assignee_id = $1
+WHERE org_id = $3 AND id = $4 AND deleted_at IS NULL
+  AND (claimed_by IS NULL OR claimed_by = $1 OR lease_expires_at <= now())
+  AND (assignee_id IS NULL OR assignee_id = $1 OR assignee_id = claimed_by)
+`
+
+type ClaimTaskParams struct {
+	AgentID   pgtype.UUID        `json:"agent_id"`
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	ID        uuid.UUID          `json:"id"`
+}
+
+// Agent claims (ADR-033, FR-AGT-004) ----------------------------------------
+// A claim is held while lease_expires_at is in the future. Each statement is a
+// single conditional UPDATE, so two agents racing for a task cannot both win.
+// Claim (or renew) a task for an agent and assign it. Blocked by another
+// agent's live lease, or by an assignee who is neither this agent nor the
+// holder of a lapsed claim (a person, or someone assigned by a person).
+func (q *Queries) ClaimTask(ctx context.Context, arg ClaimTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, claimTask,
+		arg.AgentID,
+		arg.ExpiresAt,
+		arg.OrgID,
+		arg.ID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const createTask = `-- name: CreateTask :exec
 
 INSERT INTO tasks (id, org_id, project_id, column_id, number, title, description,
@@ -84,7 +119,8 @@ func (q *Queries) CreateTask(ctx context.Context, arg CreateTaskParams) error {
 
 const getTask = `-- name: GetTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND id = $2 AND deleted_at IS NULL
 `
@@ -95,22 +131,25 @@ type GetTaskParams struct {
 }
 
 type GetTaskRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 // Live tasks only; trashed tasks are addressable through the Trash queries.
@@ -134,13 +173,17 @@ func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, e
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
+		&i.ClaimedBy,
+		&i.LeaseExpiresAt,
 	)
 	return i, err
 }
 
 const getTrashedTask = `-- name: GetTrashedTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND id = $2 AND deleted_at IS NOT NULL
 `
@@ -151,22 +194,25 @@ type GetTrashedTaskParams struct {
 }
 
 type GetTrashedTaskRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 func (q *Queries) GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) (GetTrashedTaskRow, error) {
@@ -189,13 +235,44 @@ func (q *Queries) GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) 
 		&i.CreatedBy,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Version,
+		&i.ClaimedBy,
+		&i.LeaseExpiresAt,
 	)
 	return i, err
 }
 
+const heartbeatTask = `-- name: HeartbeatTask :execrows
+UPDATE tasks SET lease_expires_at = $1
+WHERE org_id = $2 AND id = $3 AND deleted_at IS NULL
+  AND claimed_by = $4 AND lease_expires_at > now()
+`
+
+type HeartbeatTaskParams struct {
+	ExpiresAt pgtype.Timestamptz `json:"expires_at"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	ID        uuid.UUID          `json:"id"`
+	AgentID   pgtype.UUID        `json:"agent_id"`
+}
+
+// Extend a live claim the agent holds; a lapsed or foreign claim matches nothing.
+func (q *Queries) HeartbeatTask(ctx context.Context, arg HeartbeatTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, heartbeatTask,
+		arg.ExpiresAt,
+		arg.OrgID,
+		arg.ID,
+		arg.AgentID,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listTasksByColumn = `-- name: ListTasksByColumn :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND column_id = $2 AND deleted_at IS NULL
 ORDER BY rank
@@ -207,22 +284,25 @@ type ListTasksByColumnParams struct {
 }
 
 type ListTasksByColumnRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 func (q *Queries) ListTasksByColumn(ctx context.Context, arg ListTasksByColumnParams) ([]ListTasksByColumnRow, error) {
@@ -251,6 +331,9 @@ func (q *Queries) ListTasksByColumn(ctx context.Context, arg ListTasksByColumnPa
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Version,
+			&i.ClaimedBy,
+			&i.LeaseExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -264,7 +347,8 @@ func (q *Queries) ListTasksByColumn(ctx context.Context, arg ListTasksByColumnPa
 
 const listTasksByProject = `-- name: ListTasksByProject :many
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by, t.created_at, t.updated_at
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by, t.created_at, t.updated_at,
+       t.version, t.claimed_by, t.lease_expires_at
 FROM tasks t
 JOIN board_columns c ON c.id = t.column_id
 WHERE t.org_id = $1 AND t.project_id = $2 AND t.deleted_at IS NULL
@@ -277,22 +361,25 @@ type ListTasksByProjectParams struct {
 }
 
 type ListTasksByProjectRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]ListTasksByProjectRow, error) {
@@ -321,6 +408,9 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Version,
+			&i.ClaimedBy,
+			&i.LeaseExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -334,7 +424,8 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 
 const listTrashedTasks = `-- name: ListTrashedTasks :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at
+       assignee_id, priority, start_date, due_date, sprint_id, rank, created_by, created_at, updated_at,
+       version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND project_id = $2 AND deleted_at IS NOT NULL
 ORDER BY deleted_at DESC
@@ -346,22 +437,25 @@ type ListTrashedTasksParams struct {
 }
 
 type ListTrashedTasksRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 }
 
 func (q *Queries) ListTrashedTasks(ctx context.Context, arg ListTrashedTasksParams) ([]ListTrashedTasksRow, error) {
@@ -390,6 +484,9 @@ func (q *Queries) ListTrashedTasks(ctx context.Context, arg ListTrashedTasksPara
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Version,
+			&i.ClaimedBy,
+			&i.LeaseExpiresAt,
 		); err != nil {
 			return nil, err
 		}
@@ -404,13 +501,15 @@ func (q *Queries) ListTrashedTasks(ctx context.Context, arg ListTrashedTasksPara
 const moveTask = `-- name: MoveTask :execrows
 UPDATE tasks SET column_id = $1, rank = $2
 WHERE org_id = $3 AND id = $4 AND deleted_at IS NULL
+  AND ($5::bigint IS NULL OR version = $5)
 `
 
 type MoveTaskParams struct {
-	ColumnID uuid.UUID `json:"column_id"`
-	Rank     string    `json:"rank"`
-	OrgID    uuid.UUID `json:"org_id"`
-	ID       uuid.UUID `json:"id"`
+	ColumnID  uuid.UUID `json:"column_id"`
+	Rank      string    `json:"rank"`
+	OrgID     uuid.UUID `json:"org_id"`
+	ID        uuid.UUID `json:"id"`
+	IfVersion *int64    `json:"if_version"`
 }
 
 // Relocate a task. The (column_id, rank) unique index makes a concurrent
@@ -421,6 +520,7 @@ func (q *Queries) MoveTask(ctx context.Context, arg MoveTaskParams) (int64, erro
 		arg.Rank,
 		arg.OrgID,
 		arg.ID,
+		arg.IfVersion,
 	)
 	if err != nil {
 		return 0, err
@@ -441,6 +541,44 @@ type PurgeExpiredTrashParams struct {
 // Hard-delete tasks trashed before the cutoff (nightly purge job, per-tenant).
 func (q *Queries) PurgeExpiredTrash(ctx context.Context, arg PurgeExpiredTrashParams) (int64, error) {
 	result, err := q.db.Exec(ctx, purgeExpiredTrash, arg.OrgID, arg.Cutoff)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const releaseExpiredClaims = `-- name: ReleaseExpiredClaims :execrows
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = claimed_by THEN NULL ELSE assignee_id END
+WHERE org_id = $1 AND claimed_by IS NOT NULL AND lease_expires_at <= now()
+`
+
+// Sweeper: clear lapsed claims and the assignment they made.
+func (q *Queries) ReleaseExpiredClaims(ctx context.Context, orgID uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseExpiredClaims, orgID)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
+const releaseTask = `-- name: ReleaseTask :execrows
+UPDATE tasks
+SET claimed_by = NULL, lease_expires_at = NULL,
+    assignee_id = CASE WHEN assignee_id = $1 THEN NULL ELSE assignee_id END
+WHERE org_id = $2 AND id = $3 AND deleted_at IS NULL AND claimed_by = $1
+`
+
+type ReleaseTaskParams struct {
+	AgentID pgtype.UUID `json:"agent_id"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	ID      uuid.UUID   `json:"id"`
+}
+
+// Give a claim back: the task is unassigned again if the agent still holds it.
+func (q *Queries) ReleaseTask(ctx context.Context, arg ReleaseTaskParams) (int64, error) {
+	result, err := q.db.Exec(ctx, releaseTask, arg.AgentID, arg.OrgID, arg.ID)
 	if err != nil {
 		return 0, err
 	}
@@ -471,7 +609,7 @@ const searchTasks = `-- name: SearchTasks :many
 
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
        t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.rank, t.created_by,
-       t.created_at, t.updated_at,
+       t.created_at, t.updated_at, t.version, t.claimed_by, t.lease_expires_at,
        count(*) OVER() AS total_count
 FROM tasks t
 JOIN projects p ON p.id = t.project_id
@@ -511,23 +649,26 @@ type SearchTasksParams struct {
 }
 
 type SearchTasksRow struct {
-	ID          uuid.UUID          `json:"id"`
-	OrgID       uuid.UUID          `json:"org_id"`
-	ProjectID   uuid.UUID          `json:"project_id"`
-	ColumnID    uuid.UUID          `json:"column_id"`
-	Number      int32              `json:"number"`
-	Title       string             `json:"title"`
-	Description string             `json:"description"`
-	AssigneeID  pgtype.UUID        `json:"assignee_id"`
-	Priority    string             `json:"priority"`
-	StartDate   pgtype.Timestamptz `json:"start_date"`
-	DueDate     pgtype.Timestamptz `json:"due_date"`
-	SprintID    pgtype.UUID        `json:"sprint_id"`
-	Rank        string             `json:"rank"`
-	CreatedBy   uuid.UUID          `json:"created_by"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-	TotalCount  int64              `json:"total_count"`
+	ID             uuid.UUID          `json:"id"`
+	OrgID          uuid.UUID          `json:"org_id"`
+	ProjectID      uuid.UUID          `json:"project_id"`
+	ColumnID       uuid.UUID          `json:"column_id"`
+	Number         int32              `json:"number"`
+	Title          string             `json:"title"`
+	Description    string             `json:"description"`
+	AssigneeID     pgtype.UUID        `json:"assignee_id"`
+	Priority       string             `json:"priority"`
+	StartDate      pgtype.Timestamptz `json:"start_date"`
+	DueDate        pgtype.Timestamptz `json:"due_date"`
+	SprintID       pgtype.UUID        `json:"sprint_id"`
+	Rank           string             `json:"rank"`
+	CreatedBy      uuid.UUID          `json:"created_by"`
+	CreatedAt      time.Time          `json:"created_at"`
+	UpdatedAt      time.Time          `json:"updated_at"`
+	Version        int64              `json:"version"`
+	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
+	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
+	TotalCount     int64              `json:"total_count"`
 }
 
 // Full-text search (FR-TASK-007) --------------------------------------------
@@ -579,6 +720,9 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Sea
 			&i.CreatedBy,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Version,
+			&i.ClaimedBy,
+			&i.LeaseExpiresAt,
 			&i.TotalCount,
 		); err != nil {
 			return nil, err
@@ -618,6 +762,9 @@ SET title = $1, description = $2,
     assignee_id = $3, priority = $4,
     start_date = $5, due_date = $6
 WHERE org_id = $7 AND id = $8 AND deleted_at IS NULL
+  -- Optimistic concurrency (FR-AGT-005): with a version, a stale write matches
+  -- no row and the repo reports a conflict.
+  AND ($9::bigint IS NULL OR version = $9)
 `
 
 type UpdateTaskParams struct {
@@ -629,6 +776,7 @@ type UpdateTaskParams struct {
 	DueDate     pgtype.Timestamptz `json:"due_date"`
 	OrgID       uuid.UUID          `json:"org_id"`
 	ID          uuid.UUID          `json:"id"`
+	IfVersion   *int64             `json:"if_version"`
 }
 
 func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error) {
@@ -641,6 +789,7 @@ func (q *Queries) UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, 
 		arg.DueDate,
 		arg.OrgID,
 		arg.ID,
+		arg.IfVersion,
 	)
 	if err != nil {
 		return 0, err

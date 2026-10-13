@@ -10,6 +10,7 @@ package projectuc
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"strings"
 	"time"
@@ -39,8 +40,11 @@ type Deps struct {
 	Automation automation.Evaluator          // automation rules; nil ⇒ no evaluation
 	Links      project.TaskLinkRepository    // dependency guard on moves; nil ⇒ no guard
 	Events     notify.EventBus               // realtime publish; nil ⇒ no SSE events
-	Logger     *slog.Logger
-	Now        func() time.Time // injectable for tests; defaults to time.Now
+	// Concurrency backs version-checked moves (FR-AGT-005); nil ⇒ a version on a
+	// move is refused.
+	Concurrency project.ConcurrencyRepository
+	Logger      *slog.Logger
+	Now         func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // Service implements the project/board application logic.
@@ -59,6 +63,7 @@ type Service struct {
 	automation automation.Evaluator
 	links      project.TaskLinkRepository
 	events     notify.EventBus
+	conc       project.ConcurrencyRepository
 	logger     *slog.Logger
 	now        func() time.Time
 }
@@ -76,7 +81,7 @@ func New(d Deps) *Service {
 	return &Service{
 		projects: d.Projects, members: d.Members, boards: d.Boards,
 		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, fields: d.Fields, forms: d.Forms, labels: d.Labels, subtasks: d.Subtasks,
-		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, logger: logger, now: now,
+		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, logger: logger, now: now,
 	}
 }
 
@@ -454,7 +459,9 @@ func (s *Service) DeleteColumn(ctx context.Context, orgID, userID, projectID, co
 
 // MoveTask relocates a task to (columnID, rank) on the board (CONTRIBUTOR+,
 // FR-PROJ-005). A rank collision (concurrent move) surfaces as ErrConflict → 409.
-func (s *Service) MoveTask(ctx context.Context, orgID, userID, taskID, columnID, newRank string, orgRole tenant.OrgRole) error {
+// With ifVersion, a task that changed since the caller read it is refused with
+// *project.VersionConflict (FR-AGT-005).
+func (s *Service) MoveTask(ctx context.Context, orgID, userID, taskID, columnID, newRank string, ifVersion *int64, orgRole tenant.OrgRole) error {
 	if newRank == "" {
 		return domain.ErrValidation
 	}
@@ -483,7 +490,7 @@ func (s *Service) MoveTask(ctx context.Context, orgID, userID, taskID, columnID,
 		return err
 	}
 	fromColumn := t.ColumnID
-	if err := s.tasks.Move(ctx, orgID, taskID, columnID, newRank); err != nil {
+	if err := s.moveTask(ctx, orgID, taskID, columnID, newRank, ifVersion); err != nil {
 		return err
 	}
 	s.publish(ctx, orgID, notify.EventTaskMoved, userID, map[string]any{
@@ -495,6 +502,25 @@ func (s *Service) MoveTask(ctx context.Context, orgID, userID, taskID, columnID,
 		TaskID: taskID, ActorID: userID, ToColumnID: columnID,
 	})
 	return nil
+}
+
+// moveTask moves, guarded by ifVersion when given.
+func (s *Service) moveTask(ctx context.Context, orgID, taskID, columnID, newRank string, ifVersion *int64) error {
+	if ifVersion == nil {
+		return s.tasks.Move(ctx, orgID, taskID, columnID, newRank)
+	}
+	if s.conc == nil {
+		return domain.ErrValidation
+	}
+	err := s.conc.MoveIfVersion(ctx, orgID, taskID, columnID, newRank, *ifVersion)
+	if !errors.Is(err, project.ErrVersionConflict) {
+		return err
+	}
+	cur, gerr := s.tasks.Get(ctx, orgID, taskID)
+	if gerr != nil {
+		return gerr
+	}
+	return &project.VersionConflict{Current: cur}
 }
 
 // requireColumn checks LEAD access on the project and that the column belongs to

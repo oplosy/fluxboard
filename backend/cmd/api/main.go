@@ -476,15 +476,15 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
 		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
 		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
-		Automation: automationSvc,
-		Events:     eventBus, Logger: logger,
+		Automation: automationSvc, Concurrency: taskRepo,
+		Events: eventBus, Logger: logger,
 	})
 	taskSvc := taskuc.New(taskuc.Deps{
 		Tasks: taskRepo, Subtasks: subtaskRepo, Labels: labelRepo, Comments: commentRepo,
 		Activity: activityRepo, Attachments: attachmentRepo, Projects: projectRepo,
 		Members: projectMemberRepo, Boards: boardRepo, Columns: columnRepo,
 		Store: objectStore, Entitlements: billingSvc, TimeEntries: timeEntryRepo, Links: linkRepo,
-		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Logger: logger,
+		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo, Logger: logger,
 	})
 	projectHandlers := handlers.NewProjectHandlers(projectSvc, logger)
 	publicFormHandlers := handlers.NewPublicFormHandlers(projectSvc, logger)
@@ -509,7 +509,10 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	})
 	aiHandlers := handlers.NewAIHandlers(aiSvc, logger)
 	// MCP server for agents (ADR-034): same usecases as the REST surface.
-	mcpServer := mcp.NewServer(mcp.Config{Version: version, WebOrigin: cfg.WebOrigin, Logger: logger},
+	mcpServer := mcp.NewServer(mcp.Config{
+		Version: version, WebOrigin: cfg.WebOrigin, Logger: logger,
+		Idempotency: redisx.NewIdempotencyStore(rdb), // write-tool replay (FR-AGT-005)
+	},
 		mcp.Tools(mcp.Deps{AI: aiSvc, Projects: projectSvc, Tasks: taskSvc}))
 	billingHandlers := handlers.NewBillingHandlers(billingSvc, logger)
 	webhookHandlers := handlers.NewWebhookHandlers(billingSvc, stripeGW, logger)

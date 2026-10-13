@@ -99,7 +99,8 @@ type Repository interface {
 	Count(ctx context.Context, orgID string) (int64, error)
 	// Update saves name, role and status (and renames the backing user).
 	Update(ctx context.Context, a Agent) error
-	// Delete soft-deletes the agent and revokes its keys; ErrNotFound if absent.
+	// Delete soft-deletes the agent, revokes its keys and releases its task
+	// claims (and the assignments they made); ErrNotFound if absent.
 	Delete(ctx context.Context, orgID, id string) error
 	// AddKey stores another key for the agent.
 	AddKey(ctx context.Context, orgID, agentID string, key apikey.APIKey) error
