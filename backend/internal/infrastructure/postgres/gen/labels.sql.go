@@ -90,6 +90,40 @@ func (q *Queries) DetachLabel(ctx context.Context, arg DetachLabelParams) (int64
 	return result.RowsAffected(), nil
 }
 
+const ensureLabel = `-- name: EnsureLabel :one
+WITH ins AS (
+  INSERT INTO labels (id, org_id, name, color)
+  VALUES ($1, $2, $3, $4)
+  ON CONFLICT (org_id, name) DO NOTHING
+  RETURNING id
+)
+SELECT id FROM ins
+UNION ALL
+SELECT id FROM labels WHERE org_id = $2 AND name = $3
+LIMIT 1
+`
+
+type EnsureLabelParams struct {
+	ID    uuid.UUID `json:"id"`
+	OrgID uuid.UUID `json:"org_id"`
+	Name  string    `json:"name"`
+	Color string    `json:"color"`
+}
+
+// Returns the org's label with this name, creating it (with color) if absent;
+// an existing label keeps its color (project templates, FR-PROJ-007).
+func (q *Queries) EnsureLabel(ctx context.Context, arg EnsureLabelParams) (uuid.UUID, error) {
+	row := q.db.QueryRow(ctx, ensureLabel,
+		arg.ID,
+		arg.OrgID,
+		arg.Name,
+		arg.Color,
+	)
+	var id uuid.UUID
+	err := row.Scan(&id)
+	return id, err
+}
+
 const getLabel = `-- name: GetLabel :one
 SELECT id, org_id, name, color, created_at, updated_at
 FROM labels

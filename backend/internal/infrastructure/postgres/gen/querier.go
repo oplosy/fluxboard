@@ -143,6 +143,9 @@ type Querier interface {
 	// Finish a claim but keep the assignment: the agent handed the task over for
 	// review and stays its assignee for attribution.
 	EndTaskClaim(ctx context.Context, arg EndTaskClaimParams) (int64, error)
+	// Returns the org's label with this name, creating it (with color) if absent;
+	// an existing label keeps its color (project templates, FR-PROJ-007).
+	EnsureLabel(ctx context.Context, arg EnsureLabelParams) (uuid.UUID, error)
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
 	// to 401 rather than a silent miss. An agent's key carries the agent's role and
 	// status (ADR-033); the owner pool reads agents across tenants like api_keys.

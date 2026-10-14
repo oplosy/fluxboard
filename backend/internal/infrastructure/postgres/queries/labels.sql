@@ -46,3 +46,17 @@ JOIN labels l ON l.id = tl.label_id
 JOIN tasks t ON t.id = tl.task_id
 WHERE tl.org_id = @org_id AND t.project_id = @project_id
 ORDER BY l.name;
+
+-- name: EnsureLabel :one
+-- Returns the org's label with this name, creating it (with color) if absent;
+-- an existing label keeps its color (project templates, FR-PROJ-007).
+WITH ins AS (
+  INSERT INTO labels (id, org_id, name, color)
+  VALUES (@id, @org_id, @name, @color)
+  ON CONFLICT (org_id, name) DO NOTHING
+  RETURNING id
+)
+SELECT id FROM ins
+UNION ALL
+SELECT id FROM labels WHERE org_id = @org_id AND name = @name
+LIMIT 1;

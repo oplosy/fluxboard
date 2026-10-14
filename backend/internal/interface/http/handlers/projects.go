@@ -138,6 +138,72 @@ func (h *ProjectHandlers) CreateProject(w http.ResponseWriter, r *http.Request) 
 	response.JSON(w, http.StatusCreated, toProjectResp(p))
 }
 
+type templateColumnResp struct {
+	Name string `json:"name"`
+	Role string `json:"role,omitempty"`
+}
+
+type templateLabelResp struct {
+	Name  string `json:"name"`
+	Color string `json:"color"`
+}
+
+type projectTemplateResp struct {
+	Key         string               `json:"key"`
+	Name        string               `json:"name"`
+	Description string               `json:"description"`
+	Columns     []templateColumnResp `json:"columns"`
+	Labels      []templateLabelResp  `json:"labels"`
+	TaskCount   int                  `json:"task_count"`
+}
+
+// ListProjectTemplates returns the template catalog (FR-PROJ-007).
+func (h *ProjectHandlers) ListProjectTemplates(w http.ResponseWriter, _ *http.Request) {
+	tpls := h.svc.Templates()
+	out := make([]projectTemplateResp, 0, len(tpls))
+	for _, t := range tpls {
+		r := projectTemplateResp{Key: t.Key, Name: t.Name, Description: t.Description, TaskCount: len(t.Tasks),
+			Columns: []templateColumnResp{}, Labels: []templateLabelResp{}}
+		for _, c := range t.Columns {
+			r.Columns = append(r.Columns, templateColumnResp{Name: c.Name, Role: string(c.Role)})
+		}
+		for _, l := range t.Labels {
+			r.Labels = append(r.Labels, templateLabelResp{Name: l.Name, Color: l.Color})
+		}
+		out = append(out, r)
+	}
+	response.JSON(w, http.StatusOK, map[string]any{"templates": out})
+}
+
+type createFromTemplateReq struct {
+	createProjectReq
+	Template string `json:"template"`
+}
+
+// CreateProjectFromTemplate creates a project from a catalog template in one
+// transaction (MEMBER+; write:projects gate). The Idempotency-Key header makes
+// a retry return the first project.
+func (h *ProjectHandlers) CreateProjectFromTemplate(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	var req createFromTemplateReq
+	if !decodeJSON(w, r, &req) {
+		return
+	}
+	p, err := h.svc.CreateProjectFromTemplate(r.Context(), tc.OrgID, tc.UserID, req.Template, projectuc.CreateProjectInput{
+		Key: req.Key, Name: req.Name, Description: req.Description,
+		Color: req.Color, Visibility: project.Visibility(req.Visibility),
+	}, r.Header.Get("Idempotency-Key"))
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	response.JSON(w, http.StatusCreated, toProjectResp(p))
+}
+
 // ListProjects lists the caller's visible projects (?archived=true to include).
 func (h *ProjectHandlers) ListProjects(w http.ResponseWriter, r *http.Request) {
 	tc, ok := mw.TenantFrom(r.Context())
