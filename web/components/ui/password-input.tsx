@@ -40,7 +40,7 @@ export const PasswordInput = forwardRef<HTMLInputElement, PasswordInputProps>(
         {caps ? (
           <span
             role="status"
-            className="absolute right-10 top-1/2 flex -translate-y-1/2 animate-scale-in items-center gap-0.5 rounded-sm bg-warning/15 px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.06em] text-foreground"
+            className="absolute right-10 top-1/2 flex -translate-y-1/2 animate-scale-in items-center gap-0.5 rounded-sm bg-warning/15 px-1.5 py-0.5 text-xs font-medium text-foreground"
             title="Caps Lock is on"
           >
             <ArrowBigUp className="h-3 w-3" aria-hidden />

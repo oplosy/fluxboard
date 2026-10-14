@@ -30,7 +30,7 @@ export function Ticker() {
     <div className="border-y border-border bg-foreground py-3 text-background">
       <Marquee duration={50}>
         {facts.map((f) => (
-          <span key={f} className="flex items-center gap-6 pr-6 font-mono text-xs uppercase tracking-[0.14em]">
+          <span key={f} className="flex items-center gap-6 pr-6 text-xs font-medium">
             {f}
             <span className="h-1 w-1 rounded-full bg-signal" />
           </span>
@@ -84,7 +84,7 @@ function EventLog() {
 
   return (
     <div ref={ref} className="rounded-md border border-border bg-card font-mono text-[11.5px] leading-6">
-      <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+      <div className="flex items-center gap-1.5 border-b border-border px-3 py-2 text-xs text-muted-foreground">
         <span className="h-2 w-2 rounded-full bg-foreground/15" />
         <span className="h-2 w-2 rounded-full bg-foreground/15" />
         <span className="h-2 w-2 rounded-full bg-foreground/15" />
@@ -116,7 +116,7 @@ export function RealtimeSection() {
         <div className="mt-14 grid grid-cols-1 gap-6 lg:grid-cols-[1.4fr_0.6fr]">
           <Reveal variant="scale" className="ticks relative h-[360px] rounded-lg border border-border bg-card/50 md:h-[440px]">
             <SignalNet />
-            <div className="pointer-events-none absolute bottom-3 left-3 flex gap-4 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="pointer-events-none absolute bottom-3 left-3 flex gap-4 text-xs text-muted-foreground font-medium">
               <span className="flex items-center gap-1.5">
                 <span className="h-2 w-2 bg-cobalt" /> write
               </span>
@@ -137,7 +137,7 @@ export function RealtimeSection() {
                 ['Cache', 'Surgical invalidation'],
               ].map(([k, v]) => (
                 <div key={k} className="bg-card p-3">
-                  <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{k}</p>
+                  <p className="text-xs text-muted-foreground font-medium">{k}</p>
                   <p className="mt-1 text-sm font-medium">{v}</p>
                 </div>
               ))}
@@ -203,7 +203,7 @@ export function BillingSection() {
           <Reveal variant="up" className="space-y-7 rounded-lg border border-border bg-card p-6 md:p-8">
             <div className="flex items-center justify-between">
               <p className="kicker">Usage · this period</p>
-              <span className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider">Pro</span>
+              <span className="rounded-sm bg-secondary px-1.5 py-0.5 text-xs font-medium">Pro</span>
             </div>
             {meters.map((m, i) => (
               <Meter key={m.k} {...m} index={i} />
@@ -228,7 +228,7 @@ export function BillingSection() {
               ))}
             </dl>
             <div className="mt-4 flex items-end justify-between border-t border-foreground pt-4">
-              <span className="font-mono text-xs uppercase tracking-[0.16em] text-muted-foreground">Total due</span>
+              <span className="text-xs text-muted-foreground font-medium">Total due</span>
               <span className="font-display text-5xl font-semibold tracking-[-0.04em]">
                 <CountUp value={12} decimals={2} prefix="$" duration={1800} />
               </span>
@@ -267,7 +267,7 @@ export function SecuritySection() {
           {guards.map((g, i) => (
             <Reveal key={g.t} index={i} className="group relative bg-background p-6 transition-colors duration-500 hover:bg-card">
               <g.icon className="h-5 w-5 transition-[transform,color] duration-500 ease-spring group-hover:-rotate-6 group-hover:scale-110 group-hover:text-signal" strokeWidth={1.6} />
-              <h3 className="mt-10 font-mono text-[13px] font-semibold uppercase tracking-[0.08em]">
+              <h3 className="mt-10 text-[13px] font-semibold">
                 <ScrambleText text={g.t} replayOnHover />
               </h3>
               <p className="mt-2 text-sm leading-relaxed text-muted-foreground">{g.b}</p>
@@ -288,7 +288,7 @@ export function ClosingCta() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(hsl(var(--paper))_1px,transparent_1px),linear-gradient(90deg,hsl(var(--paper))_1px,transparent_1px)] [background-size:48px_48px]" />
       <div className="container relative grid gap-12 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-paper/50">06 — Start</p>
+          <p className="text-xs text-paper/50 font-medium">06 — Start</p>
           <h2 className="mt-5 max-w-[14ch] text-[clamp(2.6rem,7vw,6.5rem)] font-semibold leading-[0.9] tracking-[-0.055em]">
             <SplitText text="Your next standup could be shorter." wordClassName={(w) => (w === 'shorter.' ? 'text-signal' : undefined)} />
           </h2>

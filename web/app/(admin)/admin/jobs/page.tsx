@@ -39,7 +39,7 @@ export default function AdminJobsPage() {
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {entries.map(([key, value]) => (
           <div key={key} className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-            <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">
+            <p className="text-xs font-medium text-neutral-500">
               {key.replace(/_/g, ' ')}
             </p>
             <pre className="mt-2 overflow-x-auto whitespace-pre-wrap break-words text-sm text-neutral-200">

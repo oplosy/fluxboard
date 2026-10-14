@@ -120,7 +120,7 @@ export function BoardStory() {
           </div>
 
           <div className="ticks relative rounded-lg border border-border bg-card/70 p-3 backdrop-blur-sm sm:p-4">
-            <div className="mb-3 flex items-center justify-between px-1 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">
+            <div className="mb-3 flex items-center justify-between px-1 text-xs text-muted-foreground font-medium">
               <span>FLX / Platform board</span>
               <span className="flex items-center gap-1.5">
                 <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-success" /> live

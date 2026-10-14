@@ -28,7 +28,7 @@ export default function StatusPage() {
                   {s}
                 </span>
               </span>
-              <span className="flex items-center gap-2 font-mono text-xs uppercase tracking-[0.12em] text-muted-foreground">
+              <span className="flex items-center gap-2 text-xs text-muted-foreground font-medium">
                 <span className="h-2 w-2 rounded-full bg-success" />
                 Operational
               </span>

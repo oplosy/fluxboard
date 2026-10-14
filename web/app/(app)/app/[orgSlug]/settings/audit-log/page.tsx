@@ -9,6 +9,7 @@ import { useOrg } from '@/lib/org/context';
 import { useToast } from '@/components/ui/toast';
 import { memberName, useOrgMembers } from '@/lib/org/use-members';
 import { auditCsv, listAudit, type AuditFilter } from '@/lib/api/audit';
+import { Select } from '@/components/ui/select';
 
 const SEVERITIES = ['', 'info', 'notice', 'warning', 'critical'] as const;
 
@@ -79,7 +80,7 @@ export default function AuditLogSettingsPage() {
   return (
     <div className="max-w-4xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Audit log</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">Audit log</h2>
         <Button size="sm" variant="outline" onClick={exportCsv} disabled={exporting}>
           {exporting ? 'Exporting…' : 'Export CSV'}
         </Button>
@@ -102,17 +103,14 @@ export default function AuditLogSettingsPage() {
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Severity
-          <select
+          <Select
+            size="sm"
+            className="h-9 w-40"
+            aria-label="Severity"
             value={severity}
-            onChange={(e) => setSeverity(e.target.value)}
-            className="h-9 rounded-md border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            {SEVERITIES.map((s) => (
-              <option key={s} value={s}>
-                {s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Any'}
-              </option>
-            ))}
-          </select>
+            onValueChange={setSeverity}
+            options={SEVERITIES.map((s) => ({ value: s, label: s ? s.charAt(0).toUpperCase() + s.slice(1) : 'Any' }))}
+          />
         </label>
         <label className="flex flex-col gap-1 text-xs text-muted-foreground">
           Since
@@ -138,7 +136,7 @@ export default function AuditLogSettingsPage() {
       ) : (
         <div className="overflow-x-auto rounded-md border">
           <table className="w-full text-sm">
-            <thead className="border-b bg-secondary/40 text-left text-xs uppercase tracking-wide text-muted-foreground">
+            <thead className="border-b bg-secondary/40 text-left text-xs text-muted-foreground">
               <tr>
                 <th className="p-2 font-medium">Time</th>
                 <th className="p-2 font-medium">Action</th>

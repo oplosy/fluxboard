@@ -7,8 +7,9 @@ import type { Project } from '@/lib/api/types';
 import { useOrg } from '@/lib/org/context';
 import { SlidingTabs } from '@/components/motion/sliding-tabs';
 
-// Shared header for the project board / list / settings pages: title, key,
-// archived badge and the tab nav.
+// Shared header for every project tab: title, key, archived badge and the tab
+// nav. Its box is fixed (no entrance animation, constant heights) so switching
+// tabs never moves it.
 export function ProjectHeader({ project }: { project: Project }) {
   const { slug, isAdmin } = useOrg();
   const pathname = usePathname();
@@ -28,26 +29,24 @@ export function ProjectHeader({ project }: { project: Project }) {
   const onBoard = pathname === base || /\/tasks\/\d+$/.test(pathname);
 
   return (
-    <div className="mb-6">
-      <div className="flex flex-wrap items-end gap-x-4 gap-y-2">
+    <header className="mb-6">
+      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1">
         <span
-          className="mb-2 h-3 w-3 shrink-0 rounded-sm"
+          className="h-3.5 w-3.5 shrink-0 rounded-sm"
           style={{ backgroundColor: project.color || 'hsl(var(--muted-foreground))' }}
           aria-hidden
         />
-        <h1 className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards] text-3xl font-semibold tracking-[-0.045em] md:text-4xl">
-          {project.name}
-        </h1>
-        <span className="mb-1.5 rounded-sm border border-border px-1.5 py-0.5 font-mono text-[11px] uppercase tracking-wider text-muted-foreground">
+        <h1 className="min-w-0 truncate text-2xl font-semibold tracking-[-0.04em] md:text-3xl">{project.name}</h1>
+        <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
           {project.key}
         </span>
         {project.archived_at ? (
-          <span className="mb-1.5 inline-flex items-center gap-1 rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
-            <Archive className="h-3 w-3" /> Archived
+          <span className="inline-flex items-center gap-1 rounded-sm bg-secondary px-1.5 py-0.5 text-xs font-medium text-muted-foreground">
+            <Archive className="h-3 w-3" aria-hidden /> Archived
           </span>
         ) : null}
       </div>
-      <div className="mt-5 border-b border-border pb-1">
+      <div className="mt-4 overflow-x-auto border-b border-border pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <SlidingTabs
           tabs={tabs.map((t) => ({
             href: t.href,
@@ -56,6 +55,6 @@ export function ProjectHeader({ project }: { project: Project }) {
           }))}
         />
       </div>
-    </div>
+    </header>
   );
 }

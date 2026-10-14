@@ -10,12 +10,12 @@ export default function NotFound() {
     <div className="blueprint relative flex min-h-screen flex-col">
       <div className="flex items-center justify-between p-5 sm:p-8">
         <Logo />
-        <span className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">Error 404</span>
+        <span className="text-xs text-muted-foreground font-medium">Error 404</span>
       </div>
 
       <div className="relative mx-auto h-[38vh] min-h-[220px] w-full max-w-5xl px-4">
         <ScatterText text="404" />
-        <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+        <p className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 text-xs text-muted-foreground font-medium">
           Push the pixels · click to scatter
         </p>
       </div>

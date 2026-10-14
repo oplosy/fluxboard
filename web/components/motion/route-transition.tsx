@@ -207,7 +207,7 @@ export function RouteTransition({ children }: { children: ReactNode }) {
             )}
           >
             <LogoMark animated className="h-9 w-9" />
-            <span className="font-mono text-[11px] uppercase tracking-[0.3em] text-paper/60">{label}</span>
+            <span className="text-xs text-paper/60 font-medium">{label}</span>
           </div>
         </div>
       ) : null}

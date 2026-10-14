@@ -148,7 +148,7 @@ export default function OrgGeneralSettingsPage() {
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{children}</h2>;
 }
 
 // Org logo picker (ADMIN+ surface; the API gates the same). Uploads straight

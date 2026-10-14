@@ -33,7 +33,7 @@ export default function GlobalError({
         <span className="h-[65%] w-3 origin-bottom-left animate-[topple_1s_var(--ease-spring)_0.4s_both] rounded-[2px] bg-destructive" />
       </div>
       <div className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards] [animation-delay:150ms]">
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em] text-muted-foreground">{forbidden ? '403' : 'Error'}</p>
+        <p className="text-xs text-muted-foreground font-medium">{forbidden ? '403' : 'Error'}</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-[-0.03em]">
           {forbidden ? "You don't have access" : 'Something went wrong'}
         </h1>

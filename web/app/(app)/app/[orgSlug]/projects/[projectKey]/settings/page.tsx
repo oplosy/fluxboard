@@ -3,11 +3,16 @@
 import { use, useState } from 'react';
 import Link from 'next/link';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { ArrowDown, ArrowUp, Trash2 } from 'lucide-react';
+import { ArrowDown, ArrowUp, Building2, Lock, MoreHorizontal, Trash2 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Field } from '@/components/auth/field';
+import { Menu, MenuItem } from '@/components/ui/menu';
+import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/components/ui/toast';
 import { useOrg } from '@/lib/org/context';
 import { useProjectByKey } from '@/lib/board/use-project';
 import { archiveProject, unarchiveProject, updateProject } from '@/lib/api/projects';
@@ -20,10 +25,10 @@ import {
   setColumnRole,
 } from '@/lib/api/board';
 import { between } from '@/lib/board/rank';
-import { useToast } from '@/components/ui/toast';
-import { ProjectHeader } from '@/components/board/project-header';
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { FieldsManager } from '@/components/board/fields-manager';
 import { FormsManager } from '@/components/board/forms-manager';
+import { ConfirmStrip, EmptyState, RowList, SettingsSection } from '@/components/board/settings-section';
 import type { BoardColumn, ColumnRole, Project, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
@@ -44,10 +49,9 @@ export default function ProjectSettingsPage(props: { params: Promise<{ projectKe
     );
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 lg:px-10 lg:py-14">
-      <ProjectHeader project={project} />
+    <ProjectFrame project={project} narrow>
       {isAdmin ? (
-        <div className="max-w-2xl space-y-8">
+        <div className="space-y-5">
           <GeneralSection project={project} />
           <ColumnsSection project={project} />
           <FieldsManager projectId={project.id} />
@@ -55,17 +59,18 @@ export default function ProjectSettingsPage(props: { params: Promise<{ projectKe
           <DangerSection project={project} />
         </div>
       ) : (
-        <p className="max-w-2xl rounded-2xl bg-secondary/55 p-5 text-sm text-muted-foreground">
+        <p className="rounded-md border border-border bg-secondary/40 p-5 text-sm text-muted-foreground">
           Only project leads and organization admins can change project settings.
         </p>
       )}
-    </div>
+    </ProjectFrame>
   );
 }
 
-function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>;
-}
+const VISIBILITY: { v: Visibility; label: string; hint: string; icon: React.ReactNode }[] = [
+  { v: 'org', label: 'Organization', hint: 'All org members can see it.', icon: <Building2 /> },
+  { v: 'private', label: 'Private', hint: 'Only project members.', icon: <Lock /> },
+];
 
 function GeneralSection({ project }: { project: Project }) {
   const { orgId } = useOrg();
@@ -78,6 +83,12 @@ function GeneralSection({ project }: { project: Project }) {
   const [visibility, setVisibility] = useState<Visibility>(project.visibility);
   const archived = Boolean(project.archived_at);
 
+  const dirty =
+    name !== project.name ||
+    description !== project.description ||
+    color !== project.color ||
+    visibility !== project.visibility;
+
   const mutation = useMutation({
     mutationFn: () => updateProject(orgId, project.id, { name, description, color, visibility }),
     onSuccess: () => {
@@ -88,74 +99,107 @@ function GeneralSection({ project }: { project: Project }) {
     onError: () => toast({ title: 'Update failed', variant: 'error' }),
   });
 
+  function discard() {
+    setName(project.name);
+    setDescription(project.description);
+    setColor(project.color);
+    setVisibility(project.visibility);
+  }
+
   return (
-    <section>
-      <SectionTitle>General</SectionTitle>
+    <SettingsSection title="General" description="Name, description and who can see this project.">
       {archived ? (
-        <p className="mb-3 rounded-2xl bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
-          This project is archived and read-only. Unarchive it below to edit.
+        <p className="mb-4 rounded-md border border-warning/40 bg-warning/15 p-3 text-[13px]">
+          This project is archived and read-only. Restore it below to edit.
         </p>
       ) : null}
       <form
-        className="space-y-4"
+        className="space-y-5"
         onSubmit={(e) => {
           e.preventDefault();
-          mutation.mutate();
+          if (dirty && name.trim()) mutation.mutate();
         }}
       >
-        <Field id="p-name" label="Name">
-          <Input id="p-name" value={name} onChange={(e) => setName(e.target.value)} disabled={archived} required />
+        <Field label="Name">
+          <Input value={name} onChange={(e) => setName(e.target.value)} disabled={archived} required />
         </Field>
-        <Field id="p-desc" label="Description">
-          <textarea
-            id="p-desc"
+        <Field label="Description" optional>
+          <Textarea
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={archived}
             rows={3}
-            className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
+            autoResize
           />
         </Field>
-        <Field id="p-color" label="Color">
-          <input
-            id="p-color"
-            type="color"
-            value={color || '#6366f1'}
-            onChange={(e) => setColor(e.target.value)}
-            disabled={archived}
-            className="h-9 w-16 rounded border border-input bg-card transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          />
+        <Field label="Color">
+          <div className="flex items-center gap-3">
+            <input
+              type="color"
+              value={color || '#6366f1'}
+              onChange={(e) => setColor(e.target.value)}
+              disabled={archived}
+              className="h-9 w-12 cursor-pointer rounded-md border border-input bg-card p-1 disabled:cursor-not-allowed disabled:opacity-50"
+            />
+            <span className="font-mono text-xs uppercase text-muted-foreground">{color || '#6366f1'}</span>
+          </div>
         </Field>
         <div className="space-y-1.5">
-          <span className="text-sm font-medium">Visibility</span>
-          <div className="grid gap-2 sm:grid-cols-2">
-            {(
-              [
-                { v: 'org', label: 'Organization', hint: 'All org members.' },
-                { v: 'private', label: 'Private', hint: 'Only project members.' },
-              ] as const
-            ).map(({ v, label, hint }) => (
+          <span id="visibility-label" className="text-[13px] font-medium">
+            Visibility
+          </span>
+          <div role="radiogroup" aria-labelledby="visibility-label" className="grid gap-2 sm:grid-cols-2">
+            {VISIBILITY.map(({ v, label, hint, icon }) => (
               <button
                 key={v}
                 type="button"
+                role="radio"
+                aria-checked={visibility === v}
                 disabled={archived}
                 onClick={() => setVisibility(v)}
                 className={cn(
-                  'rounded-2xl bg-secondary/45 p-4 text-left text-sm transition-colors disabled:opacity-50',
-                  visibility === v ? 'bg-primary/10 text-foreground ring-1 ring-primary/30' : 'hover:bg-secondary',
+                  'flex items-start gap-3 rounded-md border p-3 text-left text-sm transition-colors disabled:opacity-50',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                  visibility === v
+                    ? 'border-foreground bg-secondary/60'
+                    : 'border-input bg-card hover:border-foreground/40',
                 )}
               >
-                <span className="font-medium">{label}</span>
-                <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+                <span className="mt-0.5 text-muted-foreground [&>svg]:h-4 [&>svg]:w-4">{icon}</span>
+                <span>
+                  <span className="block font-medium">{label}</span>
+                  <span className="mt-0.5 block text-xs text-muted-foreground">{hint}</span>
+                </span>
               </button>
             ))}
           </div>
         </div>
-        <Button type="submit" disabled={archived || mutation.isPending}>
-          {mutation.isPending ? 'Saving…' : 'Save changes'}
-        </Button>
+
+        <div
+          className={cn(
+            'sticky bottom-4 z-10 flex items-center gap-3 rounded-md border px-3 py-2 transition-colors',
+            dirty ? 'border-foreground/30 bg-card shadow-lg' : 'border-transparent',
+          )}
+        >
+          <span className="flex-1 text-[13px] text-muted-foreground" aria-live="polite">
+            {dirty ? 'You have unsaved changes.' : 'All changes saved.'}
+          </span>
+          {dirty ? (
+            <Button type="button" size="sm" variant="ghost" onClick={discard} disabled={mutation.isPending}>
+              Discard
+            </Button>
+          ) : null}
+          <Button
+            type="submit"
+            size="sm"
+            disabled={archived || !dirty || !name.trim()}
+            isLoading={mutation.isPending}
+          >
+            Save changes
+          </Button>
+        </div>
       </form>
-    </section>
+    </SettingsSection>
   );
 }
 
@@ -228,51 +272,62 @@ function ColumnsSection({ project }: { project: Project }) {
     reorder.mutate({ id: col.id, rank });
   }
 
-  return (
-    <section>
-      <SectionTitle>Columns</SectionTitle>
-      <p className="-mt-1 mb-3 text-xs text-muted-foreground">
-        Each column can stand for a workflow stage. Agents move work by stage and can take it as far as Review;
-        only a person moves it to Done. Stages left unset are inferred from column names.
-      </p>
-      {board.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading columns…</p>
-      ) : (
-        <div className="space-y-2">
-          {columns.map((c, i) => (
-            <ColumnRow
-              // Remount on a saved change so the drafts start from the new values.
-              key={`${c.id}:${c.name}:${c.wip_limit ?? ''}`}
-              column={c}
-              index={i}
-              total={columns.length}
-              others={columns.filter((o) => o.id !== c.id)}
-              onRename={(name, wip) => rename.mutate({ id: c.id, name, wip_limit: wip })}
-              onMove={(dir) => move(i, dir)}
-              onDelete={(target) => remove.mutate({ id: c.id, target })}
-              onRole={(role) => setRole.mutate({ id: c.id, role })}
-              busy={rename.isPending || reorder.isPending || remove.isPending || setRole.isPending}
-            />
-          ))}
+  const busy = rename.isPending || reorder.isPending || remove.isPending || setRole.isPending;
 
-          <div className="flex items-center gap-2 pt-2">
-            <Input
-              value={newName}
-              onChange={(e) => setNewName(e.target.value)}
-              placeholder="New column name"
-              className="max-w-xs"
-            />
-            <Button
-              variant="outline"
-              onClick={() => newName.trim() && add.mutate()}
-              disabled={add.isPending || !newName.trim()}
-            >
-              Add column
-            </Button>
+  return (
+    <SettingsSection
+      title="Columns"
+      description="Each column can stand for a workflow stage. Agents move work by stage and can take it as far as Review; only a person moves it to Done. Stages left unset are inferred from column names."
+    >
+      <div className="space-y-4">
+        {board.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
           </div>
-        </div>
-      )}
-    </section>
+        ) : columns.length === 0 ? (
+          <EmptyState title="No columns yet">Add a first column to start shaping the workflow.</EmptyState>
+        ) : (
+          <RowList>
+            {columns.map((c, i) => (
+              <ColumnRow
+                // Remount on a saved change so the drafts start from the new values.
+                key={`${c.id}:${c.name}:${c.wip_limit ?? ''}`}
+                column={c}
+                index={i}
+                total={columns.length}
+                others={columns.filter((o) => o.id !== c.id)}
+                onRename={(name, wip) => rename.mutate({ id: c.id, name, wip_limit: wip })}
+                onMove={(dir) => move(i, dir)}
+                onDelete={(target) => remove.mutate({ id: c.id, target })}
+                onRole={(role) => setRole.mutate({ id: c.id, role })}
+                busy={busy}
+              />
+            ))}
+          </RowList>
+        )}
+
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (newName.trim()) add.mutate();
+          }}
+        >
+          <Input
+            value={newName}
+            onChange={(e) => setNewName(e.target.value)}
+            placeholder="New column name"
+            aria-label="New column name"
+            className="h-9 min-w-0 flex-1 sm:max-w-xs"
+          />
+          <Button type="submit" size="sm" variant="outline" disabled={add.isPending || !newName.trim()}>
+            Add column
+          </Button>
+        </form>
+      </div>
+    </SettingsSection>
   );
 }
 
@@ -310,7 +365,6 @@ function ColumnRow({
   const [confirming, setConfirming] = useState(false);
   const [target, setTarget] = useState(others[0]?.id ?? '');
 
-
   function commit() {
     const parsedWip = wip.trim() === '' ? null : Number.parseInt(wip, 10);
     const wipVal = parsedWip != null && Number.isFinite(parsedWip) && parsedWip > 0 ? parsedWip : null;
@@ -320,10 +374,20 @@ function ColumnRow({
   }
 
   return (
-    <div className="rounded-2xl bg-card p-3 shadow-sm">
-      <div className="flex flex-wrap items-center gap-2">
-        <Input value={name} onChange={(e) => setName(e.target.value)} onBlur={commit} className="max-w-[16rem]" />
-        <label className="flex items-center gap-1 text-xs text-muted-foreground">
+    <li>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
+        <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground" aria-hidden>
+          {index + 1}
+        </span>
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onBlur={commit}
+          onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+          aria-label={`Name of column ${index + 1}`}
+          className="h-8 min-w-0 flex-1 basis-40 text-[13px]"
+        />
+        <label className="flex items-center gap-1.5 text-xs text-muted-foreground">
           WIP
           <Input
             type="number"
@@ -331,86 +395,68 @@ function ColumnRow({
             value={wip}
             onChange={(e) => setWip(e.target.value)}
             onBlur={commit}
-            placeholder="—"
-            className="h-8 w-16"
+            onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+            placeholder="∞"
+            className="h-8 w-16 text-[13px]"
           />
         </label>
-        <label className="flex items-center gap-1 text-xs text-muted-foreground">
-          Stage
-          <select
-            value={column.role ?? ''}
-            onChange={(e) => onRole((e.target.value || null) as ColumnRole | null)}
-            disabled={busy}
-            aria-label={`Stage of ${column.name}`}
-            className="h-8 rounded border border-input bg-card px-2 text-sm text-foreground transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            <option value="">None</option>
-            {STAGES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
-        </label>
-        <div className="ml-auto flex items-center gap-1">
-          <button
-            onClick={() => onMove(-1)}
-            disabled={index === 0 || busy}
-            className="rounded p-1.5 hover:bg-secondary disabled:opacity-30"
-            aria-label="Move column up"
-          >
-            <ArrowUp className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => onMove(1)}
-            disabled={index === total - 1 || busy}
-            className="rounded p-1.5 hover:bg-secondary disabled:opacity-30"
-            aria-label="Move column down"
-          >
-            <ArrowDown className="h-4 w-4" />
-          </button>
-          <button
-            onClick={() => setConfirming((v) => !v)}
+        <Select
+          size="sm"
+          className="w-36"
+          value={column.role ?? ''}
+          onValueChange={(v) => onRole((v || null) as ColumnRole | null)}
+          disabled={busy}
+          aria-label={`Stage of ${column.name}`}
+          options={[{ value: '', label: 'No stage' }, ...STAGES]}
+        />
+        <Menu
+          align="end"
+          aria-label={`Actions for ${column.name}`}
+          trigger={
+            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Actions for ${column.name}`}>
+              <MoreHorizontal className="h-4 w-4" />
+            </Button>
+          }
+        >
+          <MenuItem icon={<ArrowUp />} disabled={index === 0 || busy} onSelect={() => onMove(-1)}>
+            Move up
+          </MenuItem>
+          <MenuItem icon={<ArrowDown />} disabled={index === total - 1 || busy} onSelect={() => onMove(1)}>
+            Move down
+          </MenuItem>
+          <MenuItem
+            destructive
+            icon={<Trash2 />}
             disabled={others.length === 0 || busy}
-            className="rounded p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-30"
-            aria-label="Delete column"
-            title={others.length === 0 ? 'Cannot delete the only column' : 'Delete column'}
+            onSelect={() => setConfirming(true)}
           >
-            <Trash2 className="h-4 w-4" />
-          </button>
-        </div>
+            Delete column
+          </MenuItem>
+        </Menu>
       </div>
 
       {confirming ? (
-        <div className="mt-2 flex flex-wrap items-center gap-2 rounded-2xl bg-destructive/5 p-3 text-sm">
+        <ConfirmStrip
+          confirmLabel="Delete column"
+          disabled={!target}
+          onConfirm={() => {
+            onDelete(target);
+            setConfirming(false);
+          }}
+          onCancel={() => setConfirming(false)}
+        >
           <span>Move its tasks to</span>
-          <select
+          <Select
+            size="sm"
+            className="w-44"
+            aria-label="Move tasks to"
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="h-8 rounded border border-input bg-card px-2 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            {others.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
-          <button
-            onClick={() => {
-              onDelete(target);
-              setConfirming(false);
-            }}
-            disabled={!target}
-            className="rounded bg-destructive px-2 py-1 text-xs font-medium text-destructive-foreground disabled:opacity-50"
-          >
-            Delete column
-          </button>
-          <button onClick={() => setConfirming(false)} className="text-xs text-muted-foreground hover:text-foreground">
-            Cancel
-          </button>
-        </div>
+            onValueChange={setTarget}
+            options={others.map((o) => ({ value: o.id, label: o.name }))}
+          />
+        </ConfirmStrip>
       ) : null}
-    </div>
+    </li>
   );
 }
 
@@ -419,6 +465,7 @@ function DangerSection({ project }: { project: Project }) {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const archived = Boolean(project.archived_at);
+  const [confirming, setConfirming] = useState(false);
 
   function invalidate() {
     queryClient.invalidateQueries({ queryKey: ['project-by-key', orgId, project.key] });
@@ -428,6 +475,7 @@ function DangerSection({ project }: { project: Project }) {
   const archive = useMutation({
     mutationFn: () => archiveProject(orgId, project.id),
     onSuccess: () => {
+      setConfirming(false);
       invalidate();
       toast({ title: 'Project archived', variant: 'success' });
     },
@@ -444,32 +492,49 @@ function DangerSection({ project }: { project: Project }) {
   });
 
   return (
-    <section>
-      <SectionTitle>Danger zone</SectionTitle>
-      <div className="flex items-center justify-between rounded-2xl bg-destructive/5 p-5">
-        <div>
-          <p className="text-sm font-medium">{archived ? 'Restore project' : 'Archive project'}</p>
-          <p className="text-sm text-muted-foreground">
-            {archived
-              ? 'Make this project active and editable again.'
-              : 'Hide it from the active list and make it read-only. You can restore it later.'}
-          </p>
+    <SettingsSection
+      danger
+      title="Danger zone"
+      description="Actions here change who can use the project. They can be undone."
+    >
+      <div className="overflow-hidden rounded-md border border-destructive/30">
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4">
+          <div className="min-w-0">
+            <p className="text-sm font-medium">{archived ? 'Restore project' : 'Archive project'}</p>
+            <p className="mt-0.5 text-[13px] text-muted-foreground">
+              {archived
+                ? 'Make this project active and editable again.'
+                : 'Hide it from the active list and make it read-only. You can restore it later.'}
+            </p>
+          </div>
+          {archived ? (
+            <Button size="sm" variant="outline" onClick={() => unarchive.mutate()} isLoading={unarchive.isPending}>
+              Restore
+            </Button>
+          ) : (
+            <Button size="sm" variant="destructive" onClick={() => setConfirming(true)} disabled={confirming}>
+              Archive
+            </Button>
+          )}
         </div>
-        {archived ? (
-          <Button variant="outline" onClick={() => unarchive.mutate()} disabled={unarchive.isPending}>
-            Restore
-          </Button>
-        ) : (
-          <Button variant="destructive" onClick={() => archive.mutate()} disabled={archive.isPending}>
-            Archive
-          </Button>
-        )}
+        {confirming && !archived ? (
+          <ConfirmStrip
+            confirmLabel="Archive project"
+            disabled={archive.isPending}
+            onConfirm={() => archive.mutate()}
+            onCancel={() => setConfirming(false)}
+          >
+            <span>
+              Archive <strong className="font-medium">{project.name}</strong>? It becomes read-only for everyone.
+            </span>
+          </ConfirmStrip>
+        ) : null}
       </div>
-      <p className="mt-3 text-xs text-muted-foreground">
+      <p className="mt-4 text-xs text-muted-foreground">
         <Link href={`/app/${slug}/projects`} className="hover:underline">
           Back to projects
         </Link>
       </p>
-    </section>
+    </SettingsSection>
   );
 }

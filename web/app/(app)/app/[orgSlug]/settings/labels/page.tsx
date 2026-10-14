@@ -52,7 +52,7 @@ export default function LabelsSettingsPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div>
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Labels</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">Labels</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           Labels are shared across all projects and used to tag and filter tasks.
         </p>

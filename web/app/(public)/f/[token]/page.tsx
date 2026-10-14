@@ -7,6 +7,8 @@ import { getPublicForm, submitPublicForm } from '@/lib/api/forms';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/auth/field';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const PRIORITIES = [
   { value: '', label: 'No priority' },
@@ -101,29 +103,22 @@ export default function PublicFormPage(props: { params: Promise<{ token: string 
               />
             </Field>
             <Field id="f-desc" label="Details">
-              <textarea
+              <Textarea
                 id="f-desc"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
                 placeholder="Anything that helps us understand the request…"
-                className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               />
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="f-priority" label="Priority">
-                <select
+                <Select
                   id="f-priority"
                   value={priority}
-                  onChange={(e) => setPriority(e.target.value)}
-                  className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-                >
-                  {PRIORITIES.map((p) => (
-                    <option key={p.value} value={p.value}>
-                      {p.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setPriority}
+                  options={PRIORITIES.map((p) => ({ value: p.value, label: p.label }))}
+                />
               </Field>
               <Field id="f-name" label="Your name (optional)">
                 <Input

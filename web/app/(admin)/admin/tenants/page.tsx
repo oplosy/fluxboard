@@ -7,6 +7,7 @@ import { Search } from 'lucide-react';
 
 import { listTenants } from '@/lib/api/admin';
 import { formatMoney } from '@/lib/billing/format';
+import { Select } from '@/components/ui/select';
 
 const PLANS = ['', 'free', 'pro', 'business'];
 const STATUSES = ['', 'active', 'trialing', 'past_due', 'unpaid', 'canceled', 'none'];
@@ -25,9 +26,6 @@ export default function AdminTenantsPage() {
     queryKey: ['admin-tenants', applied],
     queryFn: () => listTenants({ ...applied, limit: 200 }),
   });
-
-  const selectCls =
-    'h-9 rounded-md border border-neutral-700 bg-neutral-900 px-2 text-sm text-neutral-100';
 
   return (
     <div className="space-y-6">
@@ -49,20 +47,22 @@ export default function AdminTenantsPage() {
             className="h-9 rounded-md border border-neutral-700 bg-neutral-900 pl-8 pr-3 text-sm text-neutral-100 placeholder:text-neutral-500"
           />
         </div>
-        <select value={plan} onChange={(e) => setPlan(e.target.value)} className={selectCls}>
-          {PLANS.map((p) => (
-            <option key={p} value={p}>
-              {p === '' ? 'All plans' : p}
-            </option>
-          ))}
-        </select>
-        <select value={status} onChange={(e) => setStatus(e.target.value)} className={selectCls}>
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s === '' ? 'All statuses' : s}
-            </option>
-          ))}
-        </select>
+        <Select
+          size="sm"
+          aria-label="Plan"
+          className="h-9 w-40"
+          value={plan}
+          onValueChange={setPlan}
+          options={PLANS.map((p) => ({ value: p, label: p === '' ? 'All plans' : p }))}
+        />
+        <Select
+          size="sm"
+          aria-label="Status"
+          className="h-9 w-44"
+          value={status}
+          onValueChange={setStatus}
+          options={STATUSES.map((s) => ({ value: s, label: s === '' ? 'All statuses' : s }))}
+        />
         <button
           type="submit"
           className="h-9 rounded-md bg-signal px-4 text-sm font-medium text-neutral-950 hover:bg-signal/90"

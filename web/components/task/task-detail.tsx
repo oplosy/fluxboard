@@ -21,6 +21,8 @@ import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
 import { ActivityTimeline } from './activity-timeline';
 import { ReviewPanel } from './review-panel';
+import { Select } from '@/components/ui/select';
+import { DescriptionEditor } from '@/components/editor/description-editor';
 
 // Full task detail (FR-TASK-001/002). Inline-edits every field; UpdateTask
 // replaces the whole field set, so each change is merged onto the current task
@@ -75,7 +77,6 @@ export function TaskDetail({
   // In-progress edits, tied to the task they were typed for. Without one the
   // inputs show the saved text, so they follow refetches and task switches.
   const [titleEdit, setTitleEdit] = useState<{ taskId: string; text: string } | null>(null);
-  const [descEdit, setDescEdit] = useState<{ taskId: string; text: string } | null>(null);
 
   const patch = useMutation({
     mutationFn: (p: Partial<UpdateTaskInput>) => updateTask(orgId, taskId, toInput(task as Task, p)),
@@ -126,8 +127,6 @@ export function TaskDetail({
   if (isError || !task) return <p className="text-sm text-destructive">Couldn’t load this task.</p>;
 
   const titleDraft = titleEdit?.taskId === task.id ? titleEdit.text : task.title;
-  const descDirty = descEdit?.taskId === task.id;
-  const descDraft = descDirty ? descEdit.text : task.description;
 
   const attached = taskLabels ?? [];
   const attachedIds = new Set(attached.map((l) => l.id));
@@ -157,40 +156,12 @@ export function TaskDetail({
 
         <div>
           <h3 className="mb-2 text-sm font-semibold">Description</h3>
-          {canEdit ? (
-            <div>
-              <textarea
-                value={descDraft}
-                onChange={(e) => setDescEdit({ taskId: task.id, text: e.target.value })}
-                rows={4}
-                placeholder="Add a description…"
-                className="w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-              />
-              {descDirty ? (
-                <div className="mt-1 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => patch.mutate({ description: descDraft }, { onSuccess: () => setDescEdit(null) })}
-                    disabled={patch.isPending}
-                    className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDescEdit(null)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : task.description ? (
-            <p className="whitespace-pre-wrap text-sm">{task.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">No description.</p>
-          )}
+          <DescriptionEditor
+            key={task.id}
+            value={task.description}
+            canEdit={canEdit}
+            onSave={(description) => patch.mutateAsync({ description })}
+          />
         </div>
 
         <Subtasks taskId={taskId} canEdit={canEdit} />
@@ -207,27 +178,16 @@ export function TaskDetail({
         <ReviewPanel taskId={taskId} projectId={projectId} columnId={task.column_id} canEdit={canEdit} />
         <Field label="Assignee">
           {canEdit ? (
-            <select
+            <Select
+              aria-label="Assignee"
               value={task.assignee_id ?? ''}
-              onChange={(e) => patch.mutate({ assignee_id: e.target.value || null })}
-                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.name || m.email}
-                </option>
-              ))}
-              {agents.length > 0 ? (
-                <optgroup label="Agents">
-                  {agents.map((a) => (
-                    <option key={a.id} value={a.id}>
-                      {a.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ) : null}
-            </select>
+              onValueChange={(v) => patch.mutate({ assignee_id: v || null })}
+              options={[
+                { value: '', label: 'Unassigned' },
+                ...members.map((m) => ({ value: m.user_id, label: m.name || m.email })),
+                ...agents.map((a) => ({ value: a.id, label: a.name, description: 'Agent' })),
+              ]}
+            />
           ) : (
             <span className="text-sm">
               {members.find((m) => m.user_id === task.assignee_id)?.name ??
@@ -248,17 +208,12 @@ export function TaskDetail({
 
         <Field label="Priority">
           {canEdit ? (
-            <select
+            <Select
+              aria-label="Priority"
               value={task.priority}
-              onChange={(e) => patch.mutate({ priority: e.target.value as Priority })}
-                className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {priorityLabel(p)}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => patch.mutate({ priority: v as Priority })}
+              options={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))}
+            />
           ) : (
             <span className="text-sm">{priorityLabel(task.priority as Priority)}</span>
           )}
@@ -322,18 +277,14 @@ export function TaskDetail({
             {attached.length === 0 ? <span className="text-sm text-muted-foreground">None</span> : null}
           </div>
           {canEdit && available.length > 0 ? (
-            <select
+            <Select
+              className="mt-1.5"
+              aria-label="Add label"
               value=""
-              onChange={(e) => e.target.value && attach.mutate(e.target.value)}
-              className="mt-1.5 w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              <option value="">Add label…</option>
-              {available.map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+              placeholder="Add label…"
+              onValueChange={(v) => v && attach.mutate(v)}
+              options={available.map((l) => ({ value: l.id, label: l.name }))}
+            />
           ) : null}
         </Field>
 
@@ -357,7 +308,7 @@ export function TaskDetail({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
       {children}
     </div>
   );

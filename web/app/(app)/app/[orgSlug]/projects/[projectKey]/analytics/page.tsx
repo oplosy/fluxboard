@@ -1,5 +1,6 @@
 'use client';
 
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { useParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import {
@@ -51,10 +52,8 @@ export default function ProjectAnalyticsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-12 lg:px-10 lg:py-16">
-      <p className="mb-3 text-xs font-semibold uppercase tracking-[0.16em] text-primary">Project / analytics</p>
-      <h1 className="text-4xl font-semibold tracking-[-0.06em]">{project.name} <span className="text-muted-foreground/60">/</span> Analytics</h1>
-      <p className="mt-1 text-sm text-muted-foreground">
+    <ProjectFrame project={project}>
+      <p className="text-sm text-muted-foreground">
         Throughput, work-in-progress and cycle time from the nightly rollups.
       </p>
 
@@ -65,7 +64,7 @@ export default function ProjectAnalyticsPage() {
       ) : (
         <AnalyticsBody data={analytics.data} />
       )}
-    </div>
+    </ProjectFrame>
   );
 }
 

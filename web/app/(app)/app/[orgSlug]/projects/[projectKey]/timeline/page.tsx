@@ -6,7 +6,7 @@ import { useQuery } from '@tanstack/react-query';
 import { useOrg } from '@/lib/org/context';
 import { useProjectByKey } from '@/lib/board/use-project';
 import { getBoard } from '@/lib/api/board';
-import { ProjectHeader } from '@/components/board/project-header';
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { Timeline } from '@/components/board/timeline';
 
 export default function ProjectTimelinePage(props: { params: Promise<{ projectKey: string }> }) {
@@ -38,12 +38,11 @@ export default function ProjectTimelinePage(props: { params: Promise<{ projectKe
   }
 
   return (
-    <div className="px-6 py-6">
-      <ProjectHeader project={project} />
+    <ProjectFrame project={project}>
       <Timeline
         tasks={tasks}
         taskHref={(t) => `/app/${slug}/projects/${project.key}/tasks/${t.number}`}
       />
-    </div>
+    </ProjectFrame>
   );
 }

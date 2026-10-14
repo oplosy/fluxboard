@@ -72,7 +72,7 @@ export function FeatureRows({ groups }: { groups: Group[] }) {
                         <li
                           key={t}
                           className={cn(
-                            'rounded-sm border border-border px-2 py-1 font-mono text-[11px] uppercase tracking-[0.1em] transition-[opacity,transform] duration-500 ease-spring',
+                            'rounded-sm border border-border px-2 py-1 text-xs transition-[opacity,transform] duration-500 ease-spring font-medium',
                             isOpen ? 'scale-100 opacity-100' : 'scale-90 opacity-0',
                           )}
                           style={{ transitionDelay: isOpen ? `${220 + j * 60}ms` : '0ms' }}

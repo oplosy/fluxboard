@@ -28,7 +28,7 @@ export function ChangelogTimeline({ entries }: { entries: ChangelogEntry[] }) {
         <div className="space-y-16">
           {entries.map((e, i) => (
             <article key={e.date} className="relative grid gap-4 pl-10 md:grid-cols-[160px_1fr] md:gap-12 md:pl-0">
-              <Reveal variant="fade" className="font-mono text-xs uppercase tracking-[0.14em] text-muted-foreground md:pt-1.5 md:text-right">
+              <Reveal variant="fade" className="text-xs text-muted-foreground md:pt-1.5 md:text-right font-medium">
                 <time dateTime={e.date}>{e.date}</time>
               </Reveal>
               <span aria-hidden className="absolute left-0 top-1 flex h-[15px] w-[15px] items-center justify-center md:left-[176px]">

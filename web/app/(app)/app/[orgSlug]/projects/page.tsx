@@ -88,7 +88,7 @@ export default function ProjectsPage() {
           {filter === 'active' ? (
             <Link
               href={`/app/${slug}/projects/new`}
-              className="link-underline mt-3 font-mono text-xs uppercase tracking-[0.14em] text-foreground"
+              className="link-underline mt-3 text-xs text-foreground font-medium"
             >
               Create your first project →
             </Link>
@@ -109,9 +109,9 @@ export default function ProjectsPage() {
                 aria-hidden
               />
               <div className="flex items-center justify-between">
-                <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{p.key}</span>
+                <span className="font-mono text-xs text-muted-foreground">{p.key}</span>
                 {p.archived_at ? (
-                  <span className="inline-flex items-center gap-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                  <span className="inline-flex items-center gap-1 text-xs text-muted-foreground font-medium">
                     <Archive className="h-3 w-3" /> Archived
                   </span>
                 ) : (

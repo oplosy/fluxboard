@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { usePathname, useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { Building2, Bell, ChevronsUpDown, Plus, User, LogOut, Check, Shield, Menu, Search } from 'lucide-react';
 
@@ -13,22 +13,23 @@ import { listMyOrgs } from '@/lib/api/orgs';
 import { getUnreadCount } from '@/lib/api/notifications';
 import { getMe } from '@/lib/api/user';
 import { Avatar } from '@/components/ui/avatar';
+import { SearchPalette } from '@/components/search/search-palette';
 
 export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void }) {
   const { org, slug, role } = useOrg();
-  const router = useRouter();
+  const [searchOpen, setSearchOpen] = useState(false);
 
-  // ⌘K / Ctrl+K jumps to search from anywhere in the org shell.
+  // ⌘K / Ctrl+K toggles the search palette from anywhere in the org shell.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
-        router.push(`/app/${slug}/search`);
+        setSearchOpen((v) => !v);
       }
     }
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [router, slug]);
+  }, []);
 
   return (
     <header className="sticky top-0 z-20 flex h-14 shrink-0 items-center gap-2 border-b border-border bg-topbar/85 px-4 backdrop-blur-md lg:px-6">
@@ -47,18 +48,30 @@ export function Topbar({ onMobileMenuToggle }: { onMobileMenuToggle?: () => void
       <Breadcrumb slug={slug} />
 
       <div className="ml-auto flex items-center gap-1">
-        <Link
-          href={`/app/${slug}/search`}
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
           className="group hidden h-9 items-center gap-3 rounded-md border border-border bg-card px-3 text-xs text-muted-foreground transition-[border-color,color,width] duration-300 hover:border-foreground/40 hover:text-foreground sm:flex"
           aria-label="Search"
+          aria-haspopup="dialog"
         >
           <Search className="h-3.5 w-3.5 transition-transform duration-500 ease-spring group-hover:-rotate-12 group-hover:scale-110" />
           <span className="pr-6">Search tasks…</span>
           <kbd className="rounded-sm border border-border bg-background px-1.5 py-0.5 font-mono text-[10px]">⌘K</kbd>
-        </Link>
+        </button>
+        <button
+          type="button"
+          onClick={() => setSearchOpen(true)}
+          className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground sm:hidden"
+          aria-label="Search"
+          aria-haspopup="dialog"
+        >
+          <Search className="h-4 w-4" />
+        </button>
         <NotificationBell slug={slug} />
         <AccountMenu />
       </div>
+      {searchOpen ? <SearchPalette onClose={() => setSearchOpen(false)} /> : null}
     </header>
   );
 }
@@ -185,7 +198,7 @@ function OrgSwitcher({
     >
       {(close) => (
         <>
-          <p className="px-2.5 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Organizations</p>
+          <p className="px-2.5 pb-1 pt-1.5 text-xs text-muted-foreground font-medium">Organizations</p>
           {orgs?.map((o, i) => (
             <Link
               key={o.org_id}

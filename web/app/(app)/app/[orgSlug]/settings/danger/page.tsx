@@ -11,6 +11,7 @@ import { useAuth } from '@/lib/auth/context';
 import { useToast } from '@/components/ui/toast';
 import { useOrgMembers } from '@/lib/org/use-members';
 import { deleteOrg, transferOwnership } from '@/lib/api/orgs';
+import { Select } from '@/components/ui/select';
 
 export default function DangerSettingsPage() {
   const { isOwner } = useOrg();
@@ -59,7 +60,7 @@ function TransferSection() {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
         Transfer ownership
       </h2>
       <div className="space-y-3 rounded-md border border-destructive/30 p-4">
@@ -73,21 +74,16 @@ function TransferSection() {
           <p className="text-sm text-muted-foreground">No other members to transfer to.</p>
         ) : (
           <>
-            <select
+            <Select
+              aria-label="New owner"
+              placeholder="Select a member…"
               value={target}
-              onChange={(e) => {
-                setTarget(e.target.value);
+              onValueChange={(v) => {
+                setTarget(v);
                 setConfirm('');
               }}
-              className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              <option value="">Select a member…</option>
-              {candidates.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.name || m.email}
-                </option>
-              ))}
-            </select>
+              options={candidates.map((m) => ({ value: m.user_id, label: m.name || m.email }))}
+            />
             {target ? (
               <div className="space-y-2">
                 <p className="text-sm">
@@ -132,7 +128,7 @@ function DeleteSection() {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+      <h2 className="mb-3 text-sm font-semibold text-muted-foreground">
         Delete organization
       </h2>
       <div className="space-y-3 rounded-md border border-destructive/40 bg-destructive/5 p-4">

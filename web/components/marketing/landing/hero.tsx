@@ -33,7 +33,7 @@ export function Hero() {
       <div aria-hidden className="pointer-events-none absolute inset-0 -z-10 hidden md:block">
         {FLUX_LANES.slice(0, -1).map((f, i) => (
           <div key={f} className="absolute bottom-0 top-[72px] border-l border-dashed border-foreground/15" style={{ left: `${f * 100}%` }}>
-            <span className="absolute left-3 top-6 font-mono text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
+            <span className="absolute left-3 top-6 text-xs text-muted-foreground font-medium">
               <span className={i === 3 ? 'text-signal-ink' : undefined}>
                 <ScrambleText text={`${String(i + 1).padStart(2, '0')} ${laneNames[i]}`} />
               </span>
@@ -85,7 +85,7 @@ export function Hero() {
           <dl className="grid flex-1 grid-cols-2 gap-x-6 gap-y-4 md:grid-cols-4">
             {specs.map((s, i) => (
               <Reveal key={s.n} index={i + 5} variant="up">
-                <dt className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">
+                <dt className="text-xs text-muted-foreground font-medium">
                   {s.n} / {s.k}
                 </dt>
                 <dd className="mt-1.5 text-sm font-medium">{s.v}</dd>
@@ -93,7 +93,7 @@ export function Hero() {
             ))}
           </dl>
           <div className="hidden shrink-0 text-right lg:block" aria-live="off">
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Shipped in this field</p>
+            <p className="text-xs text-muted-foreground font-medium">Shipped in this field</p>
             <p className="tabular font-display text-4xl font-semibold tracking-[-0.04em]">
               {String(shipped).padStart(4, '0')}
             </p>

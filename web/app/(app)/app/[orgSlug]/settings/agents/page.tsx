@@ -101,7 +101,7 @@ export default function AgentsSettingsPage() {
     <div className="max-w-2xl space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div className="min-w-0">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Agents</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">Agents</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Automated teammates that work this organization over MCP with their own key. They show up by name on tasks
             and in activity, and don’t take a seat.

@@ -9,6 +9,8 @@ import type { BoardColumn, Label, Priority, TaskCard } from '@/lib/api/types';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import { cn } from '@/lib/utils';
 import { Card } from './card';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 export interface QuickTaskInput {
   title: string;
@@ -158,7 +160,7 @@ export function Column({
 
         {composing ? (
           <div className="origin-top animate-scale-in rounded-md border border-foreground/30 bg-card p-3 shadow-[0_12px_28px_-16px_hsl(var(--ink)/0.4)]">
-            <textarea
+            <Textarea
               autoFocus
               value={title}
               onChange={(e) => setTitle(e.target.value)}
@@ -171,34 +173,23 @@ export function Column({
               }}
               rows={2}
               placeholder="Task title…"
-              className="w-full resize-none bg-transparent text-sm outline-none placeholder:text-muted-foreground"
+              autoResize maxRows={6} className="rounded-none border-0 bg-transparent p-0 hover:border-0 focus-visible:border-0 focus-visible:shadow-none"
             />
             <div className="mt-2 grid grid-cols-2 gap-2">
-              <select
+              <Select
+                size="sm"
                 value={priority}
-                onChange={(e) => setPriority(e.target.value as Priority)}
+                onValueChange={(v) => setPriority(v as Priority)}
                 aria-label="Priority"
-                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-              >
-                {PRIORITIES.map((p) => (
-                  <option key={p} value={p}>
-                    {priorityLabel(p)}
-                  </option>
-                ))}
-              </select>
-              <select
+                options={PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))}
+              />
+              <Select
+                size="sm"
                 value={assigneeId}
-                onChange={(e) => setAssigneeId(e.target.value)}
+                onValueChange={setAssigneeId}
                 aria-label="Assignee"
-                className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-              >
-                <option value="">Unassigned</option>
-                {members.map((m) => (
-                  <option key={m.user_id} value={m.user_id}>
-                    {m.name}
-                  </option>
-                ))}
-              </select>
+                options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: m.name }))]}
+              />
               <input
                 type="date"
                 value={startDate}

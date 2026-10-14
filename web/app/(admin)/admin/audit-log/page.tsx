@@ -5,6 +5,7 @@ import { useQuery } from '@tanstack/react-query';
 
 import { globalAudit } from '@/lib/api/admin';
 import type { AuditFilter } from '@/lib/api/audit';
+import { Select } from '@/components/ui/select';
 
 const SEVERITIES = ['', 'info', 'notice', 'warning', 'critical'];
 
@@ -65,13 +66,14 @@ export default function AdminAuditLogPage() {
       >
         <input value={actor} onChange={(e) => setActor(e.target.value)} placeholder="Actor id" className={inputCls} />
         <input value={action} onChange={(e) => setAction(e.target.value)} placeholder="Action" className={inputCls} />
-        <select value={severity} onChange={(e) => setSeverity(e.target.value)} className={inputCls}>
-          {SEVERITIES.map((s) => (
-            <option key={s} value={s}>
-              {s === '' ? 'Any severity' : s}
-            </option>
-          ))}
-        </select>
+        <Select
+          size="sm"
+          aria-label="Severity"
+          className="h-9 w-44"
+          value={severity}
+          onValueChange={setSeverity}
+          options={SEVERITIES.map((s) => ({ value: s, label: s === '' ? 'Any severity' : s }))}
+        />
         <input type="date" value={since} onChange={(e) => setSince(e.target.value)} className={inputCls} />
         <input type="date" value={until} onChange={(e) => setUntil(e.target.value)} className={inputCls} />
         <button

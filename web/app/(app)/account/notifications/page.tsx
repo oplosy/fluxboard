@@ -8,6 +8,7 @@ import { useToast } from '@/components/ui/toast';
 import { listMyOrgs } from '@/lib/api/orgs';
 import { getPrefs, setPref, NOTIFICATION_CATEGORIES } from '@/lib/api/notifications';
 import type { NotificationPref } from '@/lib/api/types';
+import { Select } from '@/components/ui/select';
 
 function Toggle({
   checked,
@@ -114,18 +115,14 @@ export default function NotificationsPage() {
               <label htmlFor="org" className="text-sm text-muted-foreground">
                 Organization
               </label>
-              <select
+              <Select
                 id="org"
-                className="h-9 rounded-md border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
+                size="sm"
+                className="h-9 w-56"
                 value={orgId}
-                onChange={(e) => setOrgId(e.target.value)}
-              >
-                {orgs.map((o) => (
-                  <option key={o.org_id} value={o.org_id}>
-                    {o.name}
-                  </option>
-                ))}
-              </select>
+                onValueChange={setOrgId}
+                options={orgs.map((o) => ({ value: o.org_id, label: o.name }))}
+              />
             </div>
             {orgId ? <OrgPrefs orgId={orgId} /> : null}
           </>

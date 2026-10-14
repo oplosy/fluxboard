@@ -69,7 +69,7 @@ export function OAuthButtons({ next }: { next: string }) {
 
   return (
     <div className="animate-slide-down">
-      <div className="my-5 flex items-center gap-3 font-mono text-[10.5px] uppercase tracking-[0.14em] text-muted-foreground">
+      <div className="my-5 flex items-center gap-3 text-xs text-muted-foreground font-medium">
         <span className="h-px flex-1 bg-border" />
         or
         <span className="h-px flex-1 bg-border" />
