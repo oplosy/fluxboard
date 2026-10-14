@@ -14,6 +14,7 @@ import (
 type Querier interface {
 	// Project members ([T], tenant-scoped, FR-PROJ-003) ------------------------
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
+	AdvanceRecurrence(ctx context.Context, arg AdvanceRecurrenceParams) error
 	// Task activity log ([T], tenant-scoped, FR-TASK-002) -----------------------
 	AppendActivity(ctx context.Context, arg AppendActivityParams) error
 	AttachLabel(ctx context.Context, arg AttachLabelParams) error
@@ -98,6 +99,8 @@ type Querier interface {
 	// Memberships ([T], tenant-scoped) ------------------------------------------
 	CreateMembership(ctx context.Context, arg CreateMembershipParams) error
 	CreateOAuthIdentity(ctx context.Context, arg CreateOAuthIdentityParams) error
+	// (recurrence_id, occurrence_on) is unique: a repeated generation inserts nothing.
+	CreateOccurrenceTask(ctx context.Context, arg CreateOccurrenceTaskParams) (int64, error)
 	CreateOneTimeToken(ctx context.Context, arg CreateOneTimeTokenParams) error
 	// Organizations (global pool, no RLS) ---------------------------------------
 	CreateOrg(ctx context.Context, arg CreateOrgParams) error
@@ -136,6 +139,7 @@ type Querier interface {
 	DeleteSubtask(ctx context.Context, arg DeleteSubtaskParams) (int64, error)
 	DeleteTaskCustomValue(ctx context.Context, arg DeleteTaskCustomValueParams) (int64, error)
 	DeleteTaskLink(ctx context.Context, arg DeleteTaskLinkParams) (int64, error)
+	DeleteTaskRecurrence(ctx context.Context, arg DeleteTaskRecurrenceParams) (int64, error)
 	DeleteTimeEntry(ctx context.Context, arg DeleteTimeEntryParams) (int64, error)
 	// Hard-deletes the account (docs/08 §3 DELETE /me). Memberships/sessions cascade
 	// via ON DELETE CASCADE. Callers MUST enforce the sole-owner guard first.
@@ -193,6 +197,8 @@ type Querier interface {
 	GetSubtask(ctx context.Context, arg GetSubtaskParams) (Subtask, error)
 	// Live tasks only; trashed tasks are addressable through the Trash queries.
 	GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, error)
+	// Task recurrence rules ([T], tenant-scoped, research report P1) ---------------
+	GetTaskRecurrence(ctx context.Context, arg GetTaskRecurrenceParams) (GetTaskRecurrenceRow, error)
 	GetTenantSummary(ctx context.Context, orgID uuid.UUID) (GetTenantSummaryRow, error)
 	GetTimeEntry(ctx context.Context, arg GetTimeEntryParams) (TimeEntry, error)
 	GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) (GetTrashedTaskRow, error)
@@ -226,6 +232,10 @@ type Querier interface {
 	// All non-deleted org ids (organizations has no RLS). Drives per-tenant
 	// maintenance jobs (trash purge, attachment GC) which then run under WithTenant.
 	ListActiveOrgIDs(ctx context.Context) ([]uuid.UUID, error)
+	// Active rules whose template is live, with what an occurrence copies from the
+	// template, the template's board, and the completion (or trashing)
+	// of the series' latest instance for "after completion" rules.
+	ListActiveRecurrences(ctx context.Context, orgID uuid.UUID) ([]ListActiveRecurrencesRow, error)
 	// Live sessions the user can manage: not revoked, not rotated (i.e. the current
 	// head of each refresh family), not expired. Newest first (docs/04-AUTH.md §5).
 	ListActiveUserSessions(ctx context.Context, userID uuid.UUID) ([]ListActiveUserSessionsRow, error)
@@ -309,6 +319,8 @@ type Querier interface {
 	// concurrent drainers make progress without contending. The lock dies with the
 	// tx, so a crash before MarkOutboxDrained leaves the rows undrained.
 	LockOutboxBatch(ctx context.Context, arg LockOutboxBatchParams) ([]Outbox, error)
+	// Serializes generation per rule; the caller skips dates on or before last_on.
+	LockRecurrence(ctx context.Context, arg LockRecurrenceParams) (LockRecurrenceRow, error)
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) (int64, error)
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (int64, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
@@ -410,6 +422,9 @@ type Querier interface {
 	// time (after its staleness guard), so EXCLUDED never regresses it.
 	UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) error
 	UpsertTaskCustomValue(ctx context.Context, arg UpsertTaskCustomValueParams) error
+	// One rule per template task; an edit replaces the rule in place so its id, and
+	// with it the identity of every occurrence already generated, survives.
+	UpsertTaskRecurrence(ctx context.Context, arg UpsertTaskRecurrenceParams) error
 	// Usage metering — Phase 4 (docs/06-BILLING.md §5, FR-BILL-007) ----------------
 	// usage_records [T]: hourly idempotent UPSERT of the per-(org, metric, day)
 	// aggregate; daily job pushes Business-plan aggregates to Stripe with action=set.

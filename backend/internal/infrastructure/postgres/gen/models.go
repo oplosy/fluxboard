@@ -436,6 +436,8 @@ type Task struct {
 	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
 	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
+	RecurrenceID   pgtype.UUID        `json:"recurrence_id"`
+	OccurrenceOn   pgtype.Date        `json:"occurrence_on"`
 }
 
 type TaskActivity struct {
@@ -470,6 +472,22 @@ type TaskLink struct {
 	LinkedTaskID uuid.UUID `json:"linked_task_id"`
 	OrgID        uuid.UUID `json:"org_id"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+type TaskRecurrence struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	TaskID    uuid.UUID `json:"task_id"`
+	Freq      string    `json:"freq"`
+	Weekdays  []int16   `json:"weekdays"`
+	MonthDay  *int16    `json:"month_day"`
+	Timezone  string    `json:"timezone"`
+	Mode      string    `json:"mode"`
+	Paused    bool      `json:"paused"`
+	LastOn    time.Time `json:"last_on"`
+	CreatedBy uuid.UUID `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
 }
 
 type TimeEntry struct {
