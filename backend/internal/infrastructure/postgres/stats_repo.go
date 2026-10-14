@@ -37,9 +37,9 @@ func (r *StatsRepo) ProjectIDs(ctx context.Context, orgID string) ([]string, err
 }
 
 // ComputeDay aggregates a project's activity for the given UTC day: the created
-// count over [day, day+1) and a current per-column open-task snapshot. Completion
-// and cycle-time metrics need task_activity mining (deferred to Phase 6), so
-// CompletedCount is 0 and AvgCycleSeconds nil here.
+// and completed counts over [day, day+1), the mean creation-to-completion time
+// of that day's completions (nil when none), and a current per-column open-task
+// snapshot.
 func (r *StatsRepo) ComputeDay(ctx context.Context, orgID, projectID string, day time.Time) (notify.ProjectStat, error) {
 	day = day.UTC().Truncate(24 * time.Hour)
 	next := day.AddDate(0, 0, 1)
@@ -65,6 +65,21 @@ func (r *StatsRepo) ComputeDay(ctx context.Context, orgID, projectID string, day
 			return err
 		}
 		stat.CreatedCount = int(created)
+
+		done, err := q.CompletionsOnDay(ctx, gen.CompletionsOnDayParams{
+			OrgID:     oid,
+			ProjectID: pid,
+			Day:       tsVal(day),
+			NextDay:   tsVal(next),
+		})
+		if err != nil {
+			return err
+		}
+		stat.CompletedCount = int(done.Completed)
+		if done.Completed > 0 {
+			avg := done.CycleSeconds / done.Completed
+			stat.AvgCycleSeconds = &avg
+		}
 
 		cols, err := q.ColumnOpenCounts(ctx, gen.ColumnOpenCountsParams{OrgID: oid, ProjectID: pid})
 		if err != nil {

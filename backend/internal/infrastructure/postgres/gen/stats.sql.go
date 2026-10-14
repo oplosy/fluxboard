@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const columnOpenCounts = `-- name: ColumnOpenCounts :many
@@ -49,6 +50,40 @@ func (q *Queries) ColumnOpenCounts(ctx context.Context, arg ColumnOpenCountsPara
 	return items, nil
 }
 
+const completionsOnDay = `-- name: CompletionsOnDay :one
+SELECT COUNT(*) AS completed,
+       COALESCE(SUM(EXTRACT(EPOCH FROM completed_at - created_at)), 0)::bigint AS cycle_seconds
+FROM tasks
+WHERE org_id = $1 AND project_id = $2 AND deleted_at IS NULL
+  AND completed_at >= $3 AND completed_at < $4
+`
+
+type CompletionsOnDayParams struct {
+	OrgID     uuid.UUID          `json:"org_id"`
+	ProjectID uuid.UUID          `json:"project_id"`
+	Day       pgtype.Timestamptz `json:"day"`
+	NextDay   pgtype.Timestamptz `json:"next_day"`
+}
+
+type CompletionsOnDayRow struct {
+	Completed    int64 `json:"completed"`
+	CycleSeconds int64 `json:"cycle_seconds"`
+}
+
+// Tasks that entered their done column in [@day, @next_day) and are still
+// there (tasks.completed_at, 0038). Cycle time runs from creation to completion.
+func (q *Queries) CompletionsOnDay(ctx context.Context, arg CompletionsOnDayParams) (CompletionsOnDayRow, error) {
+	row := q.db.QueryRow(ctx, completionsOnDay,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.Day,
+		arg.NextDay,
+	)
+	var i CompletionsOnDayRow
+	err := row.Scan(&i.Completed, &i.CycleSeconds)
+	return i, err
+}
+
 const countTasksCreatedOnDay = `-- name: CountTasksCreatedOnDay :one
 SELECT COUNT(*) FROM tasks
 WHERE org_id = $1 AND project_id = $2
@@ -81,11 +116,9 @@ SELECT id FROM projects
 WHERE org_id = $1 AND archived_at IS NULL AND deleted_at IS NULL
 `
 
-// Project stats rollup — Phase 5 (FR-AN-001). project_stats_daily [T]: nightly
-// recompute of yesterday's grain (set-semantics UPSERT). Completion/cycle metrics
-// that need task_activity mining are deferred to Phase 6 analytics; this rollup
-// captures the created count + a current per-column open-task snapshot (recorded
-// in docs/build/PHASE-5 §4).
+// Project stats rollup (FR-AN-001). project_stats_daily [T]: nightly
+// recompute of yesterday's grain (set-semantics UPSERT): created and completed
+// counts, cycle time, and a current per-column open-task snapshot.
 // Non-archived, non-deleted projects for an org (rollup iteration).
 func (q *Queries) ListRollupProjectIDs(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error) {
 	rows, err := q.db.Query(ctx, listRollupProjectIDs, orgID)

@@ -41,6 +41,9 @@ type Querier interface {
 	// Flip a pending row to committed (idempotency: no-op if already committed via
 	// the WHERE status filter). size_bytes is corrected to the HEAD-verified size.
 	CommitAttachment(ctx context.Context, arg CommitAttachmentParams) (int64, error)
+	// Tasks that entered their done column in [@day, @next_day) and are still
+	// there (tasks.completed_at, 0038). Cycle time runs from creation to completion.
+	CompletionsOnDay(ctx context.Context, arg CompletionsOnDayParams) (CompletionsOnDayRow, error)
 	ConsumeOneTimeToken(ctx context.Context, arg ConsumeOneTimeTokenParams) (OneTimeToken, error)
 	// Single-use consume: marks a matching unused code used. Rows affected = 1 means
 	// the code was valid and is now spent; 0 means invalid/already-used.
@@ -276,11 +279,9 @@ type Querier interface {
 	// every project; otherwise the user's memberships plus, with see_org_visible
 	// (org MEMBER+, never GUEST), the 'org'-visible ones.
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error)
-	// Project stats rollup — Phase 5 (FR-AN-001). project_stats_daily [T]: nightly
-	// recompute of yesterday's grain (set-semantics UPSERT). Completion/cycle metrics
-	// that need task_activity mining are deferred to Phase 6 analytics; this rollup
-	// captures the created count + a current per-column open-task snapshot (recorded
-	// in docs/build/PHASE-5 §4).
+	// Project stats rollup (FR-AN-001). project_stats_daily [T]: nightly
+	// recompute of yesterday's grain (set-semantics UPSERT): created and completed
+	// counts, cycle time, and a current per-column open-task snapshot.
 	// Non-archived, non-deleted projects for an org (rollup iteration).
 	ListRollupProjectIDs(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error)
 	ListRunningTimeEntries(ctx context.Context, arg ListRunningTimeEntriesParams) ([]TimeEntry, error)

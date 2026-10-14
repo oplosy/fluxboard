@@ -435,6 +435,7 @@ type Task struct {
 	Version        int64              `json:"version"`
 	ClaimedBy      pgtype.UUID        `json:"claimed_by"`
 	LeaseExpiresAt pgtype.Timestamptz `json:"lease_expires_at"`
+	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 }
 
 type TaskActivity struct {

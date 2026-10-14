@@ -1,8 +1,6 @@
--- Project stats rollup — Phase 5 (FR-AN-001). project_stats_daily [T]: nightly
--- recompute of yesterday's grain (set-semantics UPSERT). Completion/cycle metrics
--- that need task_activity mining are deferred to Phase 6 analytics; this rollup
--- captures the created count + a current per-column open-task snapshot (recorded
--- in docs/build/PHASE-5 §4).
+-- Project stats rollup (FR-AN-001). project_stats_daily [T]: nightly
+-- recompute of yesterday's grain (set-semantics UPSERT): created and completed
+-- counts, cycle time, and a current per-column open-task snapshot.
 
 -- name: ListRollupProjectIDs :many
 -- Non-archived, non-deleted projects for an org (rollup iteration).
@@ -30,3 +28,12 @@ ON CONFLICT (project_id, day) DO UPDATE SET
   completed_count   = EXCLUDED.completed_count,
   column_snapshot   = EXCLUDED.column_snapshot,
   avg_cycle_seconds = EXCLUDED.avg_cycle_seconds;
+
+-- name: CompletionsOnDay :one
+-- Tasks that entered their done column in [@day, @next_day) and are still
+-- there (tasks.completed_at, 0038). Cycle time runs from creation to completion.
+SELECT COUNT(*) AS completed,
+       COALESCE(SUM(EXTRACT(EPOCH FROM completed_at - created_at)), 0)::bigint AS cycle_seconds
+FROM tasks
+WHERE org_id = @org_id AND project_id = @project_id AND deleted_at IS NULL
+  AND completed_at >= @day AND completed_at < @next_day;
