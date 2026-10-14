@@ -36,3 +36,6 @@ web/out/
 .vscode/
 .DS_Store
 Thumbs.db
+
+# Local code-graph index (codegraph init)
+.codegraph/
