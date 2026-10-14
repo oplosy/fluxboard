@@ -6,7 +6,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/lib/org/context';
 import { useProjectByKey } from '@/lib/board/use-project';
 import { createTask, getBoard } from '@/lib/api/board';
-import { ProjectHeader } from '@/components/board/project-header';
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { TaskCalendar } from '@/components/board/calendar';
 import { Button } from '@/components/ui/button';
 
@@ -58,8 +58,7 @@ export default function ProjectCalendarPage(props: { params: Promise<{ projectKe
   }
 
   return (
-    <div className="px-6 py-6">
-      <ProjectHeader project={project} />
+    <ProjectFrame project={project}>
       {pendingDue ? (
         <div className="mb-4 flex items-center gap-2 rounded-2xl border bg-card p-3">
           <span className="text-sm text-muted-foreground">
@@ -93,6 +92,6 @@ export default function ProjectCalendarPage(props: { params: Promise<{ projectKe
         taskHref={(t) => `/app/${slug}/projects/${project.key}/tasks/${t.number}`}
         onQuickAdd={(dueISO) => setPendingDue(dueISO)}
       />
-    </div>
+    </ProjectFrame>
   );
 }

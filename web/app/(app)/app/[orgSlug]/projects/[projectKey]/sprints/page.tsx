@@ -16,7 +16,7 @@ import {
   startSprint,
   type Sprint,
 } from '@/lib/api/sprints';
-import { ProjectHeader } from '@/components/board/project-header';
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/auth/field';
@@ -120,8 +120,7 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
   const sprints = sprintsQ.data ?? [];
 
   return (
-    <div className="px-6 py-6">
-      <ProjectHeader project={project} />
+    <ProjectFrame project={project}>
 
       <div className="mb-6 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
@@ -292,6 +291,6 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
           </div>
         </div>
       ) : null}
-    </div>
+    </ProjectFrame>
   );
 }

@@ -5,7 +5,7 @@ import Link from 'next/link';
 
 import { useOrg } from '@/lib/org/context';
 import { useProjectByKey } from '@/lib/board/use-project';
-import { ProjectHeader } from '@/components/board/project-header';
+import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { Board } from '@/components/board/board';
 
 export default function ProjectBoardPage(props: { params: Promise<{ projectKey: string }> }) {
@@ -35,9 +35,8 @@ export default function ProjectBoardPage(props: { params: Promise<{ projectKey: 
   }
 
   return (
-    <div className="px-6 py-6">
-      <ProjectHeader project={project} />
+    <ProjectFrame project={project}>
       <Board projectId={project.id} projectKey={project.key} />
-    </div>
+    </ProjectFrame>
   );
 }

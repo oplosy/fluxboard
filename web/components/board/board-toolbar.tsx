@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
-import { Filter, CheckSquare, X } from 'lucide-react';
+import type { ReactNode } from 'react';
+import { Check, CheckSquare, ChevronDown, Search, User, Users, X, Zap } from 'lucide-react';
 
 import type { BoardColumn, Label, Priority } from '@/lib/api/types';
 import type { Sprint } from '@/lib/api/sprints';
-import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
+import { PRIORITIES, priorityLabel, priorityLevel } from '@/lib/board/priority';
 import { cn } from '@/lib/utils';
-import { Select } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
+import { Menu, MenuItem } from '@/components/ui/menu';
 
 export interface BoardFilter {
   text: string;
@@ -18,11 +19,110 @@ export interface BoardFilter {
 
 export const EMPTY_FILTER: BoardFilter = { text: '', priority: '', assignee: 'any', sprint: '' };
 
-const selectCls = 'h-10 w-auto min-w-[8.5rem] max-w-[13rem] text-sm';
+interface PillOption {
+  value: string;
+  label: string;
+  icon?: ReactNode;
+}
 
-// Board toolbar: client-side filters (text / priority / assignee — the board
-// projection carries no labels, so label is not a filter, ADR-017) plus the
-// multi-select mode toggle and, when a selection exists, the bulk action bar.
+// Signal-strength glyph: lit bars = priority level.
+function PriorityGlyph({ priority }: { priority: Priority | '' }) {
+  const level = priority ? priorityLevel(priority) : 0;
+  return (
+    <span className="inline-flex h-3.5 items-end gap-[2px]" aria-hidden>
+      {[1, 2, 3, 4].map((n) => (
+        <span
+          key={n}
+          style={{ height: `${n * 25}%` }}
+          className={cn('w-[3px] rounded-[1px]', n <= level ? 'bg-signal' : 'bg-foreground/20')}
+        />
+      ))}
+    </span>
+  );
+}
+
+// A compact filter control: label + current value, highlighted when it is
+// narrowing the board, with an inline × to reset it.
+function FilterPill({
+  label,
+  icon,
+  value,
+  defaultValue,
+  options,
+  onChange,
+}: {
+  label: string;
+  icon: ReactNode;
+  value: string;
+  defaultValue: string;
+  options: PillOption[];
+  onChange: (value: string) => void;
+}) {
+  const active = value !== defaultValue;
+  const current = options.find((o) => o.value === value);
+
+  return (
+    <div
+      className={cn(
+        'inline-flex h-8 items-stretch rounded-md border text-[13px] transition-colors duration-200',
+        active
+          ? 'border-foreground/50 bg-secondary text-foreground'
+          : 'border-dashed border-input bg-transparent text-muted-foreground hover:border-foreground/40 hover:text-foreground',
+      )}
+    >
+      <Menu
+        aria-label={`${label} filter`}
+        trigger={
+          <button
+            type="button"
+            aria-label={`${label} filter${active && current ? `: ${current.label}` : ''}`}
+            className={cn(
+              'inline-flex h-full items-center gap-1.5 px-2.5 outline-none',
+              'focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))]',
+              active ? 'rounded-l-[5px]' : 'rounded-[5px]',
+            )}
+          >
+            <span className="inline-flex shrink-0 items-center [&>svg]:h-3.5 [&>svg]:w-3.5">
+              {active && current?.icon ? current.icon : icon}
+            </span>
+            <span>{label}</span>
+            {active && current ? (
+              <>
+                <span className="h-3.5 w-px bg-foreground/20" aria-hidden />
+                <span className="max-w-[9rem] truncate font-medium">{current.label}</span>
+              </>
+            ) : (
+              <ChevronDown className="h-3.5 w-3.5 opacity-60" aria-hidden />
+            )}
+          </button>
+        }
+      >
+        {options.map((o) => (
+          <MenuItem key={o.value} icon={o.icon} onSelect={() => onChange(o.value)}>
+            <span className="flex items-center justify-between gap-4">
+              <span className="truncate">{o.label}</span>
+              {o.value === value ? <Check className="h-3.5 w-3.5 shrink-0 text-foreground" aria-hidden /> : null}
+            </span>
+          </MenuItem>
+        ))}
+      </Menu>
+      {active ? (
+        <button
+          type="button"
+          onClick={() => onChange(defaultValue)}
+          aria-label={`Clear ${label.toLowerCase()} filter`}
+          className="inline-flex w-7 items-center justify-center rounded-r-[5px] border-l border-foreground/15 text-muted-foreground outline-none transition-colors hover:bg-foreground/10 hover:text-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))]"
+        >
+          <X className="h-3.5 w-3.5" aria-hidden />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+// Board toolbar: client-side filters (text / priority / assignee / sprint — the
+// board projection carries no labels, so label is not a filter, ADR-017) plus
+// the multi-select mode toggle and, when a selection exists, the bulk action bar.
 export function BoardToolbar({
   filter,
   onFilter,
@@ -54,147 +154,171 @@ export function BoardToolbar({
   onBulkLabel: (labelId: string) => void;
   onClearSelection: () => void;
 }) {
-  const [moveOpen, setMoveOpen] = useState(false);
-  const [labelOpen, setLabelOpen] = useState(false);
+  const activeCount =
+    (filter.text.trim() ? 1 : 0) +
+    (filter.priority ? 1 : 0) +
+    (filter.assignee !== 'any' ? 1 : 0) +
+    (filter.sprint ? 1 : 0);
 
   return (
-    <div className="mb-6 flex flex-wrap items-center gap-2 py-2">
-      <div className="flex items-center gap-2 text-muted-foreground">
-        <Filter className="h-4 w-4" />
-      </div>
-      <input
-        id="board-filter"
-        value={filter.text}
-        onChange={(e) => onFilter({ ...filter, text: e.target.value })}
-        placeholder="Filter tasks…  ( / )"
-        className="h-10 w-56 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-      />
-      <Select
-        size="sm"
-        className={selectCls}
-        value={filter.priority}
-        onValueChange={(v) => onFilter({ ...filter, priority: v as Priority | '' })}
-        aria-label="Filter by priority"
-        options={[{ value: '', label: 'Any priority' }, ...PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))]}
-      />
-      <Select
-        size="sm"
-        className={selectCls}
-        value={filter.assignee}
-        onValueChange={(v) => onFilter({ ...filter, assignee: v as BoardFilter['assignee'] })}
-        aria-label="Filter by assignee"
-        options={[
-          { value: 'any', label: 'Anyone' },
-          { value: 'me', label: 'Assigned to me' },
-          { value: 'unassigned', label: 'Unassigned' },
-        ]}
-      />
-      <Select
-        size="sm"
-        className={selectCls}
-        value={filter.sprint}
-        onValueChange={(v) => onFilter({ ...filter, sprint: v })}
-        aria-label="Filter by sprint"
-        options={[
-          { value: '', label: 'All sprints' },
-          { value: 'backlog', label: 'Backlog' },
-          ...sprints.map((s) => ({ value: s.id, label: s.name })),
-        ]}
-      />
+    <div className="mb-5 space-y-3">
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="group relative w-full sm:w-64">
+          <Search
+            className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground"
+            aria-hidden
+          />
+          <input
+            id="board-filter"
+            type="text"
+            value={filter.text}
+            onChange={(e) => onFilter({ ...filter, text: e.target.value })}
+            placeholder="Filter tasks"
+            aria-label="Filter tasks by text"
+            className={cn(
+              'h-8 w-full rounded-md border border-input bg-card pl-8 pr-8 text-[13px] text-foreground',
+              'placeholder:text-muted-foreground/80',
+              'transition-[border-color,box-shadow] duration-300 hover:border-foreground/40',
+              'focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none',
+            )}
+          />
+          {filter.text ? (
+            <button
+              type="button"
+              onClick={() => onFilter({ ...filter, text: '' })}
+              aria-label="Clear text filter"
+              className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+            >
+              <X className="h-3.5 w-3.5" aria-hidden />
+            </button>
+          ) : (
+            <kbd
+              aria-hidden
+              className="pointer-events-none absolute right-2 top-1/2 hidden h-5 min-w-5 -translate-y-1/2 items-center justify-center rounded-sm border border-border bg-secondary px-1 font-mono text-[11px] text-muted-foreground group-focus-within:hidden sm:flex"
+            >
+              /
+            </kbd>
+          )}
+        </div>
 
-      <button
-        onClick={onToggleSelectMode}
-        className={cn(
-          'ml-auto inline-flex h-10 items-center gap-2 rounded-xl px-3 text-sm transition-colors',
-          selectMode ? 'bg-primary/10 text-primary' : 'bg-secondary/60 hover:bg-secondary',
-        )}
-      >
-        <CheckSquare className="h-4 w-4" /> {selectMode ? 'Selecting' : 'Select'}
-      </button>
+        <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
+
+        <FilterPill
+          label="Priority"
+          icon={<PriorityGlyph priority="" />}
+          value={filter.priority}
+          defaultValue=""
+          onChange={(v) => onFilter({ ...filter, priority: v as Priority | '' })}
+          options={[
+            { value: '', label: 'Any priority' },
+            ...PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p), icon: <PriorityGlyph priority={p} /> })),
+          ]}
+        />
+        <FilterPill
+          label="Assignee"
+          icon={<Users />}
+          value={filter.assignee}
+          defaultValue="any"
+          onChange={(v) => onFilter({ ...filter, assignee: v as BoardFilter['assignee'] })}
+          options={[
+            { value: 'any', label: 'Anyone', icon: <Users /> },
+            { value: 'me', label: 'Assigned to me', icon: <User /> },
+            { value: 'unassigned', label: 'Unassigned', icon: <User className="opacity-50" /> },
+          ]}
+        />
+        <FilterPill
+          label="Sprint"
+          icon={<Zap />}
+          value={filter.sprint}
+          defaultValue=""
+          onChange={(v) => onFilter({ ...filter, sprint: v })}
+          options={[
+            { value: '', label: 'All sprints' },
+            { value: 'backlog', label: 'Backlog' },
+            ...sprints.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+
+        {activeCount > 0 ? (
+          <button
+            type="button"
+            onClick={() => onFilter(EMPTY_FILTER)}
+            className="inline-flex h-8 items-center gap-1.5 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground"
+          >
+            <X className="h-3.5 w-3.5" aria-hidden />
+            Clear filters
+            <span className="inline-flex h-4 min-w-4 items-center justify-center rounded-full bg-foreground px-1 text-[10px] font-medium text-background">
+              {activeCount}
+            </span>
+          </button>
+        ) : null}
+
+        <Button
+          size="sm"
+          variant={selectMode ? 'default' : 'outline'}
+          onClick={onToggleSelectMode}
+          aria-pressed={selectMode}
+          className="ml-auto"
+        >
+          <CheckSquare className="h-3.5 w-3.5" /> {selectMode ? 'Selecting' : 'Select'}
+        </Button>
+      </div>
 
       {selectMode && selectedCount > 0 ? (
-        <div className="flex w-full items-center gap-2 rounded-2xl bg-card px-4 py-3 shadow-sm">
-          <span className="text-sm font-medium">{selectedCount} selected</span>
+        <div className="flex flex-wrap items-center gap-2 rounded-lg border border-border bg-card px-3 py-2">
+          <span className="mr-1 text-[13px] font-medium">{selectedCount} selected</span>
 
-          <div className="relative">
-            <button
-              onClick={() => setMoveOpen((o) => !o)}
-              disabled={bulkPending}
-              className="h-8 rounded-md border px-2 text-sm hover:bg-secondary disabled:opacity-50"
-            >
-              Move to…
-            </button>
-            {moveOpen ? (
-              <div className="absolute z-10 mt-1 w-44 rounded-md border bg-card p-1 shadow-lg">
-                {columns.map((c) => (
-                  <button
-                    key={c.id}
-                    onClick={() => {
-                      setMoveOpen(false);
-                      onBulkMove(c.id);
-                    }}
-                    className="block w-full rounded px-2 py-1.5 text-left text-sm hover:bg-secondary"
-                  >
-                    {c.name}
-                  </button>
-                ))}
-              </div>
-            ) : null}
-          </div>
-
-          <button
-            onClick={onBulkAssignMe}
-            disabled={bulkPending}
-            className="h-8 rounded-md border px-2 text-sm hover:bg-secondary disabled:opacity-50"
+          <Menu
+            aria-label="Move selected tasks"
+            trigger={
+              <Button size="sm" variant="outline" disabled={bulkPending}>
+                Move to <ChevronDown className="h-3.5 w-3.5" />
+              </Button>
+            }
           >
+            {columns.map((c) => (
+              <MenuItem key={c.id} onSelect={() => onBulkMove(c.id)}>
+                {c.name}
+              </MenuItem>
+            ))}
+          </Menu>
+
+          <Button size="sm" variant="outline" onClick={onBulkAssignMe} disabled={bulkPending}>
             Assign to me
-          </button>
-          <button
-            onClick={onBulkUnassign}
-            disabled={bulkPending}
-            className="h-8 rounded-md border px-2 text-sm hover:bg-secondary disabled:opacity-50"
-          >
+          </Button>
+          <Button size="sm" variant="outline" onClick={onBulkUnassign} disabled={bulkPending}>
             Unassign
-          </button>
+          </Button>
 
           {labels.length > 0 ? (
-            <div className="relative">
-              <button
-                onClick={() => setLabelOpen((o) => !o)}
-                disabled={bulkPending}
-                className="h-8 rounded-md border px-2 text-sm hover:bg-secondary disabled:opacity-50"
-              >
-                Add label…
-              </button>
-              {labelOpen ? (
-                <div className="absolute z-10 mt-1 w-44 rounded-md border bg-card p-1 shadow-lg">
-                  {labels.map((l) => (
-                    <button
-                      key={l.id}
-                      onClick={() => {
-                        setLabelOpen(false);
-                        onBulkLabel(l.id);
-                      }}
-                      className="flex w-full items-center gap-2 rounded px-2 py-1.5 text-left text-sm hover:bg-secondary"
-                    >
-                      <span
-                        className="h-2.5 w-2.5 rounded-full"
-                        style={{ backgroundColor: l.color || 'hsl(var(--muted-foreground))' }}
-                      />
-                      {l.name}
-                    </button>
-                  ))}
-                </div>
-              ) : null}
-            </div>
+            <Menu
+              aria-label="Add label to selected tasks"
+              trigger={
+                <Button size="sm" variant="outline" disabled={bulkPending}>
+                  Add label <ChevronDown className="h-3.5 w-3.5" />
+                </Button>
+              }
+            >
+              {labels.map((l) => (
+                <MenuItem
+                  key={l.id}
+                  onSelect={() => onBulkLabel(l.id)}
+                  icon={
+                    <span
+                      className="block h-2.5 w-2.5 rounded-full"
+                      style={{ backgroundColor: l.color || 'hsl(var(--muted-foreground))' }}
+                    />
+                  }
+                >
+                  {l.name}
+                </MenuItem>
+              ))}
+            </Menu>
           ) : null}
 
-          <button
-            onClick={onClearSelection}
-            className="ml-auto inline-flex h-8 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground hover:text-foreground"
-          >
-            <X className="h-4 w-4" /> Clear
-          </button>
+          <Button size="sm" variant="ghost" onClick={onClearSelection} className="ml-auto">
+            <X className="h-3.5 w-3.5" /> Clear
+          </Button>
         </div>
       ) : null}
     </div>

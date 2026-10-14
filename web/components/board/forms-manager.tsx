@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Check, Copy, Link2, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { ArrowRight, Check, Copy, Link2, MoreHorizontal, Plus, RefreshCw, Trash2 } from 'lucide-react';
 
 import { useOrg } from '@/lib/org/context';
 import {
@@ -14,12 +14,16 @@ import {
   type IntakeForm,
 } from '@/lib/api/forms';
 import { getBoard } from '@/lib/api/board';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Field } from '@/components/auth/field';
+import { Menu, MenuItem, MenuSeparator } from '@/components/ui/menu';
+import { Select } from '@/components/ui/select';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
-import { Select } from '@/components/ui/select';
+import { ConfirmStrip, EmptyState, RowList, SettingsSection } from './settings-section';
 
 // Project intake-form manager (ADR-023). LEAD-only surface. The raw token is
 // shown once at create/rotate (API-key-style reveal) because only its hash is
@@ -39,6 +43,7 @@ export function FormsManager({ projectId }: { projectId: string }) {
   // formId -> raw token revealed this session (create/rotate).
   const [revealed, setRevealed] = useState<Record<string, string>>({});
   const [copied, setCopied] = useState<string | null>(null);
+  const [confirmId, setConfirmId] = useState<string | null>(null);
 
   const [showForm, setShowForm] = useState(false);
   const [name, setName] = useState('');
@@ -87,7 +92,10 @@ export function FormsManager({ projectId }: { projectId: string }) {
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => deleteForm(orgId, projectId, id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      setConfirmId(null);
+      invalidate();
+    },
     onError: () => toast({ title: 'Could not delete form', variant: 'error' }),
   });
 
@@ -110,143 +118,160 @@ export function FormsManager({ projectId }: { projectId: string }) {
   const canSave = name.trim() !== '' && columns.length > 0;
 
   return (
-    <section>
-      <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold text-muted-foreground">
-          Intake forms
-        </h2>
-        <Button size="sm" variant="outline" onClick={() => setShowForm((v) => !v)}>
+    <SettingsSection
+      title="Intake forms"
+      description="Shareable links that file tasks into this project, no account needed. Submissions land in the form's target column."
+      action={
+        <Button size="sm" variant="outline" onClick={() => setShowForm((v) => !v)} aria-expanded={showForm}>
           <Plus className="h-3.5 w-3.5" /> New form
         </Button>
-      </div>
-      <p className="mb-3 text-xs text-muted-foreground">
-        Shareable links that file tasks into this project — no account needed. Submissions land in
-        the form&apos;s target column.
-      </p>
-
-      {showForm ? (
-        <div className="mb-3 space-y-3 rounded-2xl border p-4">
-          <Field id="form-name" label="Name">
-            <Input
-              id="form-name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Bug reports"
-            />
-          </Field>
-          <Field id="form-desc" label="Description (shown on the form page)">
-            <Input
-              id="form-desc"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="What should submitters include?"
-            />
-          </Field>
-          <Field id="form-target" label="Target column">
-            <Select
-              id="form-target"
-              value={targetColumn || (columns[0]?.id ?? '')}
-              onValueChange={setTargetColumn}
-              options={columns.map((c) => ({ value: c.id, label: c.name }))}
-            />
-          </Field>
-          <Button
-            size="sm"
-            onClick={() => canSave && createMutation.mutate()}
-            disabled={!canSave || createMutation.isPending}
+      }
+    >
+      <div className="space-y-4">
+        {showForm ? (
+          <form
+            className="space-y-4 rounded-md border border-border bg-secondary/30 p-4"
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (canSave) createMutation.mutate();
+            }}
           >
-            {createMutation.isPending ? 'Creating…' : 'Create form'}
-          </Button>
-        </div>
-      ) : null}
+            <Field label="Name">
+              <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="e.g. Bug reports" autoFocus />
+            </Field>
+            <Field label="Description" hint="Shown on the form page." optional>
+              <Input
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+                placeholder="What should submitters include?"
+              />
+            </Field>
+            <Field label="Target column">
+              <Select
+                value={targetColumn || (columns[0]?.id ?? '')}
+                onValueChange={setTargetColumn}
+                options={columns.map((c) => ({ value: c.id, label: c.name }))}
+              />
+            </Field>
+            <div className="flex gap-2">
+              <Button type="submit" size="sm" disabled={!canSave || createMutation.isPending}>
+                {createMutation.isPending ? 'Creating…' : 'Create form'}
+              </Button>
+              <Button type="button" size="sm" variant="ghost" onClick={() => setShowForm(false)}>
+                Cancel
+              </Button>
+            </div>
+          </form>
+        ) : null}
 
-      {formsQ.isLoading ? (
-        <p className="text-sm text-muted-foreground">Loading forms…</p>
-      ) : forms.length === 0 && !showForm ? (
-        <p className="rounded-2xl bg-secondary/45 p-4 text-sm text-muted-foreground">
-          No intake forms yet. Create one to accept tasks from anyone with the link.
-        </p>
-      ) : (
-        <div className="space-y-2">
-          {forms.map((f) => {
-            const token = revealed[f.id];
-            return (
-              <div key={f.id} className="rounded-2xl bg-card p-4 shadow-sm">
-                <div className="flex flex-wrap items-center gap-2">
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium">{f.name}</p>
-                    <p className="text-xs text-muted-foreground">
-                      → {columns.find((c) => c.id === f.target_column_id)?.name ?? 'column'} ·{' '}
-                      {f.is_active ? 'accepting' : 'paused'}
-                    </p>
-                  </div>
-                  <button
-                    onClick={() =>
-                      toggleMutation.mutate(f)
-                    }
-                    disabled={toggleMutation.isPending}
-                    className={cn(
-                      'relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-50',
-                      f.is_active ? 'bg-primary' : 'bg-secondary',
-                    )}
-                    role="switch"
-                    aria-checked={f.is_active}
-                    aria-label={f.is_active ? 'Pause form' : 'Resume form'}
-                    title={f.is_active ? 'Pause form' : 'Resume form'}
-                  >
-                    <span
-                      className={cn(
-                        'absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all',
-                        f.is_active ? 'left-[1.375rem]' : 'left-0.5',
-                      )}
-                    />
-                  </button>
-                  <button
-                    onClick={() => rotateMutation.mutate(f.id)}
-                    disabled={rotateMutation.isPending}
-                    className="rounded p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
-                    aria-label="Issue new link"
-                    title="Issue new link (kills the old URL)"
-                  >
-                    <RefreshCw className="h-4 w-4" />
-                  </button>
-                  <button
-                    onClick={() => deleteMutation.mutate(f.id)}
-                    disabled={deleteMutation.isPending}
-                    className="rounded p-1.5 text-destructive hover:bg-destructive/10 disabled:opacity-50"
-                    aria-label="Delete form"
-                    title="Delete form (submitted tasks stay)"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </div>
-                {token ? (
-                  <div className="mt-3 flex items-center gap-2 rounded-xl bg-secondary/60 px-3 py-2">
-                    <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                    <code className="min-w-0 flex-1 truncate text-xs">{publicUrl(token)}</code>
+        {formsQ.isLoading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-14 w-full" />
+            <Skeleton className="h-14 w-full" />
+          </div>
+        ) : forms.length === 0 ? (
+          <EmptyState title="No intake forms yet">
+            Create one to accept bug reports or requests from anyone with the link.
+          </EmptyState>
+        ) : (
+          <RowList>
+            {forms.map((f) => {
+              const token = revealed[f.id];
+              return (
+                <li key={f.id}>
+                  <div className="flex items-center gap-3 px-3 py-2.5">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2">
+                        <p className="truncate text-sm font-medium">{f.name}</p>
+                        <Badge variant={f.is_active ? 'success' : 'secondary'}>
+                          {f.is_active ? 'Accepting' : 'Paused'}
+                        </Badge>
+                      </div>
+                      <p className="mt-0.5 flex items-center gap-1 text-xs text-muted-foreground">
+                        <ArrowRight className="h-3 w-3" aria-hidden />
+                        <span className="truncate">{columns.find((c) => c.id === f.target_column_id)?.name ?? 'column'}</span>
+                      </p>
+                    </div>
                     <button
-                      onClick={() => copyLink(f.id)}
-                      className="rounded p-1 hover:bg-secondary"
-                      aria-label="Copy link"
-                      title="Copy link"
-                    >
-                      {copied === f.id ? (
-                        <Check className="h-3.5 w-3.5 text-green-600" />
-                      ) : (
-                        <Copy className="h-3.5 w-3.5" />
+                      type="button"
+                      onClick={() => toggleMutation.mutate(f)}
+                      disabled={toggleMutation.isPending}
+                      className={cn(
+                        'relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50',
+                        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-signal focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+                        f.is_active ? 'bg-foreground' : 'bg-border',
                       )}
+                      role="switch"
+                      aria-checked={f.is_active}
+                      aria-label={`${f.name}: ${f.is_active ? 'pause' : 'resume'} form`}
+                    >
+                      <span
+                        className={cn(
+                          'absolute top-0.5 h-4 w-4 rounded-full bg-background shadow transition-all',
+                          f.is_active ? 'left-[1.125rem]' : 'left-0.5',
+                        )}
+                      />
                     </button>
+                    <Menu
+                      align="end"
+                      aria-label={`Actions for ${f.name}`}
+                      trigger={
+                        <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Actions for ${f.name}`}>
+                          <MoreHorizontal className="h-4 w-4" />
+                        </Button>
+                      }
+                    >
+                      <MenuItem icon={<Copy />} disabled={!token} onSelect={() => copyLink(f.id)}>
+                        Copy link
+                      </MenuItem>
+                      <MenuItem icon={<RefreshCw />} onSelect={() => rotateMutation.mutate(f.id)}>
+                        Issue new link
+                      </MenuItem>
+                      <MenuSeparator />
+                      <MenuItem destructive icon={<Trash2 />} onSelect={() => setConfirmId(f.id)}>
+                        Delete form
+                      </MenuItem>
+                    </Menu>
                   </div>
-                ) : (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    Link hidden — rotate to issue a new one (only the hash is stored).
-                  </p>
-                )}
-              </div>
-            );
-          })}
-        </div>
-      )}
-    </section>
+                  {token ? (
+                    <div className="mx-3 mb-3 flex items-center gap-2 rounded-md bg-secondary/60 px-3 py-2">
+                      <Link2 className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-hidden />
+                      <code className="min-w-0 flex-1 truncate font-mono text-xs">{publicUrl(token)}</code>
+                      <button
+                        type="button"
+                        onClick={() => copyLink(f.id)}
+                        className="rounded p-1 hover:bg-secondary"
+                        aria-label="Copy link"
+                        title="Copy link"
+                      >
+                        {copied === f.id ? (
+                          <Check className="h-3.5 w-3.5 text-success" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" />
+                        )}
+                      </button>
+                    </div>
+                  ) : (
+                    <p className="px-3 pb-2.5 text-xs text-muted-foreground">
+                      Link hidden. Issue a new one to see it again (only its hash is stored).
+                    </p>
+                  )}
+                  {confirmId === f.id ? (
+                    <ConfirmStrip
+                      confirmLabel="Delete form"
+                      onConfirm={() => deleteMutation.mutate(f.id)}
+                      onCancel={() => setConfirmId(null)}
+                      disabled={deleteMutation.isPending}
+                    >
+                      <span>Delete this form? Its link stops working; submitted tasks stay.</span>
+                    </ConfirmStrip>
+                  ) : null}
+                </li>
+              );
+            })}
+          </RowList>
+        )}
+      </div>
+    </SettingsSection>
   );
 }
