@@ -28,7 +28,13 @@ import { between } from '@/lib/board/rank';
 import { ProjectFrame } from '@/app/(app)/app/[orgSlug]/projects/[projectKey]/_components/project-frame';
 import { FieldsManager } from '@/components/board/fields-manager';
 import { FormsManager } from '@/components/board/forms-manager';
-import { ConfirmStrip, EmptyState, RowList, SettingsSection } from '@/components/board/settings-section';
+import { TransferSection } from '@/components/board/transfer-section';
+import {
+  ConfirmStrip,
+  EmptyState,
+  RowList,
+  SettingsSection,
+} from '@/components/board/settings-section';
 import type { BoardColumn, ColumnRole, Project, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 
@@ -42,7 +48,10 @@ export default function ProjectSettingsPage(props: { params: Promise<{ projectKe
     return (
       <div className="mx-auto max-w-md px-6 py-16 text-center">
         <h1 className="text-lg font-semibold">Project not found</h1>
-        <Link href={`/app/${slug}/projects`} className="mt-4 inline-block text-sm text-primary hover:underline">
+        <Link
+          href={`/app/${slug}/projects`}
+          className="mt-4 inline-block text-sm text-primary hover:underline"
+        >
           Back to projects
         </Link>
       </div>
@@ -50,19 +59,23 @@ export default function ProjectSettingsPage(props: { params: Promise<{ projectKe
 
   return (
     <ProjectFrame project={project} narrow>
-      {isAdmin ? (
-        <div className="space-y-5">
-          <GeneralSection project={project} />
-          <ColumnsSection project={project} />
-          <FieldsManager projectId={project.id} />
-          <FormsManager projectId={project.id} />
-          <DangerSection project={project} />
-        </div>
-      ) : (
-        <p className="rounded-md border border-border bg-secondary/40 p-5 text-sm text-muted-foreground">
-          Only project leads and organization admins can change project settings.
-        </p>
-      )}
+      <div className="space-y-5">
+        {isAdmin ? (
+          <>
+            <GeneralSection project={project} />
+            <ColumnsSection project={project} />
+            <FieldsManager projectId={project.id} />
+            <FormsManager projectId={project.id} />
+          </>
+        ) : (
+          <p className="rounded-md border border-border bg-secondary/40 p-5 text-sm text-muted-foreground">
+            Only project leads and organization admins can change project settings.
+          </p>
+        )}
+        {/* Project-role gated server-side: VIEWER exports, CONTRIBUTOR imports. */}
+        <TransferSection project={project} />
+        {isAdmin ? <DangerSection project={project} /> : null}
+      </div>
     </ProjectFrame>
   );
 }
@@ -121,7 +134,12 @@ function GeneralSection({ project }: { project: Project }) {
         }}
       >
         <Field label="Name">
-          <Input value={name} onChange={(e) => setName(e.target.value)} disabled={archived} required />
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            disabled={archived}
+            required
+          />
         </Field>
         <Field label="Description" optional>
           <Textarea
@@ -141,14 +159,20 @@ function GeneralSection({ project }: { project: Project }) {
               disabled={archived}
               className="h-9 w-12 cursor-pointer rounded-md border border-input bg-card p-1 disabled:cursor-not-allowed disabled:opacity-50"
             />
-            <span className="font-mono text-xs uppercase text-muted-foreground">{color || '#6366f1'}</span>
+            <span className="font-mono text-xs uppercase text-muted-foreground">
+              {color || '#6366f1'}
+            </span>
           </div>
         </Field>
         <div className="space-y-1.5">
           <span id="visibility-label" className="text-[13px] font-medium">
             Visibility
           </span>
-          <div role="radiogroup" aria-labelledby="visibility-label" className="grid gap-2 sm:grid-cols-2">
+          <div
+            role="radiogroup"
+            aria-labelledby="visibility-label"
+            className="grid gap-2 sm:grid-cols-2"
+          >
             {VISIBILITY.map(({ v, label, hint, icon }) => (
               <button
                 key={v}
@@ -185,7 +209,13 @@ function GeneralSection({ project }: { project: Project }) {
             {dirty ? 'You have unsaved changes.' : 'All changes saved.'}
           </span>
           {dirty ? (
-            <Button type="button" size="sm" variant="ghost" onClick={discard} disabled={mutation.isPending}>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={discard}
+              disabled={mutation.isPending}
+            >
               Discard
             </Button>
           ) : null}
@@ -241,13 +271,15 @@ function ColumnsSection({ project }: { project: Project }) {
   });
 
   const remove = useMutation({
-    mutationFn: (v: { id: string; target: string }) => deleteColumn(orgId, project.id, v.id, v.target),
+    mutationFn: (v: { id: string; target: string }) =>
+      deleteColumn(orgId, project.id, v.id, v.target),
     onSuccess: invalidate,
     onError: () => toast({ title: 'Couldn’t delete column', variant: 'error' }),
   });
 
   const setRole = useMutation({
-    mutationFn: (v: { id: string; role: ColumnRole | null }) => setColumnRole(orgId, project.id, v.id, v.role),
+    mutationFn: (v: { id: string; role: ColumnRole | null }) =>
+      setColumnRole(orgId, project.id, v.id, v.role),
     onSuccess: invalidate,
     onError: () => toast({ title: 'Couldn’t change the column’s stage', variant: 'error' }),
   });
@@ -287,7 +319,9 @@ function ColumnsSection({ project }: { project: Project }) {
             <Skeleton className="h-14 w-full" />
           </div>
         ) : columns.length === 0 ? (
-          <EmptyState title="No columns yet">Add a first column to start shaping the workflow.</EmptyState>
+          <EmptyState title="No columns yet">
+            Add a first column to start shaping the workflow.
+          </EmptyState>
         ) : (
           <RowList>
             {columns.map((c, i) => (
@@ -322,7 +356,12 @@ function ColumnsSection({ project }: { project: Project }) {
             aria-label="New column name"
             className="h-9 min-w-0 flex-1 sm:max-w-xs"
           />
-          <Button type="submit" size="sm" variant="outline" disabled={add.isPending || !newName.trim()}>
+          <Button
+            type="submit"
+            size="sm"
+            variant="outline"
+            disabled={add.isPending || !newName.trim()}
+          >
             Add column
           </Button>
         </form>
@@ -367,7 +406,8 @@ function ColumnRow({
 
   function commit() {
     const parsedWip = wip.trim() === '' ? null : Number.parseInt(wip, 10);
-    const wipVal = parsedWip != null && Number.isFinite(parsedWip) && parsedWip > 0 ? parsedWip : null;
+    const wipVal =
+      parsedWip != null && Number.isFinite(parsedWip) && parsedWip > 0 ? parsedWip : null;
     if (name.trim() && (name.trim() !== column.name || wipVal !== (column.wip_limit ?? null))) {
       onRename(name.trim(), wipVal);
     }
@@ -376,7 +416,10 @@ function ColumnRow({
   return (
     <li>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2 px-3 py-2.5">
-        <span className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground" aria-hidden>
+        <span
+          className="w-5 shrink-0 text-center font-mono text-xs text-muted-foreground"
+          aria-hidden
+        >
           {index + 1}
         </span>
         <Input
@@ -413,7 +456,12 @@ function ColumnRow({
           align="end"
           aria-label={`Actions for ${column.name}`}
           trigger={
-            <Button size="icon" variant="ghost" className="h-8 w-8" aria-label={`Actions for ${column.name}`}>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-8 w-8"
+              aria-label={`Actions for ${column.name}`}
+            >
               <MoreHorizontal className="h-4 w-4" />
             </Button>
           }
@@ -421,7 +469,11 @@ function ColumnRow({
           <MenuItem icon={<ArrowUp />} disabled={index === 0 || busy} onSelect={() => onMove(-1)}>
             Move up
           </MenuItem>
-          <MenuItem icon={<ArrowDown />} disabled={index === total - 1 || busy} onSelect={() => onMove(1)}>
+          <MenuItem
+            icon={<ArrowDown />}
+            disabled={index === total - 1 || busy}
+            onSelect={() => onMove(1)}
+          >
             Move down
           </MenuItem>
           <MenuItem
@@ -500,7 +552,9 @@ function DangerSection({ project }: { project: Project }) {
       <div className="overflow-hidden rounded-md border border-destructive/30">
         <div className="flex flex-wrap items-center justify-between gap-3 p-4">
           <div className="min-w-0">
-            <p className="text-sm font-medium">{archived ? 'Restore project' : 'Archive project'}</p>
+            <p className="text-sm font-medium">
+              {archived ? 'Restore project' : 'Archive project'}
+            </p>
             <p className="mt-0.5 text-[13px] text-muted-foreground">
               {archived
                 ? 'Make this project active and editable again.'
@@ -508,11 +562,21 @@ function DangerSection({ project }: { project: Project }) {
             </p>
           </div>
           {archived ? (
-            <Button size="sm" variant="outline" onClick={() => unarchive.mutate()} isLoading={unarchive.isPending}>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => unarchive.mutate()}
+              isLoading={unarchive.isPending}
+            >
               Restore
             </Button>
           ) : (
-            <Button size="sm" variant="destructive" onClick={() => setConfirming(true)} disabled={confirming}>
+            <Button
+              size="sm"
+              variant="destructive"
+              onClick={() => setConfirming(true)}
+              disabled={confirming}
+            >
               Archive
             </Button>
           )}
@@ -525,7 +589,8 @@ function DangerSection({ project }: { project: Project }) {
             onCancel={() => setConfirming(false)}
           >
             <span>
-              Archive <strong className="font-medium">{project.name}</strong>? It becomes read-only for everyone.
+              Archive <strong className="font-medium">{project.name}</strong>? It becomes read-only
+              for everyone.
             </span>
           </ConfirmStrip>
         ) : null}
