@@ -16,6 +16,7 @@ import type { Priority, Task, UpdateTaskInput } from '@/lib/api/types';
 import { Subtasks } from './subtasks';
 import { Comments } from './comments';
 import { TaskLinks } from './links';
+import { TaskRecurrence } from './recurrence';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -251,6 +252,10 @@ export function TaskDetail({
               {task.due_date ? new Date(task.due_date).toLocaleDateString() : '—'}
             </span>
           )}
+        </Field>
+
+        <Field label="Repeat">
+          <TaskRecurrence taskId={taskId} canEdit={canEdit} />
         </Field>
 
         <Field label="Labels">
