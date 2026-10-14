@@ -84,7 +84,9 @@ GET    /orgs/{orgId}/events                SSE (09 §1)
 
 ```
 GET    /orgs/{orgId}/projects              ?archived=
-POST   /orgs/{orgId}/projects              {name,key,visibility,color,template?}
+POST   /orgs/{orgId}/projects              {name,key,visibility,color}
+GET    /orgs/{orgId}/project-templates     template catalog (FR-PROJ-007)
+POST   /orgs/{orgId}/projects/from-template {template,name,key,visibility,color}  one tx, Idempotency-Key (ADR-035)
 GET    /orgs/{orgId}/projects/{key}
 PATCH  /orgs/{orgId}/projects/{key}        (LEAD)
 POST   /orgs/{orgId}/projects/{key}/archive | /unarchive

@@ -246,6 +246,9 @@ func NewRouter(d Deps) http.Handler {
 				// read:org and defers to the project-role gate in projectuc.
 				o.With(read(tenant.ObjOrg)).Get("/projects", d.Projects.ListProjects)
 				o.With(write(tenant.ObjProjects), d.Entitlement.RequireProjects()).Post("/projects", d.Projects.CreateProject)
+				// Project templates (FR-PROJ-007, ADR-035): catalog + transactional create.
+				o.With(read(tenant.ObjOrg)).Get("/project-templates", d.Projects.ListProjectTemplates)
+				o.With(write(tenant.ObjProjects), d.Entitlement.RequireProjects()).Post("/projects/from-template", d.Projects.CreateProjectFromTemplate)
 				o.Route("/projects/{projectId}", func(p chi.Router) {
 					p.With(read(tenant.ObjOrg)).Get("/", d.Projects.GetProject)
 					p.With(read(tenant.ObjOrg)).Patch("/", d.Projects.UpdateProject)

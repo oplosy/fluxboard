@@ -1,5 +1,5 @@
 import { apiFetch } from './client';
-import type { CreateProjectInput, Project, UpdateProjectInput } from './types';
+import type { CreateProjectInput, Project, ProjectTemplate, UpdateProjectInput } from './types';
 
 // Projects surface (docs/08 §5). Projects are addressed by UUID server-side;
 // there is NO by-key route, so the frontend's `/projects/{projectKey}` URLs
@@ -16,6 +16,28 @@ export async function listProjects(
 
 export function createProject(orgId: string, input: CreateProjectInput): Promise<Project> {
   return apiFetch(`/orgs/${orgId}/projects`, { method: 'POST', body: input });
+}
+
+export async function listProjectTemplates(orgId: string): Promise<ProjectTemplate[]> {
+  const res = await apiFetch<{ templates: ProjectTemplate[] }>(`/orgs/${orgId}/project-templates`);
+  return res.templates;
+}
+
+/**
+ * Create a project from a server-side template in one transaction (FR-PROJ-007).
+ * Reuse idempotencyKey on retries so a lost response never creates a second project.
+ */
+export function createProjectFromTemplate(
+  orgId: string,
+  template: string,
+  input: CreateProjectInput,
+  idempotencyKey: string,
+): Promise<Project> {
+  return apiFetch(`/orgs/${orgId}/projects/from-template`, {
+    method: 'POST',
+    body: { ...input, template },
+    headers: { 'Idempotency-Key': idempotencyKey },
+  });
 }
 
 export function updateProject(

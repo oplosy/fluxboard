@@ -3,17 +3,16 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FormError } from '@/components/auth/field';
 import { useOrg } from '@/lib/org/context';
-import { createProject } from '@/lib/api/projects';
-import { PROJECT_TEMPLATES, createProjectFromTemplate } from '@/lib/board/templates';
+import { createProject, createProjectFromTemplate, listProjectTemplates } from '@/lib/api/projects';
 import { ApiError } from '@/lib/api/client';
-import type { Visibility } from '@/lib/api/types';
+import type { ProjectTemplate, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
 import { Textarea } from '@/components/ui/textarea';
 
@@ -24,6 +23,16 @@ function suggestKey(name: string): string {
   const withLetterHead = cleaned.replace(/^[0-9]+/, '');
   return withLetterHead.slice(0, 6);
 }
+
+// Blank is the plain create (default board); the rest come from the server catalog.
+const BLANK: ProjectTemplate = {
+  key: 'blank',
+  name: 'Blank',
+  description: 'The default board. Shape it yourself.',
+  columns: [{ name: 'Backlog' }, { name: 'Todo' }, { name: 'In Progress' }, { name: 'Review' }, { name: 'Done' }],
+  labels: [],
+  task_count: 0,
+};
 
 const COLORS = ['#2f7468', '#6e9f8d', '#d49a52', '#c36d58', '#8d9a65', '#5f8ea0', '#a77c91', '#64748b'];
 
@@ -40,14 +49,23 @@ export default function NewProjectPage() {
   const [color, setColor] = useState(COLORS[0] as string);
   const [visibility, setVisibility] = useState<Visibility>('org');
   const [templateKey, setTemplateKey] = useState('blank');
+  // One key per visit: a retried submit replays instead of creating twice.
+  const [idempotencyKey] = useState(() => crypto.randomUUID());
+
+  const templatesQuery = useQuery({
+    queryKey: ['project-templates', orgId],
+    queryFn: () => listProjectTemplates(orgId),
+    staleTime: Infinity,
+  });
+  const templates = [BLANK, ...(templatesQuery.data ?? [])];
 
   const mutation = useMutation({
     mutationFn: () => {
-      const template = PROJECT_TEMPLATES.find((t) => t.key === templateKey) ?? PROJECT_TEMPLATES[0]!;
-      if (template.key === 'blank') {
-        return createProject(orgId, { key, name, description, color, visibility });
+      const input = { key, name, description, color, visibility };
+      if (templateKey === 'blank') {
+        return createProject(orgId, input);
       }
-      return createProjectFromTemplate(orgId, { key, name, description, color, visibility }, template);
+      return createProjectFromTemplate(orgId, templateKey, input, idempotencyKey);
     },
     onSuccess: async (project) => {
       await queryClient.invalidateQueries({ queryKey: ['projects', orgId] });
@@ -181,7 +199,7 @@ export default function NewProjectPage() {
             <div className="space-y-1.5">
               <span className="text-sm font-medium">Template</span>
               <div className="grid gap-2 sm:grid-cols-2">
-                {PROJECT_TEMPLATES.map((t) => (
+                {templates.map((t) => (
                   <button
                     key={t.key}
                     type="button"
@@ -194,8 +212,13 @@ export default function NewProjectPage() {
                     <span className="font-medium">{t.name}</span>
                     <span className="mt-0.5 block text-xs text-muted-foreground">{t.description}</span>
                     <span className="mt-1.5 block text-[11px] text-muted-foreground">
-                      {t.columns.join(' → ')}
+                      {t.columns.map((c) => c.name).join(' → ')}
                     </span>
+                    {t.task_count > 0 ? (
+                      <span className="mt-0.5 block text-[11px] text-muted-foreground">
+                        {t.labels.length} labels · {t.task_count} starter tasks
+                      </span>
+                    ) : null}
                   </button>
                 ))}
               </div>

@@ -50,8 +50,13 @@ type Deps struct {
 	// Commenter posts the review comment on a send-back (taskuc.Service);
 	// nil ⇒ review decisions are unavailable.
 	Commenter Commenter
-	Logger    *slog.Logger
-	Now       func() time.Time // injectable for tests; defaults to time.Now
+	// Seeder writes template projects in one transaction (FR-PROJ-007);
+	// nil ⇒ create-from-template is unavailable.
+	Seeder project.ProjectSeeder
+	// Idem backs the Idempotency-Key replay on create-from-template; nil ⇒ off.
+	Idem   IdempotencyStore
+	Logger *slog.Logger
+	Now    func() time.Time // injectable for tests; defaults to time.Now
 }
 
 // Service implements the project/board application logic.
@@ -73,6 +78,8 @@ type Service struct {
 	conc       project.ConcurrencyRepository
 	agents     agent.Lookup
 	commenter  Commenter
+	seeder     project.ProjectSeeder
+	idem       IdempotencyStore
 	logger     *slog.Logger
 	now        func() time.Time
 }
@@ -90,7 +97,7 @@ func New(d Deps) *Service {
 	return &Service{
 		projects: d.Projects, members: d.Members, boards: d.Boards,
 		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, fields: d.Fields, forms: d.Forms, labels: d.Labels, subtasks: d.Subtasks,
-		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, agents: d.Agents, commenter: d.Commenter, logger: logger, now: now,
+		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, agents: d.Agents, commenter: d.Commenter, seeder: d.Seeder, idem: d.Idem, logger: logger, now: now,
 	}
 }
 
@@ -159,6 +166,23 @@ type CreateProjectInput struct {
 	Visibility  project.Visibility
 }
 
+// normalize trims and upper-cases the key, defaults visibility to org and
+// validates the input (FR-PROJ-001/002).
+func (in *CreateProjectInput) normalize() error {
+	in.Key = strings.ToUpper(strings.TrimSpace(in.Key))
+	in.Name = strings.TrimSpace(in.Name)
+	if !project.ValidKey(in.Key) || in.Name == "" {
+		return domain.ErrValidation
+	}
+	if in.Visibility == "" {
+		in.Visibility = project.VisibilityOrg
+	}
+	if !in.Visibility.Valid() {
+		return domain.ErrValidation
+	}
+	return nil
+}
+
 // UpdateProjectInput is the payload for UpdateProject.
 type UpdateProjectInput struct {
 	Name        string
@@ -202,19 +226,8 @@ func (s *Service) access(ctx context.Context, orgID, projectID, userID string, o
 // and makes the creator a project LEAD (FR-PROJ-001/003/004). The org-role gate
 // (MEMBER+ write:projects) is enforced by the caller's middleware.
 func (s *Service) CreateProject(ctx context.Context, orgID, userID string, in CreateProjectInput) (*project.Project, error) {
-	in.Key = strings.ToUpper(strings.TrimSpace(in.Key))
-	in.Name = strings.TrimSpace(in.Name)
-	if !project.ValidKey(in.Key) {
-		return nil, domain.ErrValidation
-	}
-	if in.Name == "" {
-		return nil, domain.ErrValidation
-	}
-	if in.Visibility == "" {
-		in.Visibility = project.VisibilityOrg
-	}
-	if !in.Visibility.Valid() {
-		return nil, domain.ErrValidation
+	if err := in.normalize(); err != nil {
+		return nil, err
 	}
 
 	// Plan project-limit (FR-PROJ-001) is enforced at the route via
