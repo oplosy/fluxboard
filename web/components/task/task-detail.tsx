@@ -22,7 +22,7 @@ import { Attachments } from './attachments';
 import { ActivityTimeline } from './activity-timeline';
 import { ReviewPanel } from './review-panel';
 import { Select } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
+import { DescriptionEditor } from '@/components/editor/description-editor';
 
 // Full task detail (FR-TASK-001/002). Inline-edits every field; UpdateTask
 // replaces the whole field set, so each change is merged onto the current task
@@ -77,7 +77,6 @@ export function TaskDetail({
   // In-progress edits, tied to the task they were typed for. Without one the
   // inputs show the saved text, so they follow refetches and task switches.
   const [titleEdit, setTitleEdit] = useState<{ taskId: string; text: string } | null>(null);
-  const [descEdit, setDescEdit] = useState<{ taskId: string; text: string } | null>(null);
 
   const patch = useMutation({
     mutationFn: (p: Partial<UpdateTaskInput>) => updateTask(orgId, taskId, toInput(task as Task, p)),
@@ -128,8 +127,6 @@ export function TaskDetail({
   if (isError || !task) return <p className="text-sm text-destructive">Couldn’t load this task.</p>;
 
   const titleDraft = titleEdit?.taskId === task.id ? titleEdit.text : task.title;
-  const descDirty = descEdit?.taskId === task.id;
-  const descDraft = descDirty ? descEdit.text : task.description;
 
   const attached = taskLabels ?? [];
   const attachedIds = new Set(attached.map((l) => l.id));
@@ -159,39 +156,12 @@ export function TaskDetail({
 
         <div>
           <h3 className="mb-2 text-sm font-semibold">Description</h3>
-          {canEdit ? (
-            <div>
-              <Textarea
-                value={descDraft}
-                onChange={(e) => setDescEdit({ taskId: task.id, text: e.target.value })}
-                rows={4}
-                placeholder="Add a description…"
-              />
-              {descDirty ? (
-                <div className="mt-1 flex gap-2">
-                  <button
-                    type="button"
-                    onClick={() => patch.mutate({ description: descDraft }, { onSuccess: () => setDescEdit(null) })}
-                    disabled={patch.isPending}
-                    className="rounded bg-primary px-2 py-1 text-xs font-medium text-primary-foreground disabled:opacity-50"
-                  >
-                    Save
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setDescEdit(null)}
-                    className="text-xs text-muted-foreground hover:text-foreground"
-                  >
-                    Cancel
-                  </button>
-                </div>
-              ) : null}
-            </div>
-          ) : task.description ? (
-            <p className="whitespace-pre-wrap text-sm">{task.description}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">No description.</p>
-          )}
+          <DescriptionEditor
+            key={task.id}
+            value={task.description}
+            canEdit={canEdit}
+            onSave={(description) => patch.mutateAsync({ description })}
+          />
         </div>
 
         <Subtasks taskId={taskId} canEdit={canEdit} />
