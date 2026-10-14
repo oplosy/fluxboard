@@ -83,13 +83,13 @@ func TestProjectAnalyticsMatchesRawRecompute(t *testing.T) {
 
 	// Raw recompute.
 	var wantCreated, wantCompleted int
-	var cycleSum, cycleDays int64
+	var cycleSum, cycleTasks int64
 	for _, d := range rows {
 		wantCreated += d.CreatedCount
 		wantCompleted += d.CompletedCount
 		if d.AvgCycleSeconds != nil {
-			cycleSum += *d.AvgCycleSeconds
-			cycleDays++
+			cycleSum += *d.AvgCycleSeconds * int64(d.CompletedCount)
+			cycleTasks += int64(d.CompletedCount)
 		}
 	}
 	if out.TotalCreated != wantCreated {
@@ -99,9 +99,10 @@ func TestProjectAnalyticsMatchesRawRecompute(t *testing.T) {
 		t.Fatalf("TotalCompleted = %d, want %d", out.TotalCompleted, wantCompleted)
 	}
 	if out.AvgCycleSeconds == nil {
-		t.Fatal("AvgCycleSeconds nil, want mean over recording days")
+		t.Fatal("AvgCycleSeconds nil, want the completion-weighted mean")
 	}
-	if want := cycleSum / cycleDays; *out.AvgCycleSeconds != want {
+	// (100×1 + 300×2) / 3: weighted by each day's completions.
+	if want := cycleSum / cycleTasks; *out.AvgCycleSeconds != want {
 		t.Fatalf("AvgCycleSeconds = %d, want %d", *out.AvgCycleSeconds, want)
 	}
 	if len(out.Series) != len(rows) {

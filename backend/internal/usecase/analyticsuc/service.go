@@ -73,17 +73,19 @@ func (s *Service) ProjectAnalytics(ctx context.Context, orgID, userID string, or
 		return analytics.ProjectAnalytics{}, err
 	}
 	out := analytics.ProjectAnalytics{ProjectID: projectID, From: from, To: to, Series: series}
-	var cycleSum, cycleDays int64
+	// Each day's mean is weighted by its completions, so a day with one task
+	// does not count as much as a day with twenty.
+	var cycleSum, cycleTasks int64
 	for _, d := range series {
 		out.TotalCreated += d.CreatedCount
 		out.TotalCompleted += d.CompletedCount
-		if d.AvgCycleSeconds != nil {
-			cycleSum += *d.AvgCycleSeconds
-			cycleDays++
+		if d.AvgCycleSeconds != nil && d.CompletedCount > 0 {
+			cycleSum += *d.AvgCycleSeconds * int64(d.CompletedCount)
+			cycleTasks += int64(d.CompletedCount)
 		}
 	}
-	if cycleDays > 0 {
-		avg := cycleSum / cycleDays
+	if cycleTasks > 0 {
+		avg := cycleSum / cycleTasks
 		out.AvgCycleSeconds = &avg
 	}
 	return out, nil
