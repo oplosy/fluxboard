@@ -67,7 +67,7 @@ func (q *Queries) DeleteProjectForm(ctx context.Context, arg DeleteProjectFormPa
 
 const getProjectForm = `-- name: GetProjectForm :one
 SELECT id, org_id, project_id, name, description, target_column_id, token_hash,
-       created_by, is_active, created_at, updated_at
+       created_by, is_active, created_at, updated_at, schema_version
 FROM project_forms
 WHERE org_id = $1 AND id = $2
 `
@@ -92,13 +92,14 @@ func (q *Queries) GetProjectForm(ctx context.Context, arg GetProjectFormParams) 
 		&i.IsActive,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.SchemaVersion,
 	)
 	return i, err
 }
 
 const listProjectFormsByProject = `-- name: ListProjectFormsByProject :many
 SELECT id, org_id, project_id, name, description, target_column_id, token_hash,
-       created_by, is_active, created_at, updated_at
+       created_by, is_active, created_at, updated_at, schema_version
 FROM project_forms
 WHERE org_id = $1 AND project_id = $2
 ORDER BY created_at
@@ -130,6 +131,7 @@ func (q *Queries) ListProjectFormsByProject(ctx context.Context, arg ListProject
 			&i.IsActive,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.SchemaVersion,
 		); err != nil {
 			return nil, err
 		}
@@ -143,7 +145,10 @@ func (q *Queries) ListProjectFormsByProject(ctx context.Context, arg ListProject
 
 const updateProjectForm = `-- name: UpdateProjectForm :execrows
 UPDATE project_forms
-SET name = $1, description = $2, target_column_id = $3,
+SET schema_version = CASE WHEN name = $1 AND description = $2
+                            AND target_column_id = $3
+                       THEN schema_version ELSE schema_version + 1 END,
+    name = $1, description = $2, target_column_id = $3,
     is_active = $4, updated_at = now()
 WHERE org_id = $5 AND id = $6
 `

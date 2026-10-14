@@ -33,6 +33,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/aiuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/automationuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/billinguc"
+	"github.com/mesutokul/fluxboard/backend/internal/usecase/projectuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/taskuc"
 )
 
@@ -106,6 +107,12 @@ func run(logger *slog.Logger) error {
 	maintenanceRepo := postgres.NewMaintenanceRepo(pool)
 	maintenance := jobs.NewMaintenance(taskSvc, maintenanceRepo, logger)
 	maintenance.SetAutomation(automationSvc)
+	// Request-inbox mail sweep (acknowledgment / completion / decline mails).
+	// Only the intake repo + mailer are used, hence the sparse Deps.
+	maintenance.WithIntake(projectuc.New(projectuc.Deps{
+		Intake: postgres.NewIntakeRepo(tenantPool), Logger: logger,
+		IntakeMail: mailer.New(mailer.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom, WebOrigin: cfg.WebOrigin}, logger),
+	}))
 
 	// Metrics endpoint on its own port (scraped separately from the api).
 	metricsSrv, metricsReg := startMetrics(logger, cfg.WorkerMetricsAddr)

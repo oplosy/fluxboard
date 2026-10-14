@@ -161,6 +161,12 @@ func (m *Mailer) SendNotification(ctx context.Context, to, subject, body string)
 	return m.send(ctx, to, subject, body+"\n\nView it in Fluxboard:\n"+link)
 }
 
+// SendIntakeMail delivers a request-inbox mail to a public-form submitter.
+// Plain text, no app links: the submitter has no account.
+func (m *Mailer) SendIntakeMail(ctx context.Context, to, subject, body string) error {
+	return m.send(ctx, to, subject, body)
+}
+
 // link builds {WebOrigin}{path}?token=<raw>.
 func (m *Mailer) link(path, rawToken string) string {
 	base := strings.TrimRight(m.cfg.WebOrigin, "/")

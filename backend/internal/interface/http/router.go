@@ -289,6 +289,11 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Patch("/forms/{formId}", d.Projects.UpdateForm)
 					p.With(read(tenant.ObjOrg)).Post("/forms/{formId}/rotate", d.Projects.RotateFormToken)
 					p.With(read(tenant.ObjOrg)).Delete("/forms/{formId}", d.Projects.DeleteForm)
+					// Request inbox: CONTRIBUTOR gate in projectuc (rows hold submitter contact details).
+					p.With(read(tenant.ObjOrg)).Get("/requests", d.Projects.ListRequests)
+					p.With(read(tenant.ObjOrg)).Patch("/requests/{requestId}", d.Projects.TriageRequest)
+					p.With(read(tenant.ObjOrg)).Post("/requests/{requestId}/accept", d.Projects.AcceptRequest)
+					p.With(read(tenant.ObjOrg)).Post("/requests/{requestId}/decline", d.Projects.DeclineRequest)
 				})
 
 				// Org-wide task search + bulk actions (FR-TASK-007/008). Static

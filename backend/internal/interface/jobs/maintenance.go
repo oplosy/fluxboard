@@ -22,7 +22,14 @@ const (
 	TypeRecurrenceGenerate = "maintenance:recurrence_generate"
 	// TypeAutomationTimeScan fires the due-soon / overdue automation rules.
 	TypeAutomationTimeScan = "automation:time_scan"
+	// TypeIntakeMail sends request-inbox submitter mails and marks completions.
+	TypeIntakeMail = "maintenance:intake_mail"
 )
+
+// IntakeSweeper runs one org's request-inbox mail sweep (projectuc.Service).
+type IntakeSweeper interface {
+	SendIntakeMails(ctx context.Context, orgID string) (int, error)
+}
 
 // OrgLister enumerates active orgs so a job can run under each tenant.
 type OrgLister interface {
@@ -41,6 +48,13 @@ type Maintenance struct {
 	scan   TimeTriggerScanner // nil ⇒ the time-scan job is a no-op
 	orgs   OrgLister
 	logger *slog.Logger
+	intake IntakeSweeper // nil => intake mail job not registered
+}
+
+// WithIntake enables the request-inbox mail sweep.
+func (m *Maintenance) WithIntake(s IntakeSweeper) *Maintenance {
+	m.intake = s
+	return m
 }
 
 // NewMaintenance builds the maintenance job handlers.
@@ -61,6 +75,17 @@ func (m *Maintenance) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeAttachmentGC, m.handleAttachmentGC)
 	mux.HandleFunc(TypeClaimSweep, m.handleClaimSweep)
 	mux.HandleFunc(TypeRecurrenceGenerate, m.handleRecurrenceGenerate)
+	if m.intake != nil {
+		mux.HandleFunc(TypeIntakeMail, m.handleIntakeMail)
+	}
+}
+
+// handleIntakeMail flips completed requests to done and mails submitters. Marks
+// make a retried or overlapping run send nothing twice.
+func (m *Maintenance) handleIntakeMail(ctx context.Context, _ *asynq.Task) error {
+	return m.forEachOrg(ctx, TypeIntakeMail, func(orgID string) (int, error) {
+		return m.intake.SendIntakeMails(ctx, orgID)
+	})
 }
 
 // forEachOrg runs fn under every active tenant, logging and continuing past a
@@ -149,6 +174,7 @@ func Schedule() []ScheduleEntry {
 		{Cron: "30 3 * * *", Task: asynq.NewTask(TypeAttachmentGC, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "@every 5s", Task: asynq.NewTask(TypeOutboxDrain, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},
 		{Cron: "@every 1m", Task: asynq.NewTask(TypeClaimSweep, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}}, // ADR-033
+		{Cron: "@every 1m", Task: asynq.NewTask(TypeIntakeMail, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}},
 		// Occurrences become due at local midnight in each rule's zone; 15 min is the worst-case lag.
 		{Cron: "*/15 * * * *", Task: asynq.NewTask(TypeRecurrenceGenerate, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}},
 		{Cron: "@every 5m", Task: asynq.NewTask(TypeAutomationTimeScan, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}}, // ADR-036: worst-case lag 5 min

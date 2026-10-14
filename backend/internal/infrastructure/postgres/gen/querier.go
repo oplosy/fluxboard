@@ -12,6 +12,9 @@ import (
 )
 
 type Querier interface {
+	// The status guard makes a double-click / concurrent accept create one task:
+	// the loser matches zero rows and the caller rolls its task back.
+	AcceptIntakeRequest(ctx context.Context, arg AcceptIntakeRequestParams) (int64, error)
 	// Project members ([T], tenant-scoped, FR-PROJ-003) ------------------------
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	AdvanceRecurrence(ctx context.Context, arg AdvanceRecurrenceParams) error
@@ -42,6 +45,9 @@ type Querier interface {
 	// Flip a pending row to committed (idempotency: no-op if already committed via
 	// the WHERE status filter). size_bytes is corrected to the HEAD-verified size.
 	CommitAttachment(ctx context.Context, arg CommitAttachmentParams) (int64, error)
+	// accepted -> done once the linked task has been completed (tasks.completed_at,
+	// trigger-stamped since 0038). Returns the flipped ids for logging.
+	CompleteIntakeRequests(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error)
 	// Tasks that entered their done column in [@day, @next_day) and are still
 	// there (tasks.completed_at, 0038). Cycle time runs from creation to completion.
 	CompletionsOnDay(ctx context.Context, arg CompletionsOnDayParams) (CompletionsOnDayRow, error)
@@ -61,6 +67,7 @@ type Querier interface {
 	CountMembersByRole(ctx context.Context, arg CountMembersByRoleParams) (int64, error)
 	// Live (non-archived) project count for the plan-limit gate (FR-BILL-009).
 	CountProjectsByOrg(ctx context.Context, orgID uuid.UUID) (int64, error)
+	CountRecentIntakeForForm(ctx context.Context, arg CountRecentIntakeForFormParams) (int64, error)
 	CountSubtasksForProject(ctx context.Context, arg CountSubtasksForProjectParams) ([]CountSubtasksForProjectRow, error)
 	// [@day, @next_day) is the UTC day window (bounds computed by the caller).
 	CountTasksCreatedOnDay(ctx context.Context, arg CountTasksCreatedOnDayParams) (int64, error)
@@ -127,6 +134,7 @@ type Querier interface {
 	// Time entries ([T], tenant-scoped, FR-TIME) -------------------------------
 	CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) error
+	DeclineIntakeRequest(ctx context.Context, arg DeclineIntakeRequestParams) (int64, error)
 	DeleteAgent(ctx context.Context, arg DeleteAgentParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
 	DeleteAutomationRule(ctx context.Context, arg DeleteAutomationRuleParams) (int64, error)
@@ -155,6 +163,7 @@ type Querier interface {
 	// Returns the org's label with this name, creating it (with color) if absent;
 	// an existing label keeps its color (project templates, FR-PROJ-007).
 	EnsureLabel(ctx context.Context, arg EnsureLabelParams) (uuid.UUID, error)
+	FindRecentIntakeDuplicate(ctx context.Context, arg FindRecentIntakeDuplicateParams) (uuid.UUID, error)
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) error
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
 	// to 401 rather than a silent miss. An agent's key carries the agent's role and
@@ -171,6 +180,7 @@ type Querier interface {
 	GetColumn(ctx context.Context, arg GetColumnParams) (BoardColumn, error)
 	GetComment(ctx context.Context, arg GetCommentParams) (Comment, error)
 	GetCustomField(ctx context.Context, arg GetCustomFieldParams) (CustomField, error)
+	GetIntakeRequest(ctx context.Context, arg GetIntakeRequestParams) (GetIntakeRequestRow, error)
 	GetInvitation(ctx context.Context, arg GetInvitationParams) (Invitation, error)
 	GetInvitationByEmail(ctx context.Context, arg GetInvitationByEmailParams) (Invitation, error)
 	GetLabel(ctx context.Context, arg GetLabelParams) (Label, error)
@@ -216,6 +226,7 @@ type Querier interface {
 	// ON CONFLICT DO NOTHING hits the once-per-task-per-rule index for time
 	// triggers: 0 rows means another run already claimed this (rule, task).
 	InsertAutomationRun(ctx context.Context, arg InsertAutomationRunParams) (int64, error)
+	InsertIntakeRequest(ctx context.Context, arg InsertIntakeRequestParams) error
 	// Notifications — Phase 5 (docs/09-REALTIME-JOBS.md §3, FR-NTF-002). notifications
 	// [T]: cursor pagination by created_at DESC; unread = read_at IS NULL.
 	InsertNotification(ctx context.Context, arg InsertNotificationParams) error
@@ -263,6 +274,10 @@ type Querier interface {
 	ListEnabledAutomationRules(ctx context.Context, arg ListEnabledAutomationRulesParams) ([]AutomationRule, error)
 	// Feature flags — Phase 6 (FR-ADM-006). feature_flags is [T] (RLS via TenantPool).
 	ListFeatureFlags(ctx context.Context, orgID uuid.UUID) ([]FeatureFlag, error)
+	// Requests owing the submitter an acknowledgment, or an outcome mail once
+	// decided (declined / done). Never anything for an address-less submission.
+	ListIntakeMailDue(ctx context.Context, arg ListIntakeMailDueParams) ([]ListIntakeMailDueRow, error)
+	ListIntakeRequests(ctx context.Context, arg ListIntakeRequestsParams) ([]ListIntakeRequestsRow, error)
 	ListInvoicesByOrg(ctx context.Context, orgID uuid.UUID) ([]Invoice, error)
 	ListLabels(ctx context.Context, orgID uuid.UUID) ([]Label, error)
 	ListLabelsForProject(ctx context.Context, arg ListLabelsForProjectParams) ([]ListLabelsForProjectRow, error)
@@ -329,6 +344,10 @@ type Querier interface {
 	// Metered aggregates for a day not yet pushed to Stripe.
 	ListUsageForPush(ctx context.Context, arg ListUsageForPushParams) ([]UsageRecord, error)
 	ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]ListUsersByIDsRow, error)
+	// Request inbox ([T], tenant-scoped, research report §6.3/§7) -----------------
+	// Serializes concurrent identical submissions (same form + email + content) for
+	// the rest of the tx so the duplicate check below cannot be raced.
+	LockIntakeDedupe(ctx context.Context, key string) error
 	// Lock up to @lim undrained rows for the drain tx. FOR UPDATE SKIP LOCKED lets
 	// concurrent drainers make progress without contending. The lock dies with the
 	// tx, so a crash before MarkOutboxDrained leaves the rows undrained.
@@ -336,6 +355,8 @@ type Querier interface {
 	// Serializes generation per rule; the caller skips dates on or before last_on.
 	LockRecurrence(ctx context.Context, arg LockRecurrenceParams) (LockRecurrenceRow, error)
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) (int64, error)
+	MarkIntakeAcked(ctx context.Context, arg MarkIntakeAckedParams) error
+	MarkIntakeOutcomeSent(ctx context.Context, arg MarkIntakeOutcomeSentParams) error
 	MarkInvitationAccepted(ctx context.Context, arg MarkInvitationAcceptedParams) (int64, error)
 	MarkNotificationRead(ctx context.Context, arg MarkNotificationReadParams) (int64, error)
 	// Stamp drained_at on rows already handed off to Asynq, in the same tx that
@@ -406,6 +427,8 @@ type Querier interface {
 	// Advance last_used_at for a live session head. Called by the auth middleware on
 	// the cache-miss backfill path (≤ once per cache TTL), not per request.
 	TouchSessionLastUsed(ctx context.Context, id uuid.UUID) error
+	// Owner / priority edits; only while the request is still open (new).
+	TriageIntakeRequest(ctx context.Context, arg TriageIntakeRequestParams) (int64, error)
 	UpdateAgent(ctx context.Context, arg UpdateAgentParams) (int64, error)
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (int64, error)
 	UpdateColumn(ctx context.Context, arg UpdateColumnParams) (int64, error)

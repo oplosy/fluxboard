@@ -176,13 +176,13 @@ type submitFormReq struct {
 	SubmitterEmail string `json:"submitter_email"`
 }
 
-// SubmitPublicForm files an anonymous task. Per-IP throttled at the route.
+// SubmitPublicForm files an anonymous request (an inbox item, not a task). Per-IP throttled at the route.
 func (h *PublicFormHandlers) SubmitPublicForm(w http.ResponseWriter, r *http.Request) {
 	var req submitFormReq
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	t, err := h.svc.SubmitForm(r.Context(), chi.URLParam(r, "token"), projectuc.SubmitFormInput{
+	id, err := h.svc.SubmitForm(r.Context(), chi.URLParam(r, "token"), projectuc.SubmitFormInput{
 		Title: req.Title, Description: req.Description, Priority: req.Priority,
 		SubmitterName: req.SubmitterName, SubmitterEmail: req.SubmitterEmail,
 	})
@@ -190,5 +190,5 @@ func (h *PublicFormHandlers) SubmitPublicForm(w http.ResponseWriter, r *http.Req
 		response.Error(w, err)
 		return
 	}
-	response.JSON(w, http.StatusCreated, map[string]any{"id": t.ID, "number": t.Number})
+	response.JSON(w, http.StatusCreated, map[string]any{"id": id})
 }

@@ -34,7 +34,7 @@ func formFromRow(r gen.ProjectForm) *project.ProjectForm {
 	return &project.ProjectForm{
 		ID: r.ID.String(), OrgID: r.OrgID.String(), ProjectID: r.ProjectID.String(),
 		Name: r.Name, Description: r.Description, TargetColumnID: r.TargetColumnID.String(),
-		TokenHash: r.TokenHash, CreatedBy: r.CreatedBy.String(), IsActive: r.IsActive,
+		TokenHash: r.TokenHash, CreatedBy: r.CreatedBy.String(), IsActive: r.IsActive, SchemaVersion: int(r.SchemaVersion),
 		CreatedAt: r.CreatedAt, UpdatedAt: r.UpdatedAt,
 	}
 }
