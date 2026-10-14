@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Field } from '@/components/auth/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
 
 // Project intake-form manager (ADR-023). LEAD-only surface. The raw token is
 // shown once at create/rotate (API-key-style reveal) because only its hash is
@@ -111,7 +112,7 @@ export function FormsManager({ projectId }: { projectId: string }) {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold text-muted-foreground">
           Intake forms
         </h2>
         <Button size="sm" variant="outline" onClick={() => setShowForm((v) => !v)}>
@@ -142,18 +143,12 @@ export function FormsManager({ projectId }: { projectId: string }) {
             />
           </Field>
           <Field id="form-target" label="Target column">
-            <select
+            <Select
               id="form-target"
               value={targetColumn || (columns[0]?.id ?? '')}
-              onChange={(e) => setTargetColumn(e.target.value)}
-              className="h-9 w-full rounded-lg border border-input bg-card px-2 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              {columns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={setTargetColumn}
+              options={columns.map((c) => ({ value: c.id, label: c.name }))}
+            />
           </Field>
           <Button
             size="sm"

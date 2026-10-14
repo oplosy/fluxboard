@@ -146,7 +146,7 @@ export default function AdminTenantDetailPage() {
 function Stat({ label, value }: { label: string; value: string }) {
   return (
     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
-      <p className="text-xs font-medium uppercase tracking-wide text-neutral-500">{label}</p>
+      <p className="text-xs font-medium text-neutral-500">{label}</p>
       <p className="mt-1 text-lg font-semibold capitalize">{value}</p>
     </div>
   );
@@ -155,7 +155,7 @@ function Stat({ label, value }: { label: string; value: string }) {
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-400">
+      <h2 className="mb-3 text-sm font-semibold text-neutral-400">
         {title}
       </h2>
       <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">{children}</div>

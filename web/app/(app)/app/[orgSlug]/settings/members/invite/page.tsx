@@ -10,6 +10,8 @@ import { useOrg } from '@/lib/org/context';
 import { createInvitation } from '@/lib/api/orgs';
 import { ApiError } from '@/lib/api/client';
 import type { Role } from '@/lib/api/types';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const INVITE_ROLES: Role[] = ['ADMIN', 'MEMBER', 'GUEST'];
 
@@ -80,7 +82,7 @@ export default function InviteMembersPage() {
   return (
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Invite people</h2>
+        <h2 className="text-sm font-semibold text-muted-foreground">Invite people</h2>
         <Link href={`/app/${slug}/settings/members`} className="text-sm text-muted-foreground hover:text-foreground">
           Back to members
         </Link>
@@ -106,13 +108,12 @@ export default function InviteMembersPage() {
         }}
       >
         <Field id="emails" label="Email addresses">
-          <textarea
+          <Textarea
             id="emails"
             value={raw}
             onChange={(e) => setRaw(e.target.value)}
             rows={4}
             placeholder="alice@acme.com, bob@acme.com"
-            className="flex w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
           <p className="text-xs text-muted-foreground">
             Separate multiple addresses with commas, spaces or new lines.
@@ -121,18 +122,12 @@ export default function InviteMembersPage() {
         </Field>
 
         <Field id="invite-role" label="Role">
-          <select
+          <Select
             id="invite-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as Role)}
-            className="h-10 w-full rounded-md border border-input bg-card px-3 text-sm transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            {INVITE_ROLES.map((r) => (
-              <option key={r} value={r}>
-                {r.charAt(0) + r.slice(1).toLowerCase()}
-              </option>
-            ))}
-          </select>
+            onValueChange={(v) => setRole(v as Role)}
+            options={INVITE_ROLES.map((r) => ({ value: r, label: r.charAt(0) + r.slice(1).toLowerCase() }))}
+          />
         </Field>
 
         <Button type="submit" disabled={sending || emails.length === 0}>

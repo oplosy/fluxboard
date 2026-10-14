@@ -26,9 +26,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/auth/field';
 import { cn } from '@/lib/utils';
-
-const selectCls =
-  'w-full rounded-lg border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
+import { Select } from '@/components/ui/select';
 
 // Human sentence for a rule: "When a task is created → assign to X".
 function describeRule(
@@ -170,143 +168,94 @@ export default function AutomationsPage() {
             </Field>
             <div className="grid gap-4 sm:grid-cols-2">
               <Field id="rule-trigger" label="When">
-                <select
+                <Select
                   id="rule-trigger"
                   value={trigger}
-                  onChange={(e) => {
-                    setTrigger(e.target.value as AutomationTrigger);
+                  onValueChange={(v) => {
+                    setTrigger(v as AutomationTrigger);
                     setTriggerColumn('');
                   }}
-                  className={selectCls}
-                >
-                  {AUTOMATION_TRIGGERS.map((t) => (
-                    <option key={t.value} value={t.value} title={t.hint}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
+                  options={AUTOMATION_TRIGGERS.map((t) => ({ value: t.value, label: t.label, description: t.hint }))}
+                />
               </Field>
               <Field id="rule-action" label="Then">
-                <select
+                <Select
                   id="rule-action"
                   value={action}
-                  onChange={(e) => setAction(e.target.value as AutomationAction)}
-                  className={selectCls}
-                >
-                  {AUTOMATION_ACTIONS.map((a) => (
-                    <option key={a.value} value={a.value}>
-                      {a.label}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setAction(v as AutomationAction)}
+                  options={AUTOMATION_ACTIONS.map((a) => ({ value: a.value, label: a.label }))}
+                />
               </Field>
             </div>
 
             {trigger === 'task.moved' ? (
               <Field id="rule-trigger-col" label="Only when moved into (optional)">
-                <select
+                <Select
                   id="rule-trigger-col"
                   value={triggerColumn}
-                  onChange={(e) => setTriggerColumn(e.target.value)}
-                  className={selectCls}
-                >
-                  <option value="">Any column</option>
-                  {boardColumns.map((c) => (
-                    <option key={c.id} value={c.id}>
-                      {c.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setTriggerColumn}
+                  options={[{ value: '', label: 'Any column' }, ...boardColumns.map((c) => ({ value: c.id, label: c.name }))]}
+                />
               </Field>
             ) : null}
 
             {action === 'assign' ? (
               <Field id="rule-assign" label="Assign to">
-                <select
+                <Select
                   id="rule-assign"
                   value={paramUser}
-                  onChange={(e) => setParamUser(e.target.value)}
-                  className={selectCls}
-                >
-                  <option value="">Select a member…</option>
-                  {members.map((m) => (
-                    <option key={m.user_id} value={m.user_id}>
-                      {m.name || m.email}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setParamUser}
+                  placeholder="Select a member…"
+                  options={members.map((m) => ({ value: m.user_id, label: m.name || m.email }))}
+                />
               </Field>
             ) : null}
             {action === 'set_priority' ? (
               <Field id="rule-priority" label="Priority">
-                <select
+                <Select
                   id="rule-priority"
                   value={paramPriority}
-                  onChange={(e) => setParamPriority(e.target.value as Priority)}
-                  className={selectCls}
-                >
-                  {PRIORITIES.filter((p) => p !== 'none').map((p) => (
-                    <option key={p} value={p}>
-                      {priorityLabel(p)}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={(v) => setParamPriority(v as Priority)}
+                  options={PRIORITIES.filter((p) => p !== 'none').map((p) => ({ value: p, label: priorityLabel(p) }))}
+                />
               </Field>
             ) : null}
             {action === 'add_label' ? (
               <Field id="rule-label" label="Label">
-                <select
+                <Select
                   id="rule-label"
                   value={paramLabel}
-                  onChange={(e) => setParamLabel(e.target.value)}
-                  className={selectCls}
-                >
-                  <option value="">Select a label…</option>
-                  {labels.map((l) => (
-                    <option key={l.id} value={l.id}>
-                      {l.name}
-                    </option>
-                  ))}
-                </select>
+                  onValueChange={setParamLabel}
+                  placeholder="Select a label…"
+                  options={labels.map((l) => ({ value: l.id, label: l.name }))}
+                />
               </Field>
             ) : null}
             {action === 'move' || trigger === 'task.moved' ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field id="rule-project" label="Project (for columns)">
-                  <select
+                  <Select
                     id="rule-project"
                     value={paramProject}
-                    onChange={(e) => {
-                      setParamProject(e.target.value);
+                    onValueChange={(v) => {
+                      setParamProject(v);
                       setParamColumn('');
                       setTriggerColumn('');
                     }}
-                    className={selectCls}
-                  >
-                    <option value="">Select a project…</option>
-                    {projects.map((p) => (
-                      <option key={p.id} value={p.id}>
-                        {p.name}
-                      </option>
-                    ))}
-                  </select>
+                    placeholder="Select a project…"
+                    options={projects.map((p) => ({ value: p.id, label: p.name }))}
+                  />
                 </Field>
                 {action === 'move' ? (
                   <Field id="rule-move-col" label="Move to column">
-                    <select
+                    <Select
                       id="rule-move-col"
                       value={paramColumn}
-                      onChange={(e) => setParamColumn(e.target.value)}
-                      className={selectCls}
+                      onValueChange={setParamColumn}
                       disabled={!paramProject}
-                    >
-                      <option value="">{paramProject ? 'Select a column…' : 'Pick a project first'}</option>
-                      {boardColumns.map((c) => (
-                        <option key={c.id} value={c.id}>
-                          {c.name}
-                        </option>
-                      ))}
-                    </select>
+                      placeholder={paramProject ? 'Select a column…' : 'Pick a project first'}
+                      options={boardColumns.map((c) => ({ value: c.id, label: c.name }))}
+                    />
                   </Field>
                 ) : null}
               </div>

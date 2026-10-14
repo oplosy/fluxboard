@@ -15,6 +15,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Field } from '@/components/auth/field';
 import { useToast } from '@/components/ui/toast';
+import { Select } from '@/components/ui/select';
 
 const inputCls =
   'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -67,7 +68,7 @@ export function FieldsManager({ projectId }: { projectId: string }) {
   return (
     <section>
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
+        <h2 className="text-sm font-semibold text-muted-foreground">
           Custom fields
         </h2>
         <Button size="sm" variant="outline" onClick={() => setShowForm((v) => !v)}>
@@ -88,18 +89,12 @@ export function FieldsManager({ projectId }: { projectId: string }) {
               />
             </Field>
             <Field id="field-type" label="Type">
-              <select
+              <Select
                 id="field-type"
                 value={type}
-                onChange={(e) => setType(e.target.value as CustomFieldType)}
-                className={inputCls}
-              >
-                {FIELD_TYPES.map((t) => (
-                  <option key={t.value} value={t.value}>
-                    {t.label}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setType(v as CustomFieldType)}
+                options={FIELD_TYPES.map((t) => ({ value: t.value, label: t.label }))}
+              />
             </Field>
           </div>
           {type === 'select' ? (

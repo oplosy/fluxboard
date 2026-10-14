@@ -37,7 +37,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
     return (
       <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-ink text-paper/60">
         <Spinner size="lg" className="text-paper" />
-        <p className="font-mono text-[11px] uppercase tracking-[0.2em]">Checking platform access</p>
+        <p className="text-xs font-medium">Checking platform access</p>
       </div>
     );
   }
@@ -55,7 +55,7 @@ export default function AdminLayout({ children }: { children: ReactNode }) {
         <div className="flex h-14 items-center gap-2.5 border-b border-paper/10 px-5">
           <LogoMark className="h-[22px] w-[22px]" />
           <span className="font-display text-[15px] font-semibold tracking-[-0.02em]">Platform</span>
-          <span className="ml-auto flex items-center gap-1 rounded-sm bg-signal px-1.5 py-0.5 font-mono text-[9px] font-semibold uppercase tracking-[0.12em] text-signal-foreground">
+          <span className="ml-auto flex items-center gap-1 rounded-sm bg-signal px-1.5 py-0.5 text-xs font-semibold text-signal-foreground">
             <Shield className="h-2.5 w-2.5" /> admin
           </span>
         </div>

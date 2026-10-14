@@ -56,7 +56,7 @@ export default function ApiKeysSettingsPage() {
     <div className="max-w-2xl space-y-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">API keys</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">API keys</h2>
           <p className="mt-1 text-sm text-muted-foreground">
             Programmatic access with a <span className="font-mono">Bearer fbk_live_…</span> token.
           </p>

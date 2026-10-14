@@ -9,7 +9,7 @@ export function DotMatrixBand({ words }: { words: string[] }) {
     <Reveal variant="clip-up" className="container">
       <div className="relative h-[260px] overflow-hidden rounded-lg bg-ink md:h-[340px]">
         <DotMatrix words={words} />
-        <span className="pointer-events-none absolute bottom-3 left-4 font-mono text-[10px] uppercase tracking-[0.2em] text-paper/40">
+        <span className="pointer-events-none absolute bottom-3 left-4 text-xs text-paper/40 font-medium">
           Move your cursor · click for a ripple
         </span>
       </div>

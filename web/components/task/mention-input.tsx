@@ -4,6 +4,7 @@ import { useRef, useState } from 'react';
 
 import { useOrgMembers } from '@/lib/org/use-members';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 // A comment textarea with @mention autocomplete over the org's members
 // (FR-TASK-005). Typing "@" opens a filtered popup; selecting inserts
@@ -96,7 +97,7 @@ export function MentionInput({
 
   return (
     <div className="relative">
-      <textarea
+      <Textarea
         ref={ref}
         value={value}
         onChange={handleChange}
@@ -105,7 +106,6 @@ export function MentionInput({
         placeholder={placeholder}
         disabled={disabled}
         rows={rows}
-        className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm placeholder:text-muted-foreground focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
       />
       {query !== null && suggestions.length > 0 ? (
         <ul className="absolute z-20 mt-1 w-64 overflow-hidden rounded-md border bg-card shadow-md">

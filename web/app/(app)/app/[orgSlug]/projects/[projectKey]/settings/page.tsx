@@ -26,6 +26,8 @@ import { FieldsManager } from '@/components/board/fields-manager';
 import { FormsManager } from '@/components/board/forms-manager';
 import type { BoardColumn, ColumnRole, Project, Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 export default function ProjectSettingsPage(props: { params: Promise<{ projectKey: string }> }) {
   const params = use(props.params);
@@ -64,7 +66,7 @@ export default function ProjectSettingsPage(props: { params: Promise<{ projectKe
 }
 
 function SectionTitle({ children }: { children: React.ReactNode }) {
-  return <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">{children}</h2>;
+  return <h2 className="mb-3 text-sm font-semibold text-muted-foreground">{children}</h2>;
 }
 
 function GeneralSection({ project }: { project: Project }) {
@@ -107,13 +109,12 @@ function GeneralSection({ project }: { project: Project }) {
           <Input id="p-name" value={name} onChange={(e) => setName(e.target.value)} disabled={archived} required />
         </Field>
         <Field id="p-desc" label="Description">
-          <textarea
+          <Textarea
             id="p-desc"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             disabled={archived}
             rows={3}
-            className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
           />
         </Field>
         <Field id="p-color" label="Color">
@@ -337,20 +338,15 @@ function ColumnRow({
         </label>
         <label className="flex items-center gap-1 text-xs text-muted-foreground">
           Stage
-          <select
+          <Select
+            size="sm"
+            className="w-36"
             value={column.role ?? ''}
-            onChange={(e) => onRole((e.target.value || null) as ColumnRole | null)}
+            onValueChange={(v) => onRole((v || null) as ColumnRole | null)}
             disabled={busy}
             aria-label={`Stage of ${column.name}`}
-            className="h-8 rounded border border-input bg-card px-2 text-sm text-foreground transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            <option value="">None</option>
-            {STAGES.map((s) => (
-              <option key={s.value} value={s.value}>
-                {s.label}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: 'None' }, ...STAGES.map((s) => ({ value: s.value, label: s.label }))]}
+          />
         </label>
         <div className="ml-auto flex items-center gap-1">
           <button
@@ -384,17 +380,14 @@ function ColumnRow({
       {confirming ? (
         <div className="mt-2 flex flex-wrap items-center gap-2 rounded-2xl bg-destructive/5 p-3 text-sm">
           <span>Move its tasks to</span>
-          <select
+          <Select
+            size="sm"
+            className="w-44"
+            aria-label="Move tasks to"
             value={target}
-            onChange={(e) => setTarget(e.target.value)}
-            className="h-8 rounded border border-input bg-card px-2 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-          >
-            {others.map((o) => (
-              <option key={o.id} value={o.id}>
-                {o.name}
-              </option>
-            ))}
-          </select>
+            onValueChange={setTarget}
+            options={others.map((o) => ({ value: o.id, label: o.name }))}
+          />
           <button
             onClick={() => {
               onDelete(target);

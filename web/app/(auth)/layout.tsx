@@ -20,13 +20,13 @@ export default function AuthLayout({ children }: { children: ReactNode }) {
             <LogoMark className="h-6 w-6" />
             <span className="font-display text-[17px] font-semibold tracking-[-0.03em]">fluxboard</span>
           </Link>
-          <span className="font-mono text-[10px] uppercase tracking-[0.2em] text-paper/40">v1 · workspace</span>
+          <span className="text-xs text-paper/40 font-medium">v1 · workspace</span>
         </div>
         <div className="relative mt-auto p-8">
           <p className="max-w-[22ch] animate-slide-up font-display text-4xl font-semibold leading-[1.02] tracking-[-0.045em]">
             Keep the important work in motion.
           </p>
-          <ul className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-paper/10 bg-paper/10 font-mono text-[10px] uppercase tracking-[0.14em] text-paper/60">
+          <ul className="mt-8 grid grid-cols-3 gap-px overflow-hidden rounded-md border border-paper/10 bg-paper/10 text-xs text-paper/60 font-medium">
             {['Realtime boards', 'Tenant isolation', 'Metered billing'].map((f, i) => (
               <li key={f} className="animate-slide-up bg-ink p-3" style={{ animationDelay: `${200 + i * 90}ms` }}>
                 <span className="block text-paper/30">0{i + 1}</span>

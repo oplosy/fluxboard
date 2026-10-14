@@ -18,6 +18,7 @@ import {
   revokeInvitation,
 } from '@/lib/api/orgs';
 import type { OrgMember, Role } from '@/lib/api/types';
+import { Select } from '@/components/ui/select';
 
 // Roles assignable via the dropdown. OWNER is set only through transfer-ownership
 // (Danger zone), never here (ADR-019 §3).
@@ -30,7 +31,7 @@ export default function MembersSettingsPage() {
     <div className="max-w-3xl space-y-10">
       <section>
         <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">Members</h2>
+          <h2 className="text-sm font-semibold text-muted-foreground">Members</h2>
           <Link href={`/app/${slug}/settings/members/invite`}>
             <Button size="sm">Invite people</Button>
           </Link>
@@ -125,19 +126,16 @@ function MemberRow({
       {isOwner ? (
         <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium">Owner</span>
       ) : (
-        <select
+        <Select
+          size="sm"
+          className="h-9 w-32"
+          align="end"
           value={member.role}
           disabled={locked || busy}
-          onChange={(e) => onRole(e.target.value as Role)}
-          className="h-9 rounded-md border border-input bg-card px-2 text-sm disabled:opacity-50 transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
+          onValueChange={(v) => onRole(v as Role)}
           aria-label="Member role"
-        >
-          {ASSIGNABLE_ROLES.map((r) => (
-            <option key={r} value={r}>
-              {r.charAt(0) + r.slice(1).toLowerCase()}
-            </option>
-          ))}
-        </select>
+          options={ASSIGNABLE_ROLES.map((r) => ({ value: r, label: r.charAt(0) + r.slice(1).toLowerCase() }))}
+        />
       )}
 
       {locked ? (
@@ -197,7 +195,7 @@ function PendingInvites() {
 
   return (
     <section>
-      <h2 className="mb-3 text-sm font-semibold uppercase tracking-wide text-muted-foreground">Pending invitations</h2>
+      <h2 className="mb-3 text-sm font-semibold text-muted-foreground">Pending invitations</h2>
       {invites.isLoading ? (
         <p className="text-sm text-muted-foreground">Loading…</p>
       ) : items.length === 0 ? (

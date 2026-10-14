@@ -66,9 +66,9 @@ export function PricingTable() {
             )}
           >
             <div className="flex items-center justify-between">
-              <span className="font-mono text-[11px] uppercase tracking-[0.18em] opacity-60">0{i + 1}</span>
+              <span className="font-mono text-xs opacity-60">0{i + 1}</span>
               {plan.highlighted ? (
-                <span className="rounded-sm bg-signal px-1.5 py-0.5 font-mono text-[10px] font-medium uppercase tracking-[0.12em] text-signal-foreground">
+                <span className="rounded-sm bg-signal px-1.5 py-0.5 text-xs font-medium text-signal-foreground">
                   Most teams
                 </span>
               ) : null}

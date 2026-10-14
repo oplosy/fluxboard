@@ -21,11 +21,11 @@ import {
 import { ApiError } from '@/lib/api/client';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 
 const inputCls =
   'w-full rounded-lg border border-input bg-background px-3 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
-const selectCls =
-  'w-full rounded-lg border border-input bg-background px-2 py-2 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
 
 /** Shared error line: 402 points at billing, 403 at the org switch, else raw. */
 function AIError({ error, slug }: { error: unknown; slug: string }) {
@@ -120,8 +120,7 @@ function ParseCard() {
         <CardDescription>One sentence in, structured task drafts out.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <textarea
-          className={inputCls}
+        <Textarea
           rows={3}
           placeholder="next week: finalise wireframes, kickoff design review, draft sprint demo"
           value={input}
@@ -173,8 +172,7 @@ function PlanCard() {
         <CardDescription>Brief in, phased draft out. Apply writes real tasks, all or nothing.</CardDescription>
       </CardHeader>
       <CardContent className="space-y-3">
-        <textarea
-          className={inputCls}
+        <Textarea
           rows={3}
           placeholder="Launch usage-based billing for EU customers…"
           value={brief}
@@ -193,14 +191,13 @@ function PlanCard() {
                 setColumnId('');
               }}
             />
-            <select className={selectCls} value={columnId} onChange={(e) => setColumnId(e.target.value)}>
-              <option value="">Select a column…</option>
-              {columns.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Column"
+              placeholder="Select a column…"
+              value={columnId}
+              onValueChange={setColumnId}
+              options={columns.map((c) => ({ value: c.id, label: c.name }))}
+            />
             <Button
               variant="secondary"
               isLoading={apply.isPending}
@@ -241,14 +238,13 @@ function ProjectPicker({
   const projectsQ = useQuery({ queryKey: ['projects', orgId], queryFn: () => listProjects(orgId) });
   const projects = projectsQ.data ?? [];
   return (
-    <select className={selectCls} value={projectId} onChange={(e) => onChange(e.target.value)}>
-      <option value="">Select a project…</option>
-      {projects.map((p) => (
-        <option key={p.id} value={p.id}>
-          {p.key} — {p.name}
-        </option>
-      ))}
-    </select>
+    <Select
+      aria-label="Project"
+      placeholder="Select a project…"
+      value={projectId}
+      onValueChange={onChange}
+      options={projects.map((p) => ({ value: p.id, label: `${p.key} — ${p.name}` }))}
+    />
   );
 }
 

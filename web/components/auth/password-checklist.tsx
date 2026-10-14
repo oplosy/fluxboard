@@ -28,7 +28,7 @@ export function PasswordChecklist({ id, password, email }: { id?: string; passwo
             />
           ))}
         </div>
-        <span className="min-w-[76px] shrink-0 whitespace-nowrap text-right font-mono text-[10.5px] uppercase tracking-[0.08em] text-muted-foreground">
+        <span className="min-w-[76px] shrink-0 whitespace-nowrap text-right text-xs text-muted-foreground font-medium">
           {password ? STRENGTH_LABEL[strength] : `${n}/${PASSWORD_MAX}`}
         </span>
       </div>

@@ -15,6 +15,7 @@ import { PROJECT_TEMPLATES, createProjectFromTemplate } from '@/lib/board/templa
 import { ApiError } from '@/lib/api/client';
 import type { Visibility } from '@/lib/api/types';
 import { cn } from '@/lib/utils';
+import { Textarea } from '@/components/ui/textarea';
 
 // A project key is 2–10 upper-case letters/digits starting with a letter
 // (mirrors ValidKey server-side). We suggest one from the name until edited.
@@ -124,13 +125,12 @@ export default function NewProjectPage() {
             </Field>
 
             <Field id="description" label="Description (optional)">
-              <textarea
+              <Textarea
                 id="description"
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={3}
                 placeholder="What is this project about?"
-                className="flex w-full rounded-md border border-input bg-card px-4 py-3 text-sm placeholder:text-muted-foreground focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
               />
             </Field>
 

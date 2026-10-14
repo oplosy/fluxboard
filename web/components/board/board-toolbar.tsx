@@ -7,6 +7,7 @@ import type { BoardColumn, Label, Priority } from '@/lib/api/types';
 import type { Sprint } from '@/lib/api/sprints';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/select';
 
 export interface BoardFilter {
   text: string;
@@ -17,8 +18,7 @@ export interface BoardFilter {
 
 export const EMPTY_FILTER: BoardFilter = { text: '', priority: '', assignee: 'any', sprint: '' };
 
-const selectCls =
-  'h-10 rounded-xl border-0 bg-secondary/60 px-3 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
+const selectCls = 'h-10 w-auto min-w-[8.5rem] max-w-[13rem] text-sm';
 
 // Board toolbar: client-side filters (text / priority / assignee — the board
 // projection carries no labels, so label is not a filter, ADR-017) plus the
@@ -69,43 +69,38 @@ export function BoardToolbar({
         placeholder="Filter tasks…  ( / )"
         className="h-10 w-56 rounded-md border border-input bg-card px-3 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
       />
-      <select
+      <Select
+        size="sm"
+        className={selectCls}
         value={filter.priority}
-        onChange={(e) => onFilter({ ...filter, priority: e.target.value as Priority | '' })}
-        className={selectCls}
+        onValueChange={(v) => onFilter({ ...filter, priority: v as Priority | '' })}
         aria-label="Filter by priority"
-      >
-        <option value="">Any priority</option>
-        {PRIORITIES.map((p) => (
-          <option key={p} value={p}>
-            {priorityLabel(p)}
-          </option>
-        ))}
-      </select>
-      <select
+        options={[{ value: '', label: 'Any priority' }, ...PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p) }))]}
+      />
+      <Select
+        size="sm"
+        className={selectCls}
         value={filter.assignee}
-        onChange={(e) => onFilter({ ...filter, assignee: e.target.value as BoardFilter['assignee'] })}
-        className={selectCls}
+        onValueChange={(v) => onFilter({ ...filter, assignee: v as BoardFilter['assignee'] })}
         aria-label="Filter by assignee"
-      >
-        <option value="any">Anyone</option>
-        <option value="me">Assigned to me</option>
-        <option value="unassigned">Unassigned</option>
-      </select>
-      <select
-        value={filter.sprint}
-        onChange={(e) => onFilter({ ...filter, sprint: e.target.value })}
+        options={[
+          { value: 'any', label: 'Anyone' },
+          { value: 'me', label: 'Assigned to me' },
+          { value: 'unassigned', label: 'Unassigned' },
+        ]}
+      />
+      <Select
+        size="sm"
         className={selectCls}
+        value={filter.sprint}
+        onValueChange={(v) => onFilter({ ...filter, sprint: v })}
         aria-label="Filter by sprint"
-      >
-        <option value="">All sprints</option>
-        <option value="backlog">Backlog</option>
-        {sprints.map((s) => (
-          <option key={s.id} value={s.id}>
-            {s.name}
-          </option>
-        ))}
-      </select>
+        options={[
+          { value: '', label: 'All sprints' },
+          { value: 'backlog', label: 'Backlog' },
+          ...sprints.map((s) => ({ value: s.id, label: s.name })),
+        ]}
+      />
 
       <button
         onClick={onToggleSelectMode}

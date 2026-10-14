@@ -172,9 +172,11 @@
 
 /* ── Components ─────────────────────────────────────────────────────── */
 @layer components {
-  /* Mono eyebrow label used for section numbering and metadata. */
+  /* Eyebrow / section / stat label: small sans, medium weight, muted, normal
+     tracking and natural case. `.kicker` is the legacy name for the same style. */
+  .eyebrow,
   .kicker {
-    @apply font-mono text-[11px] font-medium uppercase tracking-[0.18em] text-muted-foreground;
+    @apply text-xs font-medium tracking-normal text-muted-foreground;
   }
 
   /* Animated underline: grows from the left on hover/focus. */

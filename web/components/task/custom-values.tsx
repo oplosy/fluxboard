@@ -12,6 +12,7 @@ import {
   type CustomValue,
 } from '@/lib/api/fields';
 import { useToast } from '@/components/ui/toast';
+import { Select } from '@/components/ui/select';
 
 const inputCls =
   'w-full rounded-lg border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
@@ -127,27 +128,19 @@ function FieldRow({
         );
       case 'select':
         return (
-          <select
-            defaultValue={value?.text ?? ''}
-            key={value?.text ?? 'empty'}
+          <Select
+            value={value?.text ?? ''}
             disabled={!canEdit}
-            onChange={(e) => {
-              if (e.target.value === '') {
+            onValueChange={(v) => {
+              if (v === '') {
                 if (value) onClear();
                 return;
               }
-              onSet({ text: e.target.value });
+              onSet({ text: v });
             }}
-            className={inputCls}
             aria-label={field.name}
-          >
-            <option value="">—</option>
-            {field.options.map((o) => (
-              <option key={o} value={o}>
-                {o}
-              </option>
-            ))}
-          </select>
+            options={[{ value: '', label: '—' }, ...field.options.map((o) => ({ value: o, label: o }))]}
+          />
         );
       default:
         return (

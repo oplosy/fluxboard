@@ -14,6 +14,7 @@ import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { Avatar } from '@/components/ui/avatar';
 import { PriorityBars } from './priority-bars';
+import { Select } from '@/components/ui/select';
 
 // Due-date presentation: overdue (red), due today (amber), upcoming (muted).
 function dueState(due: string): { label: string; className: string } {
@@ -309,7 +310,7 @@ function QuickMenu({
         <>
           <div className="fixed inset-0 z-30" onClick={() => setOpen(false)} aria-hidden />
           <div className="glass absolute right-0 top-full z-40 mt-1 w-56 origin-top-right animate-scale-in space-y-2 rounded-lg p-2.5">
-            <label className="block px-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            <label className="block px-1 text-xs font-medium text-muted-foreground">
               Priority
             </label>
             <div className="flex flex-wrap gap-1 px-1">
@@ -330,24 +331,19 @@ function QuickMenu({
                 </button>
               ))}
             </div>
-            <label className="block px-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+            <label className="block px-1 text-xs font-medium text-muted-foreground">
               Assignee
             </label>
-            <select
+            <Select
+              size="sm"
+              aria-label="Assignee"
               value={task.assignee_id ?? ''}
               disabled={busy}
-              onChange={(e) => void patch({ assignee_id: e.target.value || null })}
-              className="w-full rounded-lg border border-input bg-card px-2 py-1.5 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-            >
-              <option value="">Unassigned</option>
-              {members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.name}
-                </option>
-              ))}
-            </select>
+              onValueChange={(v) => void patch({ assignee_id: v || null })}
+              options={[{ value: '', label: 'Unassigned' }, ...members.map((m) => ({ value: m.user_id, label: m.name }))]}
+            />
             <div className="grid grid-cols-2 gap-1 px-1">
-              <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Start
                 <input
                   type="date"
@@ -359,7 +355,7 @@ function QuickMenu({
                   className="mt-0.5 w-full rounded-lg border border-input bg-card px-1.5 py-1 text-[11px] font-normal normal-case outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
                 />
               </label>
-              <label className="block font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+              <label className="block text-xs font-medium text-muted-foreground">
                 Due
                 <input
                   type="date"
@@ -374,7 +370,7 @@ function QuickMenu({
             </div>
             {labels.length > 0 ? (
               <>
-                <span className="block px-1 font-mono text-[10px] font-medium uppercase tracking-[0.14em] text-muted-foreground">
+                <span className="block px-1 text-xs font-medium text-muted-foreground">
                   Labels
                 </span>
                 <div className="max-h-28 space-y-0.5 overflow-y-auto px-1">

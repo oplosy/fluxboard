@@ -101,7 +101,7 @@ export function Timeline({
         <div className="scrollbar-thin overflow-x-auto rounded-2xl border bg-card">
           <div style={{ minWidth: 240 + totalDays * DAY_PX }}>
             <div className="flex border-b">
-              <div className="w-60 shrink-0 p-3 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
+              <div className="w-60 shrink-0 p-3 text-xs font-semibold text-muted-foreground">
                 Task
               </div>
               <div className="flex flex-1">

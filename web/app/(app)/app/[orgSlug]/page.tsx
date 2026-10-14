@@ -78,7 +78,7 @@ export default function OrgHomePage() {
       <section className="mb-10 animate-[slide-up_0.7s_var(--ease-out-expo)_backwards] rounded-lg border border-border bg-card [animation-delay:200ms]">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <p className="kicker">Your next two weeks</p>
-          <div className="flex items-center gap-4 font-mono text-[10px] uppercase tracking-[0.14em] text-muted-foreground">
+          <div className="flex items-center gap-4 text-xs text-muted-foreground font-medium">
             <span className="flex items-center gap-1.5">
               <span className="h-2 w-2 bg-signal" /> high
             </span>
@@ -144,7 +144,7 @@ export default function OrgHomePage() {
             title="Projects"
             index={2}
             action={
-              <Link href={`/app/${slug}/projects`} className="link-underline font-mono text-[11px] uppercase tracking-[0.14em] text-muted-foreground hover:text-foreground">
+              <Link href={`/app/${slug}/projects`} className="link-underline text-xs text-muted-foreground hover:text-foreground font-medium">
                 All projects →
               </Link>
             }
@@ -168,7 +168,7 @@ export default function OrgHomePage() {
                       className="absolute inset-x-0 top-0 h-[3px] origin-left scale-x-[0.18] transition-transform duration-500 ease-out-expo group-hover:scale-x-100"
                       style={{ backgroundColor: p.color || 'hsl(var(--muted-foreground))' }}
                     />
-                    <span className="font-mono text-[11px] uppercase tracking-wider text-muted-foreground">{p.key}</span>
+                    <span className="font-mono text-xs text-muted-foreground">{p.key}</span>
                     <span className="mt-6 flex items-end justify-between gap-2">
                       <span className="truncate font-display text-lg font-semibold tracking-[-0.02em]">{p.name}</span>
                       <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-[transform,color] duration-500 ease-spring group-hover:rotate-45 group-hover:text-foreground" />
@@ -199,7 +199,7 @@ function Stat({
 }) {
   return (
     <div className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards] bg-card p-5" style={{ animationDelay: `${index * 70}ms` }}>
-      <p className="font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">{label}</p>
+      <p className="text-xs text-muted-foreground font-medium">{label}</p>
       <div className={cn('mt-3 font-display text-4xl font-semibold tracking-[-0.04em]', accent && 'text-signal')}>
         {loading ? <Skeleton className="h-9 w-16" /> : <CountUp value={value ?? 0} duration={1100} />}
       </div>
@@ -211,7 +211,7 @@ function Panel({ title, index, action, children }: { title: string; index: numbe
   return (
     <section className="animate-[slide-up_0.6s_var(--ease-out-expo)_backwards]" style={{ animationDelay: `${250 + index * 80}ms` }}>
       <div className="mb-2 flex items-center justify-between border-b border-foreground pb-2">
-        <h2 className="font-mono text-[11px] font-medium uppercase tracking-[0.16em]">{title}</h2>
+        <h2 className="text-xs font-medium">{title}</h2>
         {action}
       </div>
       {children}

@@ -193,7 +193,7 @@ function SectionLabel({ children, collapsed, className }: { children: string; co
   return (
     <p
       className={cn(
-        'mb-2 flex h-4 items-center px-3 font-mono text-[10px] font-medium uppercase tracking-[0.18em] text-sidebar-foreground/45',
+        'mb-2 flex h-4 items-center px-3 text-xs font-medium text-sidebar-foreground/45',
         className,
       )}
     >

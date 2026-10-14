@@ -9,6 +9,7 @@ import { useToast } from '@/components/ui/toast';
 import { getBoard, reviewTask } from '@/lib/api/board';
 import { ApiError } from '@/lib/api/client';
 import { useOrg } from '@/lib/org/context';
+import { Textarea } from '@/components/ui/textarea';
 
 // Review decision for a task waiting in the board's review stage (ADR-033):
 // a person approves it (→ done) or sends it back with what to change
@@ -86,7 +87,7 @@ export function ReviewPanel({
           <label htmlFor="review-comment" className="sr-only">
             What needs to change
           </label>
-          <textarea
+          <Textarea
             id="review-comment"
             value={comment}
             onChange={(e) => {
@@ -98,7 +99,6 @@ export function ReviewPanel({
             aria-invalid={commentError ? true : undefined}
             aria-describedby={commentError ? 'review-comment-error' : undefined}
             placeholder="What needs to change?"
-            className="w-full rounded-md border border-input bg-card px-3 py-2 text-sm outline-none transition-[border-color] duration-300 focus-visible:border-foreground"
           />
           {commentError ? (
             <p id="review-comment-error" role="alert" className="text-xs text-destructive">

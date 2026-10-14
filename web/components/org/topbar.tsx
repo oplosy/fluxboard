@@ -185,7 +185,7 @@ function OrgSwitcher({
     >
       {(close) => (
         <>
-          <p className="px-2.5 pb-1 pt-1.5 font-mono text-[10px] uppercase tracking-[0.16em] text-muted-foreground">Organizations</p>
+          <p className="px-2.5 pb-1 pt-1.5 text-xs text-muted-foreground font-medium">Organizations</p>
           {orgs?.map((o, i) => (
             <Link
               key={o.org_id}

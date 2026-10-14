@@ -99,7 +99,7 @@ export function SiteFooter() {
           <button
             type="button"
             onClick={() => window.scrollTo({ top: 0, behavior: 'smooth' })}
-            className="group flex items-center gap-2 uppercase tracking-[0.16em] transition-colors hover:text-foreground"
+            className="group flex items-center gap-2 transition-colors hover:text-foreground"
           >
             Back to top
             <span className="flex h-7 w-7 items-center justify-center rounded-full border border-border transition-[transform,border-color] duration-500 ease-spring group-hover:-translate-y-1 group-hover:border-foreground">

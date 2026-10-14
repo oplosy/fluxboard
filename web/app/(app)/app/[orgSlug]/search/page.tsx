@@ -13,6 +13,7 @@ import { useProjectsMap } from '@/lib/board/use-projects';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import { TaskRow } from '@/components/task/task-row';
 import type { Priority } from '@/lib/api/types';
+import { Select } from '@/components/ui/select';
 
 // Full-text task search with a filter sidebar (7.6.5, FR-TASK-007). `q` lives in
 // the URL so results are shareable/bookmarkable; the facet filters are local
@@ -83,44 +84,36 @@ function SearchInner() {
       <div className="grid gap-6 lg:grid-cols-[14rem_1fr]">
         <aside className="space-y-4">
           <Facet label="Project">
-            <select value={projectId} onChange={(e) => setProjectId(e.target.value)} className={selectCls}>
-              <option value="">All projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Project"
+              value={projectId}
+              onValueChange={setProjectId}
+              options={[{ value: '', label: 'All projects' }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+            />
           </Facet>
           <Facet label="Assignee">
-            <select value={assigneeId} onChange={(e) => setAssigneeId(e.target.value)} className={selectCls}>
-              <option value="">Anyone</option>
-              {members.map((m) => (
-                <option key={m.user_id} value={m.user_id}>
-                  {m.name || m.email}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Assignee"
+              value={assigneeId}
+              onValueChange={setAssigneeId}
+              options={[{ value: '', label: 'Anyone' }, ...members.map((m) => ({ value: m.user_id, label: m.name || m.email }))]}
+            />
           </Facet>
           <Facet label="Priority">
-            <select value={priority} onChange={(e) => setPriority(e.target.value)} className={selectCls}>
-              <option value="">Any</option>
-              {PRIORITIES.map((p) => (
-                <option key={p} value={p}>
-                  {priorityLabel(p as Priority)}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Priority"
+              value={priority}
+              onValueChange={setPriority}
+              options={[{ value: '', label: 'Any' }, ...PRIORITIES.map((p) => ({ value: p, label: priorityLabel(p as Priority) }))]}
+            />
           </Facet>
           <Facet label="Label">
-            <select value={labelId} onChange={(e) => setLabelId(e.target.value)} className={selectCls}>
-              <option value="">Any</option>
-              {(labels ?? []).map((l) => (
-                <option key={l.id} value={l.id}>
-                  {l.name}
-                </option>
-              ))}
-            </select>
+            <Select
+              aria-label="Label"
+              value={labelId}
+              onValueChange={setLabelId}
+              options={[{ value: '', label: 'Any' }, ...(labels ?? []).map((l) => ({ value: l.id, label: l.name }))]}
+            />
           </Facet>
         </aside>
 
@@ -151,13 +144,10 @@ function SearchInner() {
   );
 }
 
-const selectCls =
-  'w-full rounded-md border border-input bg-background px-2 py-1.5 text-sm outline-none focus-visible:ring-2 focus-visible:ring-ring';
-
 function Facet({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <p className="mb-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</p>
+      <p className="mb-1 text-xs font-medium text-muted-foreground">{label}</p>
       {children}
     </div>
   );

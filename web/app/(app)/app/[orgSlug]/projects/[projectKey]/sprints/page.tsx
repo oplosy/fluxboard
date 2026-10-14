@@ -23,6 +23,7 @@ import { Field } from '@/components/auth/field';
 import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
+import { Select } from '@/components/ui/select';
 
 function statusBadge(s: Sprint['status']): string {
   return s === 'active'
@@ -276,26 +277,16 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
               <div key={t.id} className="flex items-center gap-2 rounded-xl border bg-card px-3 py-2 text-sm">
                 <span className="font-mono text-xs text-muted-foreground">#{t.number}</span>
                 <span className="min-w-0 flex-1 truncate">{t.title}</span>
-                <select
-                  defaultValue=""
-                  onChange={(e) => {
-                    if (e.target.value) {
-                      assignMutation.mutate({ taskIds: [t.id], sprintId: e.target.value });
-                      e.target.value = '';
-                    }
-                  }}
+                <Select
+                  size="sm"
+                  className="w-40"
+                  align="end"
+                  value=""
+                  placeholder="Add to sprint…"
+                  onValueChange={(sprintId) => assignMutation.mutate({ taskIds: [t.id], sprintId })}
                   aria-label={`Add ${t.title} to sprint`}
-                  className="rounded-lg border border-input bg-card px-2 py-1 text-xs outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
-                >
-                  <option value="">Add to sprint…</option>
-                  {sprints
-                    .filter((s) => s.status !== 'completed')
-                    .map((s) => (
-                      <option key={s.id} value={s.id}>
-                        {s.name}
-                      </option>
-                    ))}
-                </select>
+                  options={sprints.filter((s) => s.status !== 'completed').map((s) => ({ value: s.id, label: s.name }))}
+                />
               </div>
             ))}
           </div>

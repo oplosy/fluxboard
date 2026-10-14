@@ -72,7 +72,7 @@ export function UpgradeModalProvider({ children }: { children: ReactNode }) {
             onClick={(e) => e.stopPropagation()}
           >
             <div className="absolute inset-x-0 top-0 h-[3px] bg-signal" aria-hidden />
-            <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-muted-foreground">Plan limit reached</p>
+            <p className="text-xs text-muted-foreground font-medium">Plan limit reached</p>
             <h2 id="upgrade-title" className="mt-3 text-2xl font-semibold tracking-[-0.03em]">
               Upgrade your plan
             </h2>

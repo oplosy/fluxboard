@@ -62,7 +62,7 @@ function Kpi({
     <div className="rounded-lg border border-neutral-800 bg-neutral-900 p-4">
       <div className="flex items-center gap-2 text-neutral-400">
         <Icon className="h-4 w-4" />
-        <span className="text-xs font-medium uppercase tracking-wide">{label}</span>
+        <span className="text-xs font-medium">{label}</span>
       </div>
       <p className="mt-2 text-2xl font-semibold">{value}</p>
     </div>
