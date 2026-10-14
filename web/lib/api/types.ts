@@ -208,6 +208,16 @@ export interface CreateProjectInput {
   visibility: Visibility;
 }
 
+/** GET /orgs/{id}/project-templates entry (FR-PROJ-007). */
+export interface ProjectTemplate {
+  key: string;
+  name: string;
+  description: string;
+  columns: { name: string; role?: string }[];
+  labels: { name: string; color: string }[];
+  task_count: number;
+}
+
 /** Payload for PATCH /orgs/{id}/projects/{projectId}. */
 export interface UpdateProjectInput {
   name: string;
