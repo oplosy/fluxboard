@@ -68,6 +68,8 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-TASK-009 | M | Soft-delete task → Trash (30 days) → restore or permanent purge by job. |
 | FR-TASK-010 | S | Task relations: `blocks` / `blocked-by` links with cycle detection (reject with 422 + the detected path). |
 | FR-TASK-011 | C | Recurring tasks. |
+| FR-TASK-012 | S | CSV task import (Excel/Sheets/Trello): upload → column mapping preview (title, description, status/column, assignee by email, due date, priority, labels) with per-row errors → import through the normal create path (numbering, ranks, events, automation). CONTRIBUTOR+. `Idempotency-Key` required; task ids derive from (org, project, key, payload hash, row), so a retry never duplicates rows. ≤ 1000 rows. |
+| FR-TASK-013 | S | Project export: tasks as CSV (re-importable, formula-safe) and JSON with comments, labels and attachment metadata. VIEWER+ via the project-access policy. |
 
 ## BILL — Billing & Payments (full spec: 06-BILLING.md)
 

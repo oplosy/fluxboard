@@ -65,6 +65,9 @@ type Deps struct {
 	// Agents identifies agent callers for the human-approved Done gate
 	// (ADR-033); nil ⇒ every caller is treated as a person.
 	Agents agent.Lookup
+	// People resolves org members' emails for CSV import/export (assignee by
+	// email); nil ⇒ an assignee column is refused and exports omit emails.
+	People People
 	Logger *slog.Logger
 	Now    func() time.Time // injectable for tests; defaults to time.Now
 }
@@ -91,6 +94,7 @@ type Service struct {
 	automation   automation.Evaluator
 	conc         project.ConcurrencyRepository
 	agents       agent.Lookup
+	people       People
 	logger       *slog.Logger
 	now          func() time.Time
 }
@@ -110,7 +114,7 @@ func New(d Deps) *Service {
 		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, recurrences: d.Recurrences, projects: d.Projects,
 		members: d.Members, boards: d.Boards, columns: d.Columns, store: d.Store,
 		entitlements: d.Entitlements, events: d.Events, notifier: d.Notifier,
-		automation: d.Automation, conc: d.Concurrency, agents: d.Agents,
+		automation: d.Automation, conc: d.Concurrency, agents: d.Agents, people: d.People,
 		logger: logger, now: now,
 	}
 }
@@ -163,6 +167,9 @@ func (s *Service) taskAccess(ctx context.Context, orgID, taskID, userID string, 
 
 // CreateTaskInput is the payload for CreateTask.
 type CreateTaskInput struct {
+	// ID is optional; empty ⇒ a new uuidv7. Import passes a deterministic id so
+	// a retried row hits the primary key instead of duplicating the task.
+	ID          string
 	ProjectID   string
 	ColumnID    string
 	Title       string
@@ -214,8 +221,11 @@ func (s *Service) CreateTask(ctx context.Context, orgID, userID string, in Creat
 	if n := len(existing); n > 0 {
 		last = existing[n-1].Rank
 	}
+	if in.ID == "" {
+		in.ID = newID()
+	}
 	t := &project.Task{
-		ID: newID(), OrgID: orgID, ProjectID: in.ProjectID, ColumnID: in.ColumnID,
+		ID: in.ID, OrgID: orgID, ProjectID: in.ProjectID, ColumnID: in.ColumnID,
 		Title: in.Title, Description: in.Description, AssigneeID: in.AssigneeID,
 		Priority: in.Priority, StartDate: in.StartDate, DueDate: in.DueDate, Rank: rank.Append(last), CreatedBy: userID,
 	}

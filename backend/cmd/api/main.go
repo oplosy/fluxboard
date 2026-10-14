@@ -480,7 +480,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Members: projectMemberRepo, Boards: boardRepo, Columns: columnRepo,
 		Store: objectStore, Entitlements: billingSvc, TimeEntries: timeEntryRepo, Links: linkRepo,
 		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo,
-		Agents: agentLookup, Recurrences: postgres.NewRecurrenceRepo(tenantPool), Logger: logger,
+		Agents: agentLookup, Recurrences: postgres.NewRecurrenceRepo(tenantPool), People: membershipRepo, Logger: logger,
 	})
 	projectSvc := projectuc.New(projectuc.Deps{
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
