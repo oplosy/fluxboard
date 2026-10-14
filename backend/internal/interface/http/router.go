@@ -266,6 +266,11 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Post("/tasks", d.Tasks.CreateTask)
 					p.With(read(tenant.ObjOrg)).Get("/tasks", d.Tasks.ListTasks)
 					p.With(read(tenant.ObjOrg)).Get("/trash", d.Tasks.ListTrash) // FR-TASK-009
+					// CSV import (preview + idempotent commit) and export (FR-TASK-012/013).
+					// Project-role gates (CONTRIBUTOR import, VIEWER export) in taskuc.
+					p.With(read(tenant.ObjOrg)).Post("/import/preview", d.Tasks.PreviewImport)
+					p.With(read(tenant.ObjOrg)).Post("/import", d.Tasks.ImportTasks)
+					p.With(read(tenant.ObjOrg)).Get("/export", d.Tasks.ExportProject)
 					// Sprints (docs/08, FR-SPRINT). Fine-grained gates in projectuc.
 					p.With(read(tenant.ObjOrg)).Get("/sprints", d.Projects.ListSprints)
 					p.With(read(tenant.ObjOrg)).Post("/sprints", d.Projects.CreateSprint)
