@@ -47,8 +47,9 @@ type Deps struct {
 	Comments     project.CommentRepository
 	Activity     project.ActivityRepository
 	Attachments  project.AttachmentRepository
-	TimeEntries  project.TimeEntryRepository // timers; nil ⇒ time endpoints disabled
-	Links        project.TaskLinkRepository  // dependencies; nil ⇒ link endpoints disabled
+	TimeEntries  project.TimeEntryRepository  // timers; nil ⇒ time endpoints disabled
+	Links        project.TaskLinkRepository   // dependencies; nil ⇒ link endpoints disabled
+	Recurrences  project.RecurrenceRepository // recurring tasks; nil ⇒ recurrence disabled
 	Projects     project.ProjectRepository
 	Members      project.ProjectMemberRepository
 	Boards       project.BoardRepository
@@ -78,6 +79,7 @@ type Service struct {
 	attachments  project.AttachmentRepository
 	timeEntries  project.TimeEntryRepository
 	links        project.TaskLinkRepository
+	recurrences  project.RecurrenceRepository
 	projects     project.ProjectRepository
 	members      project.ProjectMemberRepository
 	boards       project.BoardRepository
@@ -105,7 +107,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		tasks: d.Tasks, subtasks: d.Subtasks, labels: d.Labels, comments: d.Comments,
-		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, projects: d.Projects,
+		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, recurrences: d.Recurrences, projects: d.Projects,
 		members: d.Members, boards: d.Boards, columns: d.Columns, store: d.Store,
 		entitlements: d.Entitlements, events: d.Events, notifier: d.Notifier,
 		automation: d.Automation, conc: d.Concurrency, agents: d.Agents,

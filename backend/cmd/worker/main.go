@@ -76,6 +76,7 @@ func run(logger *slog.Logger) error {
 	taskSvc := taskuc.New(taskuc.Deps{
 		Tasks:       taskRepo,
 		Concurrency: taskRepo, // lapsed-claim sweeper (ADR-033)
+		Recurrences: postgres.NewRecurrenceRepo(tenantPool),
 		Subtasks:    postgres.NewSubtaskRepo(tenantPool),
 		Labels:      postgres.NewLabelRepo(tenantPool),
 		Comments:    postgres.NewCommentRepo(tenantPool),

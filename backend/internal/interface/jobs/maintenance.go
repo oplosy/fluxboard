@@ -18,6 +18,8 @@ const (
 	TypeAttachmentGC = "maintenance:attachment_gc"
 	// TypeClaimSweep clears lapsed agent claims (ADR-033, FR-AGT-004).
 	TypeClaimSweep = "maintenance:claim_sweep"
+	// TypeRecurrenceGenerate creates due occurrences of recurring tasks.
+	TypeRecurrenceGenerate = "maintenance:recurrence_generate"
 )
 
 // OrgLister enumerates active orgs so a job can run under each tenant.
@@ -45,6 +47,7 @@ func (m *Maintenance) Register(mux *asynq.ServeMux) {
 	mux.HandleFunc(TypeTrashPurge, m.handleTrashPurge)
 	mux.HandleFunc(TypeAttachmentGC, m.handleAttachmentGC)
 	mux.HandleFunc(TypeClaimSweep, m.handleClaimSweep)
+	mux.HandleFunc(TypeRecurrenceGenerate, m.handleRecurrenceGenerate)
 }
 
 // forEachOrg runs fn under every active tenant, logging and continuing past a
@@ -95,6 +98,15 @@ func (m *Maintenance) handleClaimSweep(ctx context.Context, _ *asynq.Task) error
 	})
 }
 
+// handleRecurrenceGenerate creates the recurring-task occurrences due now. A
+// retry or an overlapping run is harmless: occurrences are unique per rule and
+// date, so the repeat inserts nothing.
+func (m *Maintenance) handleRecurrenceGenerate(ctx context.Context, _ *asynq.Task) error {
+	return m.forEachOrg(ctx, TypeRecurrenceGenerate, func(orgID string) (int, error) {
+		return m.tasks.GenerateOccurrences(ctx, orgID)
+	})
+}
+
 // ScheduleEntry is one periodic-schedule registration (cron spec + task +
 // enqueue options, e.g. the target queue per 09 §2 priorities).
 type ScheduleEntry struct {
@@ -112,6 +124,8 @@ func Schedule() []ScheduleEntry {
 		{Cron: "30 3 * * *", Task: asynq.NewTask(TypeAttachmentGC, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "@every 5s", Task: asynq.NewTask(TypeOutboxDrain, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},
 		{Cron: "@every 1m", Task: asynq.NewTask(TypeClaimSweep, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}}, // ADR-033
+		// Occurrences become due at local midnight in each rule's zone; 15 min is the worst-case lag.
+		{Cron: "*/15 * * * *", Task: asynq.NewTask(TypeRecurrenceGenerate, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}},
 		{Cron: "0 * * * *", Task: asynq.NewTask(TypeUsageAggregate, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 2 * * *", Task: asynq.NewTask(TypeUsagePushStripe, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 4 * * *", Task: asynq.NewTask(TypeBillingReconcile, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},
