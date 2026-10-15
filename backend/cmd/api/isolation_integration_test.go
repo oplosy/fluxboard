@@ -147,7 +147,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	e.bParams = map[string]string{
@@ -156,7 +156,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
 		"sprintId": e.bIDs["sprint"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
-		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"],
+		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"], "approvalId": e.bIDs["approval"],
 	}
 
 	if err := pgx.BeginFunc(ctx, owner, func(tx pgx.Tx) error {
@@ -243,6 +243,10 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{b["entry"], e.orgB, b["task"], owner}},
 		{`INSERT INTO task_links (task_id, linked_task_id, org_id) VALUES ($1, $2, $3)`,
 			[]any{b["task"], b["task2"], e.orgB}},
+		{`INSERT INTO task_approvals (id, org_id, task_id, requested_by) VALUES ($1, $2, $3, $4)`,
+			[]any{b["approval"], e.orgB, b["task"], owner}},
+		{`INSERT INTO task_approval_approvers (approval_id, org_id, user_id) VALUES ($1, $2, $3)`,
+			[]any{b["approval"], e.orgB, b["member"]}},
 		{`INSERT INTO notifications (id, org_id, user_id, category, title) VALUES ($1, $2, $3, 'assignment', $4)`,
 			[]any{b["notification"], e.orgB, b["member"], orgBMarker + " notification"}},
 		{`INSERT INTO api_keys (id, org_id, prefix, key_hash, name, scopes, created_by) VALUES ($1, $2, 'fbk_live_iso', 'isolation-key-hash', 'Beta key', '{read}', $3)`,

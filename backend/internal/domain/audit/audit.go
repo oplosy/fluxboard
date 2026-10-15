@@ -72,6 +72,11 @@ const (
 	// model+tokens in metadata; risk dismissals log ai.risk_dismiss.
 	ActionAIRun         Action = "ai.run"
 	ActionAIRiskDismiss Action = "ai.risk_dismiss"
+
+	// Task approvals (ADR-037).
+	ActionApprovalRequest Action = "approval.request"
+	ActionApprovalDecide  Action = "approval.decide"
+	ActionApprovalCancel  Action = "approval.cancel"
 )
 
 // Entry is one immutable audit record. Empty string IDs map to SQL NULL in the

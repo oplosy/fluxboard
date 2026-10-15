@@ -492,6 +492,29 @@ type TaskActivity struct {
 	AutomationRuleID pgtype.UUID `json:"automation_rule_id"`
 }
 
+type TaskApproval struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	TaskID      uuid.UUID          `json:"task_id"`
+	RequestedBy uuid.UUID          `json:"requested_by"`
+	Note        string             `json:"note"`
+	Deadline    pgtype.Timestamptz `json:"deadline"`
+	State       string             `json:"state"`
+	StaleAt     pgtype.Timestamptz `json:"stale_at"`
+	DecidedAt   pgtype.Timestamptz `json:"decided_at"`
+	CreatedAt   time.Time          `json:"created_at"`
+	UpdatedAt   time.Time          `json:"updated_at"`
+}
+
+type TaskApprovalApprover struct {
+	ApprovalID uuid.UUID          `json:"approval_id"`
+	OrgID      uuid.UUID          `json:"org_id"`
+	UserID     uuid.UUID          `json:"user_id"`
+	Decision   *string            `json:"decision"`
+	Comment    string             `json:"comment"`
+	DecidedAt  pgtype.Timestamptz `json:"decided_at"`
+}
+
 type TaskCustomValue struct {
 	TaskID      uuid.UUID          `json:"task_id"`
 	FieldID     uuid.UUID          `json:"field_id"`

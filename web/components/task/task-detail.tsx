@@ -17,6 +17,7 @@ import { Subtasks } from './subtasks';
 import { Comments } from './comments';
 import { TaskLinks } from './links';
 import { TaskRecurrence } from './recurrence';
+import { TaskApprovals } from './approvals';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -177,6 +178,9 @@ export function TaskDetail({
       {/* Meta sidebar */}
       <aside className="space-y-5">
         <ReviewPanel taskId={taskId} projectId={projectId} columnId={task.column_id} canEdit={canEdit} />
+        <Field label="Approval">
+          <TaskApprovals taskId={taskId} canEdit={canEdit} />
+        </Field>
         <Field label="Assignee">
           {canEdit ? (
             <Select

@@ -18,6 +18,7 @@ const (
 	CategoryComment        Category = "comment"
 	CategoryInviteAccepted Category = "invite_accepted"
 	CategoryBilling        Category = "billing"
+	CategoryApproval       Category = "approval"
 
 	// Auth-flow categories never create in-app rows; they exist only so
 	// transactional emails (verify/reset) bypass user preferences via the
@@ -34,6 +35,7 @@ var centerCategories = map[Category]bool{
 	CategoryComment:        true,
 	CategoryInviteAccepted: true,
 	CategoryBilling:        true,
+	CategoryApproval:       true,
 }
 
 // Valid reports whether c is a known notification-center category.
@@ -59,6 +61,7 @@ func CenterCategories() []Category {
 		CategoryComment,
 		CategoryInviteAccepted,
 		CategoryBilling,
+		CategoryApproval,
 	}
 }
 

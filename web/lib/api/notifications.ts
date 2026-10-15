@@ -57,4 +57,5 @@ export const NOTIFICATION_CATEGORIES: { key: string; label: string }[] = [
   { key: 'comment', label: 'New comment on my tasks' },
   { key: 'invite_accepted', label: 'Invitation accepted' },
   { key: 'billing', label: 'Billing & usage' },
+  { key: 'approval', label: 'Approval requests and decisions' },
 ];
