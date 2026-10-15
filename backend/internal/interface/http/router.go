@@ -299,6 +299,7 @@ func NewRouter(d Deps) http.Handler {
 				// Org-wide task search + bulk actions (FR-TASK-007/008). Static
 				// segments; chi matches them ahead of the {taskId} subrouter.
 				o.With(read(tenant.ObjOrg)).Get("/tasks/search", d.Tasks.Search)
+				o.With(read(tenant.ObjOrg)).Get("/approvals/waiting", d.Tasks.ListWaitingApprovals)
 				o.With(read(tenant.ObjOrg)).Post("/tasks/bulk", d.Tasks.BulkAction)
 
 				// Tasks by id (flat; access derives the project). docs/01 §TASK.
@@ -339,6 +340,11 @@ func NewRouter(d Deps) http.Handler {
 					t.With(read(tenant.ObjOrg)).Get("/recurrence", d.Tasks.GetTaskRecurrence)
 					t.With(read(tenant.ObjOrg)).Put("/recurrence", d.Tasks.SetTaskRecurrence)
 					t.With(read(tenant.ObjOrg)).Delete("/recurrence", d.Tasks.StopTaskRecurrence)
+					// Approvals (ADR-037). Fine-grained gates in taskuc.
+					t.With(read(tenant.ObjOrg)).Get("/approvals", d.Tasks.ListTaskApprovals)
+					t.With(read(tenant.ObjOrg)).Post("/approvals", d.Tasks.RequestTaskApproval)
+					t.With(read(tenant.ObjOrg)).Post("/approvals/{approvalId}/decision", d.Tasks.DecideTaskApproval)
+					t.With(read(tenant.ObjOrg)).Post("/approvals/{approvalId}/cancel", d.Tasks.CancelTaskApproval)
 					// Time tracking (docs/08, FR-TIME). Fine-grained gates in taskuc.
 					t.With(read(tenant.ObjOrg)).Get("/time", d.Tasks.ListTimeEntries)
 					t.With(read(tenant.ObjOrg)).Post("/time/start", d.Tasks.StartTimer)

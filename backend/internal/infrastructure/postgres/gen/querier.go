@@ -213,6 +213,7 @@ type Querier interface {
 	GetSubtask(ctx context.Context, arg GetSubtaskParams) (Subtask, error)
 	// Live tasks only; trashed tasks are addressable through the Trash queries.
 	GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, error)
+	GetTaskApproval(ctx context.Context, arg GetTaskApprovalParams) (TaskApproval, error)
 	// Task recurrence rules ([T], tenant-scoped, research report P1) ---------------
 	GetTaskRecurrence(ctx context.Context, arg GetTaskRecurrenceParams) (GetTaskRecurrenceRow, error)
 	GetTenantSummary(ctx context.Context, orgID uuid.UUID) (GetTenantSummaryRow, error)
@@ -239,6 +240,9 @@ type Querier interface {
 	// the tenant tx (webhook_repo) and on the plain pool (processed_event_repo).
 	InsertProcessedEvent(ctx context.Context, arg InsertProcessedEventParams) (int64, error)
 	InsertSlugHistory(ctx context.Context, arg InsertSlugHistoryParams) error
+	// Task approvals ([T], tenant-scoped, ADR-037) ---------------------------------
+	InsertTaskApproval(ctx context.Context, arg InsertTaskApprovalParams) error
+	InsertTaskApprovalApprover(ctx context.Context, arg InsertTaskApprovalApproverParams) error
 	// Retires every outstanding token of one purpose for a user, so older links
 	// from earlier emails stop working once one of them has been used.
 	InvalidateUserOneTimeTokens(ctx context.Context, arg InvalidateUserOneTimeTokensParams) error
@@ -265,6 +269,7 @@ type Querier interface {
 	// Active keys of every agent in the org; the repo groups them by agent.
 	ListAgentAPIKeys(ctx context.Context, orgID uuid.UUID) ([]ApiKey, error)
 	ListAgents(ctx context.Context, orgID uuid.UUID) ([]Agent, error)
+	ListApprovalApprovers(ctx context.Context, arg ListApprovalApproversParams) ([]ListApprovalApproversRow, error)
 	ListAttachmentsByTask(ctx context.Context, arg ListAttachmentsByTaskParams) ([]Attachment, error)
 	ListAutomationRules(ctx context.Context, orgID uuid.UUID) ([]AutomationRule, error)
 	ListAutomationRuns(ctx context.Context, arg ListAutomationRunsParams) ([]ListAutomationRunsRow, error)
@@ -327,6 +332,7 @@ type Querier interface {
 	ListSoleOwnerOrgs(ctx context.Context, userID uuid.UUID) ([]ListSoleOwnerOrgsRow, error)
 	ListSprintsByProject(ctx context.Context, arg ListSprintsByProjectParams) ([]Sprint, error)
 	ListSubtasksByTask(ctx context.Context, arg ListSubtasksByTaskParams) ([]Subtask, error)
+	ListTaskApprovals(ctx context.Context, arg ListTaskApprovalsParams) ([]TaskApproval, error)
 	ListTaskBlocked(ctx context.Context, arg ListTaskBlockedParams) ([]ListTaskBlockedRow, error)
 	ListTaskBlockers(ctx context.Context, arg ListTaskBlockersParams) ([]ListTaskBlockersRow, error)
 	ListTaskCustomValues(ctx context.Context, arg ListTaskCustomValuesParams) ([]ListTaskCustomValuesRow, error)
@@ -344,6 +350,7 @@ type Querier interface {
 	// Metered aggregates for a day not yet pushed to Stripe.
 	ListUsageForPush(ctx context.Context, arg ListUsageForPushParams) ([]UsageRecord, error)
 	ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]ListUsersByIDsRow, error)
+	ListWaitingApprovals(ctx context.Context, arg ListWaitingApprovalsParams) ([]ListWaitingApprovalsRow, error)
 	// Request inbox ([T], tenant-scoped, research report §6.3/§7) -----------------
 	// Serializes concurrent identical submissions (same form + email + content) for
 	// the rest of the tx so the duplicate check below cannot be raced.
@@ -354,6 +361,8 @@ type Querier interface {
 	LockOutboxBatch(ctx context.Context, arg LockOutboxBatchParams) ([]Outbox, error)
 	// Serializes generation per rule; the caller skips dates on or before last_on.
 	LockRecurrence(ctx context.Context, arg LockRecurrenceParams) (LockRecurrenceRow, error)
+	// Serializes concurrent decisions on one request.
+	LockTaskApproval(ctx context.Context, arg LockTaskApprovalParams) (TaskApproval, error)
 	MarkAllNotificationsRead(ctx context.Context, arg MarkAllNotificationsReadParams) (int64, error)
 	MarkIntakeAcked(ctx context.Context, arg MarkIntakeAckedParams) error
 	MarkIntakeOutcomeSent(ctx context.Context, arg MarkIntakeOutcomeSentParams) error
@@ -407,6 +416,7 @@ type Querier interface {
 	// joining task_labels returned a task once per label (duplicate hits, inflated
 	// total).
 	SearchTasks(ctx context.Context, arg SearchTasksParams) ([]SearchTasksRow, error)
+	SetApproverDecision(ctx context.Context, arg SetApproverDecisionParams) error
 	SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error)
 	SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)
@@ -445,6 +455,7 @@ type Querier interface {
 	UpdateSprint(ctx context.Context, arg UpdateSprintParams) (int64, error)
 	UpdateSubtask(ctx context.Context, arg UpdateSubtaskParams) (int64, error)
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error)
+	UpdateTaskApprovalState(ctx context.Context, arg UpdateTaskApprovalStateParams) error
 	// Sets (or clears, via empty string) the MinIO object key for the user's avatar.
 	UpdateUserAvatarKey(ctx context.Context, arg UpdateUserAvatarKeyParams) error
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) error
