@@ -20,6 +20,8 @@ const (
 	TypeClaimSweep = "maintenance:claim_sweep"
 	// TypeRecurrenceGenerate creates due occurrences of recurring tasks.
 	TypeRecurrenceGenerate = "maintenance:recurrence_generate"
+	// TypeAutomationTimeScan fires the due-soon / overdue automation rules.
+	TypeAutomationTimeScan = "automation:time_scan"
 )
 
 // OrgLister enumerates active orgs so a job can run under each tenant.
@@ -27,9 +29,16 @@ type OrgLister interface {
 	ListActiveOrgIDs(ctx context.Context) ([]string, error)
 }
 
+// TimeTriggerScanner evaluates the time-based automation triggers of one org
+// (automationuc.Service).
+type TimeTriggerScanner interface {
+	ScanTimeTriggers(ctx context.Context, orgID string) (int, error)
+}
+
 // Maintenance runs the periodic per-tenant housekeeping jobs.
 type Maintenance struct {
 	tasks  *taskuc.Service
+	scan   TimeTriggerScanner // nil ⇒ the time-scan job is a no-op
 	orgs   OrgLister
 	logger *slog.Logger
 }
@@ -42,8 +51,12 @@ func NewMaintenance(tasks *taskuc.Service, orgs OrgLister, logger *slog.Logger) 
 	return &Maintenance{tasks: tasks, orgs: orgs, logger: logger}
 }
 
+// SetAutomation enables the time-trigger scan job.
+func (m *Maintenance) SetAutomation(s TimeTriggerScanner) { m.scan = s }
+
 // Register wires the handlers onto an Asynq mux.
 func (m *Maintenance) Register(mux *asynq.ServeMux) {
+	mux.HandleFunc(TypeAutomationTimeScan, m.handleAutomationTimeScan)
 	mux.HandleFunc(TypeTrashPurge, m.handleTrashPurge)
 	mux.HandleFunc(TypeAttachmentGC, m.handleAttachmentGC)
 	mux.HandleFunc(TypeClaimSweep, m.handleClaimSweep)
@@ -107,6 +120,18 @@ func (m *Maintenance) handleRecurrenceGenerate(ctx context.Context, _ *asynq.Tas
 	})
 }
 
+// handleAutomationTimeScan fires due-soon and overdue automation rules. Each
+// (rule, task) fires once whatever the retry or overlap: the run row is the
+// claim (automationuc.ScanTimeTriggers).
+func (m *Maintenance) handleAutomationTimeScan(ctx context.Context, _ *asynq.Task) error {
+	if m.scan == nil {
+		return nil
+	}
+	return m.forEachOrg(ctx, TypeAutomationTimeScan, func(orgID string) (int, error) {
+		return m.scan.ScanTimeTriggers(ctx, orgID)
+	})
+}
+
 // ScheduleEntry is one periodic-schedule registration (cron spec + task +
 // enqueue options, e.g. the target queue per 09 §2 priorities).
 type ScheduleEntry struct {
@@ -126,6 +151,7 @@ func Schedule() []ScheduleEntry {
 		{Cron: "@every 1m", Task: asynq.NewTask(TypeClaimSweep, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}}, // ADR-033
 		// Occurrences become due at local midnight in each rule's zone; 15 min is the worst-case lag.
 		{Cron: "*/15 * * * *", Task: asynq.NewTask(TypeRecurrenceGenerate, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}},
+		{Cron: "@every 5m", Task: asynq.NewTask(TypeAutomationTimeScan, nil), Opts: []asynq.Option{asynq.Queue(QueueDefault)}}, // ADR-036: worst-case lag 5 min
 		{Cron: "0 * * * *", Task: asynq.NewTask(TypeUsageAggregate, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 2 * * *", Task: asynq.NewTask(TypeUsagePushStripe, nil), Opts: []asynq.Option{asynq.Queue(QueueLow)}},
 		{Cron: "0 4 * * *", Task: asynq.NewTask(TypeBillingReconcile, nil), Opts: []asynq.Option{asynq.Queue(QueueCritical)}},

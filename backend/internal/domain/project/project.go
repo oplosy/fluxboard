@@ -342,6 +342,10 @@ type Activity struct {
 	OldValue  *string
 	NewValue  *string
 	CreatedAt time.Time
+	// AutomationRuleID names the automation rule behind the change, when one
+	// made it; AutomationRuleName is joined on read (nil once the rule is gone).
+	AutomationRuleID   *string
+	AutomationRuleName *string
 }
 
 // AttachmentStatus is the upload lifecycle state (FR-TASK-006).

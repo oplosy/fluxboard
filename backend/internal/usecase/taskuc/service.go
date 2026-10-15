@@ -295,6 +295,15 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 		return nil, err
 	}
 
+	return s.applyUpdate(ctx, orgID, userID, "", t, in)
+}
+
+// applyUpdate writes the new field values of an already-authorised task,
+// records each change and fires the realtime event, notification and
+// automation triggers. ruleID is non-empty when an automation rule made the
+// change: the activity entries then name it.
+func (s *Service) applyUpdate(ctx context.Context, orgID, userID, ruleID string, t *project.Task, in UpdateTaskInput) (*project.Task, error) {
+	taskID := t.ID
 	changes := diffTask(t, in)
 	t.Title = in.Title
 	t.Description = in.Description
@@ -308,10 +317,7 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 	fields := make([]string, 0, len(changes))
 	assigneeChanged := false
 	for _, c := range changes {
-		a := &project.Activity{ID: newID(), TaskID: taskID, ActorID: userID, Field: c.field, OldValue: c.old, NewValue: c.new}
-		if err := s.activity.Append(ctx, orgID, a); err != nil {
-			s.logger.Warn("activity append failed", "task", taskID, "field", c.field, "err", err)
-		}
+		s.appendActivity(ctx, orgID, userID, ruleID, taskID, c.field, c.old, c.new)
 		fields = append(fields, c.field)
 		if c.field == "assignee" {
 			assigneeChanged = true
@@ -336,6 +342,17 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 		})
 	}
 	return s.tasks.Get(ctx, orgID, taskID)
+}
+
+// appendActivity logs one change best-effort (never fails the write).
+func (s *Service) appendActivity(ctx context.Context, orgID, userID, ruleID, taskID, field string, oldV, newV *string) {
+	a := &project.Activity{ID: newID(), TaskID: taskID, ActorID: userID, Field: field, OldValue: oldV, NewValue: newV}
+	if ruleID != "" {
+		a.AutomationRuleID = &ruleID
+	}
+	if err := s.activity.Append(ctx, orgID, a); err != nil {
+		s.logger.Warn("activity append failed", "task", taskID, "field", field, "err", err)
+	}
 }
 
 // ListActivity returns a task's change history (viewer, FR-TASK-002).

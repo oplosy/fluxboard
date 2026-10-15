@@ -2,11 +2,12 @@ package automationuc
 
 import (
 	"context"
+	"errors"
 	"testing"
+	"time"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/automation"
-	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
 )
 
 type fakeRules struct {
@@ -28,10 +29,6 @@ func (f *fakeRules) Get(_ context.Context, _, id string) (*automation.Rule, erro
 	return nil, domain.ErrNotFound
 }
 
-func (f *fakeRules) List(_ context.Context, _ string) ([]automation.Rule, error) {
-	return f.rules, nil
-}
-
 func (f *fakeRules) ListEnabled(_ context.Context, _ string, trigger string) ([]automation.Rule, error) {
 	var out []automation.Rule
 	for _, r := range f.rules {
@@ -42,154 +39,224 @@ func (f *fakeRules) ListEnabled(_ context.Context, _ string, trigger string) ([]
 	return out, nil
 }
 
-func (f *fakeRules) Update(_ context.Context, _ string, r *automation.Rule) error {
-	for i := range f.rules {
-		if f.rules[i].ID == r.ID {
-			f.rules[i] = *r
-			return nil
+// fakeRuns is an in-memory RunRepository with the once-only claim of the
+// time-trigger unique index.
+type fakeRuns struct {
+	runs []automation.Run
+	due  map[string][]string // ruleID -> task ids the scan query returns
+}
+
+func (f *fakeRuns) Insert(_ context.Context, _ string, r *automation.Run) (bool, error) {
+	if automation.IsTimeTrigger(r.Trigger) {
+		for _, x := range f.runs {
+			if x.RuleID == r.RuleID && x.TaskID == r.TaskID && automation.IsTimeTrigger(x.Trigger) {
+				return false, nil
+			}
 		}
 	}
-	return domain.ErrNotFound
+	f.runs = append(f.runs, *r)
+	return true, nil
 }
 
-func (f *fakeRules) Delete(_ context.Context, _, id string) error {
-	for i := range f.rules {
-		if f.rules[i].ID == id {
-			f.rules = append(f.rules[:i], f.rules[i+1:]...)
-			return nil
+func (f *fakeRuns) Finish(_ context.Context, _, id, status, msg string) error {
+	for i := range f.runs {
+		if f.runs[i].ID == id {
+			f.runs[i].Status, f.runs[i].Error = status, msg
 		}
 	}
-	return domain.ErrNotFound
+	return nil
 }
 
-type fakeTasks struct {
-	project.TaskRepository
-	tasks map[string]*project.Task
-	moved []string
-}
-
-func (f *fakeTasks) Get(_ context.Context, _, id string) (*project.Task, error) {
-	t, ok := f.tasks[id]
-	if !ok {
-		return nil, domain.ErrNotFound
+func (f *fakeRuns) ListByRule(_ context.Context, _, ruleID string, _ int) ([]automation.Run, error) {
+	var out []automation.Run
+	for _, r := range f.runs {
+		if r.RuleID == ruleID {
+			out = append(out, r)
+		}
 	}
-	cp := *t
-	return &cp, nil
+	return out, nil
 }
 
-func (f *fakeTasks) Update(_ context.Context, _ string, t *project.Task) error {
-	cp := *t
-	f.tasks[t.ID] = &cp
-	return nil
+func (f *fakeRuns) CountSince(_ context.Context, _ string, _ time.Time) (int, error) {
+	n := 0
+	for _, r := range f.runs {
+		if r.Status != automation.RunSkipped {
+			n++
+		}
+	}
+	return n, nil
 }
 
-func (f *fakeTasks) Move(_ context.Context, _, id, columnID, rank string) error {
-	t := f.tasks[id]
-	t.ColumnID = columnID
-	t.Rank = rank
-	f.moved = append(f.moved, id+":"+columnID)
-	return nil
+// DueTasks ignores claims on purpose: the claim in Insert must hold even when
+// the scan query returns an already-fired task (a concurrent scan).
+func (f *fakeRuns) DueTasks(_ context.Context, _, ruleID string, _, _ time.Time) ([]string, error) {
+	return f.due[ruleID], nil
 }
 
-func (f *fakeTasks) ListByColumn(_ context.Context, _ string, _ string) ([]project.Task, error) {
-	return nil, nil
+type fakeActions struct {
+	calls []automation.ActionRequest
+	depth []int
+	err   error
+	// onApply lets a test re-enter Evaluate, as taskuc.automate does.
+	onApply func(ctx context.Context)
 }
 
-type fakeLabels struct {
-	project.LabelRepository
-	attached [][2]string
+func (f *fakeActions) ApplyAutomation(ctx context.Context, _ string, a automation.ActionRequest) error {
+	f.calls = append(f.calls, a)
+	f.depth = append(f.depth, automation.DepthFrom(ctx))
+	if f.onApply != nil {
+		f.onApply(ctx)
+	}
+	return f.err
 }
 
-func (f *fakeLabels) Attach(_ context.Context, _, taskID, labelID string) error {
-	f.attached = append(f.attached, [2]string{taskID, labelID})
-	return nil
+func testService() (*Service, *fakeRules, *fakeRuns, *fakeActions) {
+	rules, runs, actions := &fakeRules{}, &fakeRuns{due: map[string][]string{}}, &fakeActions{}
+	svc := New(Deps{Rules: rules, Runs: runs, Budget: 3})
+	svc.SetActions(actions)
+	return svc, rules, runs, actions
 }
 
-type fakeColumns struct {
-	project.ColumnRepository
-	boardID string
+func assignRule(id, trigger string) automation.Rule {
+	return automation.Rule{
+		ID: id, OrgID: "o", Name: id, Enabled: true, Trigger: trigger,
+		Action: automation.ActionAssign, ActionConfig: automation.ActionConfig{UserID: "u9"}, CreatedBy: "creator",
+	}
 }
 
-func (f *fakeColumns) Get(_ context.Context, _, id string) (*project.Column, error) {
-	return &project.Column{ID: id, BoardID: f.boardID}, nil
-}
-
-type fakeBoards struct {
-	project.BoardRepository
-	boardID string
-}
-
-func (f *fakeBoards) GetByProject(_ context.Context, _, _ string) (*project.Board, error) {
-	return &project.Board{ID: f.boardID}, nil
-}
-
-func testService() (*Service, *fakeRules, *fakeTasks, *fakeLabels) {
-	rules := &fakeRules{}
-	tasks := &fakeTasks{tasks: map[string]*project.Task{
-		"t1": {ID: "t1", ProjectID: "p1", ColumnID: "c1", Title: "T", Priority: project.PriorityNone},
-	}}
-	labels := &fakeLabels{}
-	svc := New(Deps{
-		Rules: rules, Tasks: tasks, Labels: labels,
-		Columns: &fakeColumns{boardID: "b1"}, Boards: &fakeBoards{boardID: "b1"},
-	})
-	return svc, rules, tasks, labels
-}
-
-func TestCreate_RejectsUnknownVocabulary(t *testing.T) {
+func TestCreate_RejectsBadDefinitions(t *testing.T) {
 	svc, _, _, _ := testService()
-	if _, err := svc.Create(context.Background(), "o", CreateInput{Name: "x", Trigger: "nope", Action: automation.ActionAssign, ActionConfig: automation.ActionConfig{UserID: "u"}}); err == nil {
-		t.Fatal("want validation error for unknown trigger")
+	assign := automation.ActionConfig{UserID: "u"}
+	cases := map[string]CreateInput{
+		"unknown trigger":      {Name: "x", Trigger: "nope", Action: automation.ActionAssign, ActionConfig: assign},
+		"unknown action":       {Name: "x", Trigger: automation.TriggerTaskCreated, Action: "nope"},
+		"assign w/o user":      {Name: "x", Trigger: automation.TriggerTaskCreated, Action: automation.ActionAssign},
+		"due_soon w/o hours":   {Name: "x", Trigger: automation.TriggerTaskDueSoon, Action: automation.ActionAssign, ActionConfig: assign},
+		"due_soon over 30 day": {Name: "x", Trigger: automation.TriggerTaskDueSoon, TriggerConfig: automation.TriggerConfig{Hours: automation.MaxHours + 1}, Action: automation.ActionAssign, ActionConfig: assign},
 	}
-	if _, err := svc.Create(context.Background(), "o", CreateInput{Name: "x", Trigger: automation.TriggerTaskCreated, Action: "nope"}); err == nil {
-		t.Fatal("want validation error for unknown action")
+	for name, in := range cases {
+		if _, err := svc.Create(context.Background(), "o", in); !errors.Is(err, domain.ErrValidation) {
+			t.Errorf("%s: want ErrValidation, got %v", name, err)
+		}
 	}
-	if _, err := svc.Create(context.Background(), "o", CreateInput{Name: "x", Trigger: automation.TriggerTaskCreated, Action: automation.ActionAssign}); err == nil {
-		t.Fatal("want validation error for assign without user_id")
+	ok := CreateInput{Name: "x", Trigger: automation.TriggerTaskDueSoon, TriggerConfig: automation.TriggerConfig{Hours: 24}, Action: automation.ActionAssign, ActionConfig: assign}
+	if _, err := svc.Create(context.Background(), "o", ok); err != nil {
+		t.Fatalf("valid due_soon rule rejected: %v", err)
 	}
 }
 
-func TestEvaluate_AssignOnCreate(t *testing.T) {
-	svc, rules, tasks, _ := testService()
-	rules.rules = []automation.Rule{{
-		ID: "r1", OrgID: "o", Name: "auto-assign", Enabled: true,
-		Trigger: automation.TriggerTaskCreated, Action: automation.ActionAssign,
-		ActionConfig: automation.ActionConfig{UserID: "u9"},
-	}}
+func TestEvaluate_RecordsSuccessWithAttribution(t *testing.T) {
+	svc, rules, runs, actions := testService()
+	rules.rules = []automation.Rule{assignRule("r1", automation.TriggerTaskCreated)}
 	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskCreated, TaskID: "t1", ActorID: "actor"})
-	if tasks.tasks["t1"].AssigneeID == nil || *tasks.tasks["t1"].AssigneeID != "u9" {
-		t.Fatalf("assignee not set by rule: %+v", tasks.tasks["t1"].AssigneeID)
+	if len(actions.calls) != 1 || actions.calls[0].ActorID != "creator" || actions.calls[0].RuleID != "r1" {
+		t.Fatalf("action not attributed to the rule and its creator: %+v", actions.calls)
+	}
+	if actions.depth[0] != 1 {
+		t.Fatalf("action must run one level deeper, got depth %d", actions.depth[0])
+	}
+	if len(runs.runs) != 1 || runs.runs[0].Status != automation.RunSuccess || runs.runs[0].ActorID != "actor" || runs.runs[0].TaskID != "t1" {
+		t.Fatalf("run not recorded as success: %+v", runs.runs)
 	}
 }
 
-func TestEvaluate_MoveColumnFilter(t *testing.T) {
-	svc, rules, tasks, _ := testService()
-	rules.rules = []automation.Rule{{
-		ID: "r1", OrgID: "o", Name: "to-done", Enabled: true,
-		Trigger: automation.TriggerTaskMoved, TriggerConfig: automation.TriggerConfig{ColumnID: "c2"},
-		Action: automation.ActionMove, ActionConfig: automation.ActionConfig{ColumnID: "c3"},
-	}}
-	// Wrong destination: no-op.
-	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskMoved, TaskID: "t1", ActorID: "a", ToColumnID: "c9"})
-	if len(tasks.moved) != 0 {
-		t.Fatalf("rule fired for non-matching column: %v", tasks.moved)
-	}
-	// Matching destination: moves onward.
-	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskMoved, TaskID: "t1", ActorID: "a", ToColumnID: "c2"})
-	if len(tasks.moved) != 1 || tasks.tasks["t1"].ColumnID != "c3" {
-		t.Fatalf("rule did not move: moved=%v col=%s", tasks.moved, tasks.tasks["t1"].ColumnID)
+func TestEvaluate_RecordsFailure(t *testing.T) {
+	svc, rules, runs, actions := testService()
+	actions.err = errors.New("column gone")
+	rules.rules = []automation.Rule{assignRule("r1", automation.TriggerTaskCreated)}
+	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskCreated, TaskID: "t1"})
+	if len(runs.runs) != 1 || runs.runs[0].Status != automation.RunFailed || runs.runs[0].Error != "column gone" {
+		t.Fatalf("failure not recorded: %+v", runs.runs)
 	}
 }
 
-func TestEvaluate_DisabledRuleSkipped(t *testing.T) {
-	svc, rules, tasks, _ := testService()
-	rules.rules = []automation.Rule{{
-		ID: "r1", OrgID: "o", Name: "off", Enabled: false,
-		Trigger: automation.TriggerTaskCreated, Action: automation.ActionSetPriority,
-		ActionConfig: automation.ActionConfig{Priority: "high"},
-	}}
-	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskCreated, TaskID: "t1", ActorID: "a"})
-	if tasks.tasks["t1"].Priority != project.PriorityNone {
-		t.Fatalf("disabled rule fired: %s", tasks.tasks["t1"].Priority)
+func TestEvaluate_MoveColumnFilterAndDisabled(t *testing.T) {
+	svc, rules, runs, actions := testService()
+	moved := assignRule("r1", automation.TriggerTaskMoved)
+	moved.TriggerConfig.ColumnID = "c2"
+	off := assignRule("r2", automation.TriggerTaskMoved)
+	off.Enabled = false
+	rules.rules = []automation.Rule{moved, off}
+	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskMoved, TaskID: "t1", ToColumnID: "c9"})
+	if len(actions.calls) != 0 || len(runs.runs) != 0 {
+		t.Fatalf("rule fired for a non-matching column or while disabled: %+v", actions.calls)
+	}
+	svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskMoved, TaskID: "t1", ToColumnID: "c2"})
+	if len(actions.calls) != 1 {
+		t.Fatalf("want 1 action, got %d", len(actions.calls))
+	}
+}
+
+// A rule whose action re-triggers itself (assign -> task.assigned -> assign...)
+// must stop at MaxDepth and record the skip.
+func TestEvaluate_LoopGuardStopsCascade(t *testing.T) {
+	svc, rules, runs, actions := testService()
+	svc.budget = 1000
+	rules.rules = []automation.Rule{assignRule("loop", automation.TriggerTaskAssigned)}
+	ev := automation.Event{OrgID: "o", Trigger: automation.TriggerTaskAssigned, TaskID: "t1"}
+	actions.onApply = func(ctx context.Context) { svc.Evaluate(ctx, ev) }
+	svc.Evaluate(context.Background(), ev)
+	if len(actions.calls) != automation.MaxDepth {
+		t.Fatalf("want %d executed actions, got %d", automation.MaxDepth, len(actions.calls))
+	}
+	last := runs.runs[len(runs.runs)-1]
+	if last.Status != automation.RunSkipped || last.Depth != automation.MaxDepth {
+		t.Fatalf("last run must be a depth skip: %+v", last)
+	}
+}
+
+func TestEvaluate_BudgetSkipsAndRecords(t *testing.T) {
+	svc, rules, runs, actions := testService() // budget 3
+	rules.rules = []automation.Rule{assignRule("r1", automation.TriggerTaskCreated)}
+	for i := 0; i < 5; i++ {
+		svc.Evaluate(context.Background(), automation.Event{OrgID: "o", Trigger: automation.TriggerTaskCreated, TaskID: "t1"})
+	}
+	if len(actions.calls) != 3 {
+		t.Fatalf("budget of 3 not enforced: %d actions", len(actions.calls))
+	}
+	skipped := 0
+	for _, r := range runs.runs {
+		if r.Status == automation.RunSkipped {
+			skipped++
+		}
+	}
+	if skipped != 2 {
+		t.Fatalf("want 2 recorded budget skips, got %d", skipped)
+	}
+}
+
+func TestScanTimeTriggers_FiresOncePerTaskPerRule(t *testing.T) {
+	svc, rules, runs, actions := testService()
+	svc.budget = 1000
+	rules.rules = []automation.Rule{
+		assignRule("soon", automation.TriggerTaskDueSoon),
+		assignRule("late", automation.TriggerTaskOverdue),
+	}
+	rules.rules[0].TriggerConfig.Hours = 24
+	runs.due["soon"] = []string{"t1", "t2"}
+	runs.due["late"] = []string{"t1"}
+
+	for i := 0; i < 3; i++ { // repeated scans return the same tasks
+		if _, err := svc.ScanTimeTriggers(context.Background(), "o"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if len(actions.calls) != 3 {
+		t.Fatalf("want 3 firings (t1+t2 soon, t1 late), got %d", len(actions.calls))
+	}
+}
+
+func TestScanTimeTriggers_StopsAtBudgetWithoutRecording(t *testing.T) {
+	svc, rules, runs, actions := testService() // budget 3
+	rules.rules = []automation.Rule{assignRule("late", automation.TriggerTaskOverdue)}
+	runs.due["late"] = []string{"t1", "t2", "t3", "t4", "t5"}
+	n, err := svc.ScanTimeTriggers(context.Background(), "o")
+	if err != nil || n != 3 || len(actions.calls) != 3 {
+		t.Fatalf("want 3 fired within budget, got n=%d calls=%d err=%v", n, len(actions.calls), err)
+	}
+	for _, r := range runs.runs {
+		if r.Status == automation.RunSkipped {
+			t.Fatalf("a time trigger over budget must not be recorded (it retries next scan): %+v", r)
+		}
 	}
 }

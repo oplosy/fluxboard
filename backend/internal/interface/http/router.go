@@ -353,6 +353,7 @@ func NewRouter(d Deps) http.Handler {
 				// writes need the ADMIN automations gate.
 				if d.Automations != nil {
 					o.With(read(tenant.ObjOrg)).Get("/automations", d.Automations.ListRules)
+					o.With(read(tenant.ObjOrg)).Get("/automations/{ruleId}/runs", d.Automations.ListRuns)
 					o.With(write(tenant.ObjAutomations)).Post("/automations", d.Automations.CreateRule)
 					o.With(write(tenant.ObjAutomations)).Patch("/automations/{ruleId}", d.Automations.UpdateRule)
 					o.With(write(tenant.ObjAutomations)).Post("/automations/{ruleId}/enabled", d.Automations.SetRuleEnabled)

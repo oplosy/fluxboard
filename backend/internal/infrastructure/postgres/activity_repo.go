@@ -4,6 +4,9 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
+
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/postgres/gen"
@@ -31,11 +34,19 @@ func (r *ActivityRepo) Append(ctx context.Context, orgID string, a *project.Acti
 	if err != nil {
 		return fmt.Errorf("activity append: actor: %w", err)
 	}
+	var ruleID pgtype.UUID
+	if a.AutomationRuleID != nil {
+		rid, err := parseUUID(*a.AutomationRuleID)
+		if err != nil {
+			return fmt.Errorf("activity append: rule: %w", err)
+		}
+		ruleID = pgtype.UUID{Bytes: rid, Valid: true}
+	}
 	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
 		oid, _ := parseUUID(orgID)
 		return q.AppendActivity(ctx, gen.AppendActivityParams{
 			ID: id, OrgID: oid, TaskID: tid, ActorID: actor,
-			Field: a.Field, OldValue: a.OldValue, NewValue: a.NewValue,
+			Field: a.Field, OldValue: a.OldValue, NewValue: a.NewValue, AutomationRuleID: ruleID,
 		})
 	})
 	if isForeignKey(err) {
@@ -57,10 +68,16 @@ func (r *ActivityRepo) ListByTask(ctx context.Context, orgID, taskID string) ([]
 			return err
 		}
 		for _, row := range rows {
-			out = append(out, project.Activity{
+			act := project.Activity{
 				ID: row.ID.String(), TaskID: row.TaskID.String(), ActorID: row.ActorID.String(),
 				Field: row.Field, OldValue: row.OldValue, NewValue: row.NewValue, CreatedAt: row.CreatedAt,
-			})
+				AutomationRuleName: row.AutomationRuleName,
+			}
+			if row.AutomationRuleID.Valid {
+				id := uuid.UUID(row.AutomationRuleID.Bytes).String()
+				act.AutomationRuleID = &id
+			}
+			out = append(out, act)
 		}
 		return nil
 	})

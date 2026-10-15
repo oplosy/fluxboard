@@ -108,6 +108,19 @@ type AutomationRule struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
+type AutomationRun struct {
+	ID        uuid.UUID   `json:"id"`
+	OrgID     uuid.UUID   `json:"org_id"`
+	RuleID    uuid.UUID   `json:"rule_id"`
+	Trigger   string      `json:"trigger"`
+	TaskID    uuid.UUID   `json:"task_id"`
+	ActorID   pgtype.UUID `json:"actor_id"`
+	Status    string      `json:"status"`
+	Error     *string     `json:"error"`
+	Depth     int32       `json:"depth"`
+	CreatedAt time.Time   `json:"created_at"`
+}
+
 type Board struct {
 	ID        uuid.UUID `json:"id"`
 	OrgID     uuid.UUID `json:"org_id"`
@@ -441,14 +454,15 @@ type Task struct {
 }
 
 type TaskActivity struct {
-	ID        uuid.UUID `json:"id"`
-	OrgID     uuid.UUID `json:"org_id"`
-	TaskID    uuid.UUID `json:"task_id"`
-	ActorID   uuid.UUID `json:"actor_id"`
-	Field     string    `json:"field"`
-	OldValue  *string   `json:"old_value"`
-	NewValue  *string   `json:"new_value"`
-	CreatedAt time.Time `json:"created_at"`
+	ID               uuid.UUID   `json:"id"`
+	OrgID            uuid.UUID   `json:"org_id"`
+	TaskID           uuid.UUID   `json:"task_id"`
+	ActorID          uuid.UUID   `json:"actor_id"`
+	Field            string      `json:"field"`
+	OldValue         *string     `json:"old_value"`
+	NewValue         *string     `json:"new_value"`
+	CreatedAt        time.Time   `json:"created_at"`
+	AutomationRuleID pgtype.UUID `json:"automation_rule_id"`
 }
 
 type TaskCustomValue struct {
