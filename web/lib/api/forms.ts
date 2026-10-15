@@ -87,10 +87,10 @@ export interface SubmitFormInput {
   submitter_email?: string;
 }
 
-/** File an anonymous task (201 -> { id, number }). Per-IP throttled server-side. */
+/** File an anonymous request (201 -> { id }); lands in the project inbox. Throttled per IP and per form. */
 export function submitPublicForm(
   token: string,
   input: SubmitFormInput,
-): Promise<{ id: string; number: number }> {
+): Promise<{ id: string }> {
   return apiFetch(`/forms/${token}/submit`, { method: 'POST', body: input });
 }

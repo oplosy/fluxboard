@@ -32,7 +32,7 @@ export default function PublicFormPage(props: { params: Promise<{ token: string 
   const [email, setEmail] = useState('');
   const [fieldError, setFieldError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
-  const [receipt, setReceipt] = useState<number | null>(null);
+  const [received, setReceived] = useState(false);
 
   useEffect(() => {
     getPublicForm(params.token).then(setForm).catch(setMissingTrue);
@@ -46,16 +46,18 @@ export default function PublicFormPage(props: { params: Promise<{ token: string 
     setFieldError(null);
     setSubmitting(true);
     try {
-      const res = await submitPublicForm(params.token, {
+      await submitPublicForm(params.token, {
         title: title.trim(),
         description: description.trim(),
         priority: priority || undefined,
         submitter_name: name.trim() || undefined,
         submitter_email: email.trim() || undefined,
       });
-      setReceipt(res.number);
+      setReceived(true);
     } catch (err) {
-      if (err instanceof ApiError && err.status === 422) {
+      if (err instanceof ApiError && err.status === 429) {
+        setFieldError('Too many requests right now. Please try again in a few minutes.');
+      } else if (err instanceof ApiError && err.status === 422) {
         setFieldError('Please check the highlighted fields and try again.');
       } else if (err instanceof ApiError && err.status === 404) {
         setMissing(true);
@@ -78,11 +80,11 @@ export default function PublicFormPage(props: { params: Promise<{ token: string 
         </div>
       ) : !form ? (
         <p className="py-8 text-center text-sm text-muted-foreground">Loading form…</p>
-      ) : receipt !== null ? (
+      ) : received ? (
         <div className="rounded-2xl bg-card p-8 text-center shadow-sm">
           <h1 className="text-lg font-semibold">Thanks — we got it</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Your request was filed as task #{receipt}. The team will take it from here.
+            Your request was received. The team will review it{email.trim() ? ` and email ${email.trim()} with updates` : ''}.
           </p>
         </div>
       ) : (
