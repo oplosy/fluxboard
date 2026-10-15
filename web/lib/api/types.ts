@@ -323,6 +323,9 @@ export interface Activity {
   field: string;
   old_value?: string;
   new_value?: string;
+  /** Set when an automation rule made the change ("why did this change?"). */
+  automation_rule_id?: string;
+  automation_rule_name?: string;
   created_at: string;
 }
 

@@ -2,7 +2,8 @@
 
 import { useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Plus, Trash2, Zap } from 'lucide-react';
+import { ChevronDown, Plus, Trash2, Zap } from 'lucide-react';
+import Link from 'next/link';
 
 import { useOrg } from '@/lib/org/context';
 import { memberName, useOrgMembers } from '@/lib/org/use-members';
@@ -17,6 +18,7 @@ import {
   createAutomationRule,
   deleteAutomationRule,
   listAutomationRules,
+  listAutomationRuns,
   setAutomationRuleEnabled,
   type AutomationAction,
   type AutomationRule,
@@ -36,7 +38,11 @@ function describeRule(
   const when =
     r.trigger === 'task.created'
       ? 'a task is created'
-      : r.trigger === 'task.moved'
+      : r.trigger === 'task.due_soon'
+        ? `a task is due within ${r.trigger_config.hours ?? '?'} hours`
+        : r.trigger === 'task.overdue'
+          ? 'a task is overdue'
+          : r.trigger === 'task.moved'
         ? `a task moves${r.trigger_config.column_id ? ` into ${names.column(r.trigger_config.column_id)}` : ''}`
         : 'a task is assigned';
   const then =
@@ -50,8 +56,51 @@ function describeRule(
   return `When ${when}, ${then}.`;
 }
 
+const RUN_STATUS_CLASS: Record<string, string> = {
+  success: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300',
+  failed: 'bg-destructive/15 text-destructive',
+  skipped: 'bg-secondary text-muted-foreground',
+  pending: 'bg-secondary text-muted-foreground',
+};
+
+// Run history of one rule: every firing with its task, status and error.
+function RuleRuns({ ruleId, slug, orgId }: { ruleId: string; slug: string; orgId: string }) {
+  const runs = useQuery({
+    queryKey: ['automation-runs', orgId, ruleId],
+    queryFn: () => listAutomationRuns(orgId, ruleId),
+  });
+  if (runs.isLoading) return <p className="px-4 pb-3 text-xs text-muted-foreground">Loading history…</p>;
+  const list = runs.data ?? [];
+  if (list.length === 0) {
+    return <p className="px-4 pb-3 text-xs text-muted-foreground">This rule has not fired yet.</p>;
+  }
+  return (
+    <ul className="space-y-1.5 border-t px-4 py-3">
+      {list.map((run) => (
+        <li key={run.id} className="flex flex-wrap items-center gap-x-2 text-xs">
+          <span
+            className={cn('rounded px-1.5 py-0.5 font-medium', RUN_STATUS_CLASS[run.status])}
+            data-testid="run-status"
+          >
+            {run.status}
+          </span>
+          <span className="text-muted-foreground">{new Date(run.created_at).toLocaleString()}</span>
+          <Link
+            href={`/app/${slug}/projects/${run.project_key}/tasks/${run.task_number}`}
+            className="truncate font-medium underline-offset-2 hover:underline"
+          >
+            {run.task_title}
+          </Link>
+          {run.depth > 0 ? <span className="text-muted-foreground">(cascade depth {run.depth})</span> : null}
+          {run.error ? <span className="basis-full text-muted-foreground">{run.error}</span> : null}
+        </li>
+      ))}
+    </ul>
+  );
+}
+
 export default function AutomationsPage() {
-  const { orgId } = useOrg();
+  const { orgId, slug } = useOrg();
   const queryClient = useQueryClient();
   const { members, byId } = useOrgMembers();
   const key = ['automations', orgId] as const;
@@ -64,6 +113,11 @@ export default function AutomationsPage() {
   const projects = projectsQ.data ?? [];
 
   const [showForm, setShowForm] = useState(false);
+  // A deep link from a task's activity ("via automation ...") opens that rule's history.
+  const [openRuns, setOpenRuns] = useState<string | null>(() =>
+    typeof window === 'undefined' ? null : (window.location.hash.match(/^#rule-(.+)$/)?.[1] ?? null),
+  );
+  const [triggerHours, setTriggerHours] = useState('24');
   const [name, setName] = useState('');
   const [trigger, setTrigger] = useState<AutomationTrigger>('task.created');
   const [triggerColumn, setTriggerColumn] = useState('');
@@ -88,7 +142,12 @@ export default function AutomationsPage() {
       createAutomationRule(orgId, {
         name: name.trim(),
         trigger,
-        trigger_config: trigger === 'task.moved' && triggerColumn ? { column_id: triggerColumn } : {},
+        trigger_config:
+          trigger === 'task.moved' && triggerColumn
+            ? { column_id: triggerColumn }
+            : trigger === 'task.due_soon'
+              ? { hours: Number(triggerHours) }
+              : {},
         action,
         action_config:
           action === 'assign'
@@ -120,8 +179,10 @@ export default function AutomationsPage() {
     onSuccess: invalidate,
   });
 
+  const hoursOk = trigger !== 'task.due_soon' || (Number(triggerHours) >= 1 && Number(triggerHours) <= 720);
   const canSave =
     name.trim() !== '' &&
+    hoursOk &&
     (action !== 'assign' || paramUser !== '') &&
     (action !== 'move' || paramColumn !== '') &&
     (action !== 'add_label' || paramLabel !== '');
@@ -188,6 +249,19 @@ export default function AutomationsPage() {
               </Field>
             </div>
 
+            {trigger === 'task.due_soon' ? (
+              <Field id="rule-trigger-hours" label="Hours before the due date (1–720)">
+                <input
+                  id="rule-trigger-hours"
+                  type="number"
+                  min={1}
+                  max={720}
+                  value={triggerHours}
+                  onChange={(e) => setTriggerHours(e.target.value)}
+                  className="w-full rounded-lg border border-input bg-card px-3 py-2 text-sm outline-none focus-visible:border-foreground"
+                />
+              </Field>
+            ) : null}
             {trigger === 'task.moved' ? (
               <Field id="rule-trigger-col" label="Only when moved into (optional)">
                 <Select
@@ -290,7 +364,7 @@ export default function AutomationsPage() {
           </Card>
         ) : (
           (rules.data ?? []).map((r) => (
-            <Card key={r.id} className={cn(!r.enabled && 'opacity-60')}>
+            <Card key={r.id} id={`rule-${r.id}`} className={cn(!r.enabled && 'opacity-60')}>
               <CardContent className="flex items-center gap-3 py-3">
                 <button
                   type="button"
@@ -316,6 +390,15 @@ export default function AutomationsPage() {
                 </div>
                 <button
                   type="button"
+                  aria-expanded={openRuns === r.id}
+                  aria-label={`Run history of ${r.name}`}
+                  onClick={() => setOpenRuns(openRuns === r.id ? null : r.id)}
+                  className="flex items-center gap-1 rounded-md p-1.5 text-xs text-muted-foreground hover:bg-secondary"
+                >
+                  History <ChevronDown className={cn('h-3.5 w-3.5 transition-transform', openRuns === r.id && 'rotate-180')} />
+                </button>
+                <button
+                  type="button"
                   onClick={() => deleteMutation.mutate(r.id)}
                   aria-label={`Delete ${r.name}`}
                   className="rounded-md p-1.5 text-muted-foreground hover:bg-secondary hover:text-destructive"
@@ -323,6 +406,7 @@ export default function AutomationsPage() {
                   <Trash2 className="h-4 w-4" />
                 </button>
               </CardContent>
+              {openRuns === r.id ? <RuleRuns ruleId={r.id} slug={slug} orgId={orgId} /> : null}
             </Card>
           ))
         )}

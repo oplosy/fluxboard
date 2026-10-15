@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useQuery } from '@tanstack/react-query';
 
 import { listActivity } from '@/lib/api/tasks';
@@ -11,7 +12,7 @@ import type { Activity } from '@/lib/api/types';
 // Task activity timeline (FR-TASK-002). Renders the server's field-change log as
 // a plain chronological list.
 export function ActivityTimeline({ taskId }: { taskId: string }) {
-  const { orgId } = useOrg();
+  const { orgId, slug } = useOrg();
   const { byId } = useOrgMembers();
   const { names: agentNames } = useOrgAgents();
   const { data: activity } = useQuery({
@@ -37,6 +38,14 @@ export function ActivityTimeline({ taskId }: { taskId: string }) {
           <li key={a.id} className="text-sm text-muted-foreground">
             <span className="font-medium text-foreground">{memberName(byId, a.actor_id, agentNames)}</span>{' '}
             {describe(a)}{' '}
+            {a.automation_rule_id ? (
+              <Link
+                href={`/app/${slug}/settings/automations#rule-${a.automation_rule_id}`}
+                className="text-xs underline underline-offset-2 hover:text-foreground"
+              >
+                via automation “{a.automation_rule_name ?? 'deleted rule'}”
+              </Link>
+            ) : null}{' '}
             <span className="text-xs">· {new Date(a.created_at).toLocaleString()}</span>
           </li>
         ))}
