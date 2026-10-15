@@ -1,4 +1,4 @@
--- 0041_intake_requests -- Request inbox (research report §6.3/§7). A public
+-- 0043_intake_requests -- Request inbox (research report §6.3/§7). A public
 -- form submission becomes a tracked request instead of a task: the submitter's
 -- real name/email live on the request (never on a user row), the owner triages
 -- it (accept -> task, decline with reason), and the submitter is mailed an
@@ -10,7 +10,7 @@
 -- dedupe key within a window; the repo takes an advisory lock per
 -- (form, email, hash) so concurrent identical posts collapse to one row.
 -- ack_sent_at / outcome_sent_at are the mail sweeper's idempotency marks.
--- DDL only; RLS lands in 0042 (the DDL/RLS split).
+-- DDL only; RLS lands in 0044 (the DDL/RLS split).
 
 ALTER TABLE project_forms ADD COLUMN schema_version integer NOT NULL DEFAULT 1;
 
