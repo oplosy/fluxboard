@@ -111,6 +111,9 @@ type activityResp struct {
 	OldValue  *string   `json:"old_value,omitempty"`
 	NewValue  *string   `json:"new_value,omitempty"`
 	CreatedAt time.Time `json:"created_at"`
+	// Set when an automation rule made the change ("why did this change?").
+	AutomationRuleID   *string `json:"automation_rule_id,omitempty"`
+	AutomationRuleName *string `json:"automation_rule_name,omitempty"`
 }
 
 // ---- Tasks ----------------------------------------------------------------
@@ -239,6 +242,7 @@ func (h *TaskHandlers) ListActivity(w http.ResponseWriter, r *http.Request) {
 		out = append(out, activityResp{
 			ID: a.ID, ActorID: a.ActorID, Field: a.Field,
 			OldValue: a.OldValue, NewValue: a.NewValue, CreatedAt: a.CreatedAt,
+			AutomationRuleID: a.AutomationRuleID, AutomationRuleName: a.AutomationRuleName,
 		})
 	}
 	response.JSON(w, http.StatusOK, map[string]any{"activity": out})

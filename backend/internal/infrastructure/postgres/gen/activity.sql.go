@@ -7,25 +7,28 @@ package gen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const appendActivity = `-- name: AppendActivity :exec
 
-INSERT INTO task_activity (id, org_id, task_id, actor_id, field, old_value, new_value)
+INSERT INTO task_activity (id, org_id, task_id, actor_id, field, old_value, new_value, automation_rule_id)
 VALUES ($1, $2, $3, $4, $5,
-        $6, $7)
+        $6, $7, $8)
 `
 
 type AppendActivityParams struct {
-	ID       uuid.UUID `json:"id"`
-	OrgID    uuid.UUID `json:"org_id"`
-	TaskID   uuid.UUID `json:"task_id"`
-	ActorID  uuid.UUID `json:"actor_id"`
-	Field    string    `json:"field"`
-	OldValue *string   `json:"old_value"`
-	NewValue *string   `json:"new_value"`
+	ID               uuid.UUID   `json:"id"`
+	OrgID            uuid.UUID   `json:"org_id"`
+	TaskID           uuid.UUID   `json:"task_id"`
+	ActorID          uuid.UUID   `json:"actor_id"`
+	Field            string      `json:"field"`
+	OldValue         *string     `json:"old_value"`
+	NewValue         *string     `json:"new_value"`
+	AutomationRuleID pgtype.UUID `json:"automation_rule_id"`
 }
 
 // Task activity log ([T], tenant-scoped, FR-TASK-002) -----------------------
@@ -38,15 +41,18 @@ func (q *Queries) AppendActivity(ctx context.Context, arg AppendActivityParams) 
 		arg.Field,
 		arg.OldValue,
 		arg.NewValue,
+		arg.AutomationRuleID,
 	)
 	return err
 }
 
 const listActivityByTask = `-- name: ListActivityByTask :many
-SELECT id, org_id, task_id, actor_id, field, old_value, new_value, created_at
-FROM task_activity
-WHERE org_id = $1 AND task_id = $2
-ORDER BY created_at DESC
+SELECT a.id, a.org_id, a.task_id, a.actor_id, a.field, a.old_value, a.new_value, a.created_at,
+       a.automation_rule_id, r.name AS automation_rule_name
+FROM task_activity a
+LEFT JOIN automation_rules r ON r.id = a.automation_rule_id
+WHERE a.org_id = $1 AND a.task_id = $2
+ORDER BY a.created_at DESC
 `
 
 type ListActivityByTaskParams struct {
@@ -54,15 +60,29 @@ type ListActivityByTaskParams struct {
 	TaskID uuid.UUID `json:"task_id"`
 }
 
-func (q *Queries) ListActivityByTask(ctx context.Context, arg ListActivityByTaskParams) ([]TaskActivity, error) {
+type ListActivityByTaskRow struct {
+	ID                 uuid.UUID   `json:"id"`
+	OrgID              uuid.UUID   `json:"org_id"`
+	TaskID             uuid.UUID   `json:"task_id"`
+	ActorID            uuid.UUID   `json:"actor_id"`
+	Field              string      `json:"field"`
+	OldValue           *string     `json:"old_value"`
+	NewValue           *string     `json:"new_value"`
+	CreatedAt          time.Time   `json:"created_at"`
+	AutomationRuleID   pgtype.UUID `json:"automation_rule_id"`
+	AutomationRuleName *string     `json:"automation_rule_name"`
+}
+
+// automation_rule_name answers "why did this change?" for rule-made entries.
+func (q *Queries) ListActivityByTask(ctx context.Context, arg ListActivityByTaskParams) ([]ListActivityByTaskRow, error) {
 	rows, err := q.db.Query(ctx, listActivityByTask, arg.OrgID, arg.TaskID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var items []TaskActivity
+	var items []ListActivityByTaskRow
 	for rows.Next() {
-		var i TaskActivity
+		var i ListActivityByTaskRow
 		if err := rows.Scan(
 			&i.ID,
 			&i.OrgID,
@@ -72,6 +92,8 @@ func (q *Queries) ListActivityByTask(ctx context.Context, arg ListActivityByTask
 			&i.OldValue,
 			&i.NewValue,
 			&i.CreatedAt,
+			&i.AutomationRuleID,
+			&i.AutomationRuleName,
 		); err != nil {
 			return nil, err
 		}

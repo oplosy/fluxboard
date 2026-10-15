@@ -121,6 +121,43 @@ func (h *AutomationHandlers) UpdateRule(w http.ResponseWriter, r *http.Request) 
 	response.JSON(w, http.StatusOK, toAutomationRuleResp(rule))
 }
 
+type automationRunResp struct {
+	ID         string    `json:"id"`
+	Trigger    string    `json:"trigger"`
+	TaskID     string    `json:"task_id"`
+	TaskTitle  string    `json:"task_title"`
+	TaskNumber int       `json:"task_number"`
+	ProjectKey string    `json:"project_key"`
+	ActorID    string    `json:"actor_id,omitempty"`
+	Status     string    `json:"status"`
+	Error      string    `json:"error,omitempty"`
+	Depth      int       `json:"depth"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+// ListRuns returns a rule's recent firings, newest first (ADMIN+).
+func (h *AutomationHandlers) ListRuns(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	runs, err := h.svc.Runs(r.Context(), tc.OrgID, chi.URLParam(r, "ruleId"), 50)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	out := make([]automationRunResp, 0, len(runs))
+	for _, run := range runs {
+		out = append(out, automationRunResp{
+			ID: run.ID, Trigger: run.Trigger, TaskID: run.TaskID, TaskTitle: run.TaskTitle,
+			TaskNumber: run.TaskNumber, ProjectKey: run.ProjectKey,
+			ActorID: run.ActorID, Status: run.Status, Error: run.Error, Depth: run.Depth, CreatedAt: run.CreatedAt,
+		})
+	}
+	response.JSON(w, http.StatusOK, map[string]any{"runs": out})
+}
+
 type automationEnabledReq struct {
 	Enabled bool `json:"enabled"`
 }

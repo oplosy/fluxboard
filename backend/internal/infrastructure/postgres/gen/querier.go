@@ -51,6 +51,8 @@ type Querier interface {
 	ConsumeRecoveryCode(ctx context.Context, arg ConsumeRecoveryCodeParams) (int64, error)
 	// Live agents, paused included: pausing must not dodge the plan cap.
 	CountAgents(ctx context.Context, orgID uuid.UUID) (int64, error)
+	// The per-org action budget window: runs that executed (or are executing).
+	CountAutomationActionsSince(ctx context.Context, arg CountAutomationActionsSinceParams) (int64, error)
 	CountColumnTasks(ctx context.Context, arg CountColumnTasksParams) (int64, error)
 	CountCommentsForProject(ctx context.Context, arg CountCommentsForProjectParams) ([]CountCommentsForProjectRow, error)
 	// Billable seats: members other than GUEST (FR-TEN-010). The same number gates
@@ -153,6 +155,7 @@ type Querier interface {
 	// Returns the org's label with this name, creating it (with color) if absent;
 	// an existing label keeps its color (project templates, FR-PROJ-007).
 	EnsureLabel(ctx context.Context, arg EnsureLabelParams) (uuid.UUID, error)
+	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) error
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
 	// to 401 rather than a silent miss. An agent's key carries the agent's role and
 	// status (ADR-033); the owner pool reads agents across tenants like api_keys.
@@ -209,6 +212,10 @@ type Querier interface {
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
 	// Extend a live claim the agent holds; a lapsed or foreign claim matches nothing.
 	HeartbeatTask(ctx context.Context, arg HeartbeatTaskParams) (int64, error)
+	// Run history ([T], FR-AUTO) --------------------------------------------------
+	// ON CONFLICT DO NOTHING hits the once-per-task-per-rule index for time
+	// triggers: 0 rows means another run already claimed this (rule, task).
+	InsertAutomationRun(ctx context.Context, arg InsertAutomationRunParams) (int64, error)
 	// Notifications — Phase 5 (docs/09-REALTIME-JOBS.md §3, FR-NTF-002). notifications
 	// [T]: cursor pagination by created_at DESC; unread = read_at IS NULL.
 	InsertNotification(ctx context.Context, arg InsertNotificationParams) error
@@ -242,12 +249,14 @@ type Querier interface {
 	// Live sessions the user can manage: not revoked, not rotated (i.e. the current
 	// head of each refresh family), not expired. Newest first (docs/04-AUTH.md §5).
 	ListActiveUserSessions(ctx context.Context, userID uuid.UUID) ([]ListActiveUserSessionsRow, error)
-	ListActivityByTask(ctx context.Context, arg ListActivityByTaskParams) ([]TaskActivity, error)
+	// automation_rule_name answers "why did this change?" for rule-made entries.
+	ListActivityByTask(ctx context.Context, arg ListActivityByTaskParams) ([]ListActivityByTaskRow, error)
 	// Active keys of every agent in the org; the repo groups them by agent.
 	ListAgentAPIKeys(ctx context.Context, orgID uuid.UUID) ([]ApiKey, error)
 	ListAgents(ctx context.Context, orgID uuid.UUID) ([]Agent, error)
 	ListAttachmentsByTask(ctx context.Context, arg ListAttachmentsByTaskParams) ([]Attachment, error)
 	ListAutomationRules(ctx context.Context, orgID uuid.UUID) ([]AutomationRule, error)
+	ListAutomationRuns(ctx context.Context, arg ListAutomationRunsParams) ([]ListAutomationRunsRow, error)
 	ListColumnsByBoard(ctx context.Context, arg ListColumnsByBoardParams) ([]BoardColumn, error)
 	ListCommentsByTask(ctx context.Context, arg ListCommentsByTaskParams) ([]Comment, error)
 	ListCustomFieldsByProject(ctx context.Context, arg ListCustomFieldsByProjectParams) ([]CustomField, error)
@@ -308,6 +317,8 @@ type Querier interface {
 	ListTaskCustomValues(ctx context.Context, arg ListTaskCustomValuesParams) ([]ListTaskCustomValuesRow, error)
 	ListTasksByColumn(ctx context.Context, arg ListTasksByColumnParams) ([]ListTasksByColumnRow, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]ListTasksByProjectRow, error)
+	// Open, live tasks due in [from_at, to_at) that the rule has not yet fired on.
+	ListTasksDueBetween(ctx context.Context, arg ListTasksDueBetweenParams) ([]uuid.UUID, error)
 	// Platform admin cross-tenant reads — Phase 6 (FR-ADM-002/004). These span ALL
 	// orgs, so the repo runs them on the OWNER pool (table owner bypasses the ENABLE
 	// (non-FORCE) RLS on subscriptions/memberships). Gated by the platform-admin HTTP

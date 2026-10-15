@@ -7,9 +7,29 @@ package gen
 
 import (
 	"context"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
+
+const countAutomationActionsSince = `-- name: CountAutomationActionsSince :one
+SELECT count(*) FROM automation_runs
+WHERE org_id = $1 AND created_at >= $2 AND status IN ('pending', 'success', 'failed')
+`
+
+type CountAutomationActionsSinceParams struct {
+	OrgID uuid.UUID `json:"org_id"`
+	Since time.Time `json:"since"`
+}
+
+// The per-org action budget window: runs that executed (or are executing).
+func (q *Queries) CountAutomationActionsSince(ctx context.Context, arg CountAutomationActionsSinceParams) (int64, error) {
+	row := q.db.QueryRow(ctx, countAutomationActionsSince, arg.OrgID, arg.Since)
+	var count int64
+	err := row.Scan(&count)
+	return count, err
+}
 
 const createAutomationRule = `-- name: CreateAutomationRule :exec
 
@@ -63,6 +83,28 @@ func (q *Queries) DeleteAutomationRule(ctx context.Context, arg DeleteAutomation
 	return result.RowsAffected(), nil
 }
 
+const finishAutomationRun = `-- name: FinishAutomationRun :exec
+UPDATE automation_runs SET status = $1, error = $2
+WHERE org_id = $3 AND id = $4
+`
+
+type FinishAutomationRunParams struct {
+	Status string    `json:"status"`
+	Error  *string   `json:"error"`
+	OrgID  uuid.UUID `json:"org_id"`
+	ID     uuid.UUID `json:"id"`
+}
+
+func (q *Queries) FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) error {
+	_, err := q.db.Exec(ctx, finishAutomationRun,
+		arg.Status,
+		arg.Error,
+		arg.OrgID,
+		arg.ID,
+	)
+	return err
+}
+
 const getAutomationRule = `-- name: GetAutomationRule :one
 SELECT id, org_id, name, enabled, trigger, trigger_config, action, action_config, created_by, created_at
 FROM automation_rules
@@ -92,6 +134,46 @@ func (q *Queries) GetAutomationRule(ctx context.Context, arg GetAutomationRulePa
 	return i, err
 }
 
+const insertAutomationRun = `-- name: InsertAutomationRun :execrows
+
+INSERT INTO automation_runs (id, org_id, rule_id, trigger, task_id, actor_id, status, error, depth)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+ON CONFLICT DO NOTHING
+`
+
+type InsertAutomationRunParams struct {
+	ID      uuid.UUID   `json:"id"`
+	OrgID   uuid.UUID   `json:"org_id"`
+	RuleID  uuid.UUID   `json:"rule_id"`
+	Trigger string      `json:"trigger"`
+	TaskID  uuid.UUID   `json:"task_id"`
+	ActorID pgtype.UUID `json:"actor_id"`
+	Status  string      `json:"status"`
+	Error   *string     `json:"error"`
+	Depth   int32       `json:"depth"`
+}
+
+// Run history ([T], FR-AUTO) --------------------------------------------------
+// ON CONFLICT DO NOTHING hits the once-per-task-per-rule index for time
+// triggers: 0 rows means another run already claimed this (rule, task).
+func (q *Queries) InsertAutomationRun(ctx context.Context, arg InsertAutomationRunParams) (int64, error) {
+	result, err := q.db.Exec(ctx, insertAutomationRun,
+		arg.ID,
+		arg.OrgID,
+		arg.RuleID,
+		arg.Trigger,
+		arg.TaskID,
+		arg.ActorID,
+		arg.Status,
+		arg.Error,
+		arg.Depth,
+	)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const listAutomationRules = `-- name: ListAutomationRules :many
 SELECT id, org_id, name, enabled, trigger, trigger_config, action, action_config, created_by, created_at
 FROM automation_rules
@@ -119,6 +201,73 @@ func (q *Queries) ListAutomationRules(ctx context.Context, orgID uuid.UUID) ([]A
 			&i.ActionConfig,
 			&i.CreatedBy,
 			&i.CreatedAt,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listAutomationRuns = `-- name: ListAutomationRuns :many
+SELECT r.id, r.org_id, r.rule_id, r.trigger, r.task_id, r.actor_id, r.status, r.error, r.depth, r.created_at,
+       t.title AS task_title, t.number AS task_number, p.key AS project_key
+FROM automation_runs r
+JOIN tasks t ON t.id = r.task_id
+JOIN projects p ON p.id = t.project_id
+WHERE r.org_id = $1 AND r.rule_id = $2
+ORDER BY r.created_at DESC
+LIMIT $3
+`
+
+type ListAutomationRunsParams struct {
+	OrgID   uuid.UUID `json:"org_id"`
+	RuleID  uuid.UUID `json:"rule_id"`
+	MaxRows int32     `json:"max_rows"`
+}
+
+type ListAutomationRunsRow struct {
+	ID         uuid.UUID   `json:"id"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	RuleID     uuid.UUID   `json:"rule_id"`
+	Trigger    string      `json:"trigger"`
+	TaskID     uuid.UUID   `json:"task_id"`
+	ActorID    pgtype.UUID `json:"actor_id"`
+	Status     string      `json:"status"`
+	Error      *string     `json:"error"`
+	Depth      int32       `json:"depth"`
+	CreatedAt  time.Time   `json:"created_at"`
+	TaskTitle  string      `json:"task_title"`
+	TaskNumber int32       `json:"task_number"`
+	ProjectKey string      `json:"project_key"`
+}
+
+func (q *Queries) ListAutomationRuns(ctx context.Context, arg ListAutomationRunsParams) ([]ListAutomationRunsRow, error) {
+	rows, err := q.db.Query(ctx, listAutomationRuns, arg.OrgID, arg.RuleID, arg.MaxRows)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListAutomationRunsRow
+	for rows.Next() {
+		var i ListAutomationRunsRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.OrgID,
+			&i.RuleID,
+			&i.Trigger,
+			&i.TaskID,
+			&i.ActorID,
+			&i.Status,
+			&i.Error,
+			&i.Depth,
+			&i.CreatedAt,
+			&i.TaskTitle,
+			&i.TaskNumber,
+			&i.ProjectKey,
 		); err != nil {
 			return nil, err
 		}
@@ -166,6 +315,48 @@ func (q *Queries) ListEnabledAutomationRules(ctx context.Context, arg ListEnable
 			return nil, err
 		}
 		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const listTasksDueBetween = `-- name: ListTasksDueBetween :many
+SELECT t.id FROM tasks t
+WHERE t.org_id = $1 AND t.deleted_at IS NULL AND t.completed_at IS NULL
+  AND t.due_date IS NOT NULL AND t.due_date >= $2 AND t.due_date < $3
+  AND NOT EXISTS (SELECT 1 FROM automation_runs r WHERE r.rule_id = $4 AND r.task_id = t.id)
+ORDER BY t.due_date
+LIMIT 500
+`
+
+type ListTasksDueBetweenParams struct {
+	OrgID  uuid.UUID          `json:"org_id"`
+	FromAt pgtype.Timestamptz `json:"from_at"`
+	ToAt   pgtype.Timestamptz `json:"to_at"`
+	RuleID uuid.UUID          `json:"rule_id"`
+}
+
+// Open, live tasks due in [from_at, to_at) that the rule has not yet fired on.
+func (q *Queries) ListTasksDueBetween(ctx context.Context, arg ListTasksDueBetweenParams) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listTasksDueBetween,
+		arg.OrgID,
+		arg.FromAt,
+		arg.ToAt,
+		arg.RuleID,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, err

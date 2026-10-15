@@ -31,6 +31,7 @@ import (
 	stripex "github.com/mesutokul/fluxboard/backend/internal/infrastructure/stripe"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/jobs"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/aiuc"
+	"github.com/mesutokul/fluxboard/backend/internal/usecase/automationuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/billinguc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/taskuc"
 )
@@ -73,7 +74,19 @@ func run(logger *slog.Logger) error {
 	}
 	tenantPool := postgres.NewTenantPool(pool)
 	taskRepo := postgres.NewTaskRepo(tenantPool)
+	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
+	defer rdb.Close()
+	eventBus := redisx.NewEventBus(rdb, logger)
+	// Time-trigger automations (ADR-036): the scheduled scan fires rules whose
+	// actions run through taskSvc, the same write path the api uses.
+	automationSvc := automationuc.New(automationuc.Deps{
+		Rules:  postgres.NewAutomationRepo(tenantPool),
+		Runs:   postgres.NewAutomationRunRepo(tenantPool),
+		Logger: logger,
+	})
 	taskSvc := taskuc.New(taskuc.Deps{
+		Events:      eventBus,
+		Automation:  automationSvc,
 		Tasks:       taskRepo,
 		Concurrency: taskRepo, // lapsed-claim sweeper (ADR-033)
 		Recurrences: postgres.NewRecurrenceRepo(tenantPool),
@@ -89,8 +102,10 @@ func run(logger *slog.Logger) error {
 		Store:       objectStore,
 		Logger:      logger,
 	})
+	automationSvc.SetActions(taskSvc)
 	maintenanceRepo := postgres.NewMaintenanceRepo(pool)
 	maintenance := jobs.NewMaintenance(taskSvc, maintenanceRepo, logger)
+	maintenance.SetAutomation(automationSvc)
 
 	// Metrics endpoint on its own port (scraped separately from the api).
 	metricsSrv, metricsReg := startMetrics(logger, cfg.WorkerMetricsAddr)
@@ -111,8 +126,6 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	rdb := redis.NewClient(&redis.Options{Addr: cfg.RedisAddr})
-	defer rdb.Close()
 	asynqClient := asynq.NewClient(redisOpt)
 	defer asynqClient.Close()
 	driftCounter := prometheus.NewCounter(prometheus.CounterOpts{
@@ -123,7 +136,6 @@ func run(logger *slog.Logger) error {
 	mail := mailer.New(mailer.Config{Host: cfg.SMTPHost, Port: cfg.SMTPPort, Username: cfg.SMTPUser, Password: cfg.SMTPPassword, From: cfg.SMTPFrom, WebOrigin: cfg.WebOrigin}, logger)
 	membershipRepo := postgres.NewMembershipRepo(tenantPool)
 	processedEventRepo := postgres.NewProcessedEventRepo(pool)
-	eventBus := redisx.NewEventBus(rdb, logger)
 	billingSvc := billinguc.New(billinguc.Deps{
 		Plans:    planRepo,
 		Subs:     postgres.NewSubscriptionRepo(tenantPool),

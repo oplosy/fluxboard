@@ -468,8 +468,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	userHandlers.Export = handlers.ExportSources{Sessions: authSvc.ListSessions, Orgs: tenantSvc.ListMyOrgs}
 
 	automationSvc := automationuc.New(automationuc.Deps{
-		Rules: automationRepo, Tasks: taskRepo, Labels: labelRepo,
-		Columns: columnRepo, Boards: boardRepo, Logger: logger,
+		Rules: automationRepo, Runs: postgres.NewAutomationRunRepo(tenantPool), Logger: logger,
 	})
 	automationHandlers := handlers.NewAutomationHandlers(automationSvc, logger)
 	// Agents are identified for the human-approved Done gate (ADR-033).
@@ -482,6 +481,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo,
 		Agents: agentLookup, Recurrences: postgres.NewRecurrenceRepo(tenantPool), People: membershipRepo, Logger: logger,
 	})
+	automationSvc.SetActions(taskSvc) // actions take the normal task write path (ADR-036)
 	projectSvc := projectuc.New(projectuc.Deps{
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
 		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
