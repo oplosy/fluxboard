@@ -147,14 +147,14 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	e.bParams = map[string]string{
 		"projectId": e.bIDs["project"], "taskId": e.bIDs["task"], "linkedId": e.bIDs["task2"],
 		"columnId": e.bIDs["column"], "labelId": e.bIDs["label"], "userId": e.bIDs["member"],
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
-		"sprintId": e.bIDs["sprint"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"],
+		"sprintId": e.bIDs["sprint"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
 		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"],
 	}
@@ -230,6 +230,9 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 		{`INSERT INTO project_forms (id, org_id, project_id, name, target_column_id, token_hash, created_by)
 		  VALUES ($1, $2, $3, 'Beta form', $4, $5, $6)`,
 			[]any{b["form"], e.orgB, b["project"], b["column"], []byte("isolation-form-token-hash"), owner}},
+		{`INSERT INTO intake_requests (id, org_id, project_id, form_id, form_schema_version, title, content_hash)
+		  VALUES ($1, $2, $3, $4, 1, 'Beta request', $5)`,
+			[]any{b["request"], e.orgB, b["project"], b["form"], []byte("isolation-request-hash")}},
 		{`INSERT INTO automation_rules (id, org_id, name, trigger, action, action_config, created_by)
 		  VALUES ($1, $2, 'Beta rule', 'task.created', 'set_priority', '{"priority":"high"}', $3)`,
 			[]any{b["rule"], e.orgB, owner}},
