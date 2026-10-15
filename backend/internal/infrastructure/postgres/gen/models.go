@@ -181,6 +181,32 @@ type FeatureFlag struct {
 	Enabled bool      `json:"enabled"`
 }
 
+type IntakeRequest struct {
+	ID                uuid.UUID          `json:"id"`
+	OrgID             uuid.UUID          `json:"org_id"`
+	ProjectID         uuid.UUID          `json:"project_id"`
+	FormID            pgtype.UUID        `json:"form_id"`
+	FormSchemaVersion int32              `json:"form_schema_version"`
+	FormSnapshot      []byte             `json:"form_snapshot"`
+	Title             string             `json:"title"`
+	Description       string             `json:"description"`
+	Priority          string             `json:"priority"`
+	SubmitterName     string             `json:"submitter_name"`
+	SubmitterEmail    string             `json:"submitter_email"`
+	ContentHash       []byte             `json:"content_hash"`
+	Status            string             `json:"status"`
+	OwnerID           pgtype.UUID        `json:"owner_id"`
+	DeclineReason     string             `json:"decline_reason"`
+	TaskID            pgtype.UUID        `json:"task_id"`
+	DecidedBy         pgtype.UUID        `json:"decided_by"`
+	DecidedAt         pgtype.Timestamptz `json:"decided_at"`
+	ReceivedAt        time.Time          `json:"received_at"`
+	AckSentAt         pgtype.Timestamptz `json:"ack_sent_at"`
+	OutcomeSentAt     pgtype.Timestamptz `json:"outcome_sent_at"`
+	CreatedAt         time.Time          `json:"created_at"`
+	UpdatedAt         time.Time          `json:"updated_at"`
+}
+
 type Invitation struct {
 	ID         uuid.UUID          `json:"id"`
 	OrgID      uuid.UUID          `json:"org_id"`
@@ -339,6 +365,7 @@ type ProjectForm struct {
 	IsActive       bool      `json:"is_active"`
 	CreatedAt      time.Time `json:"created_at"`
 	UpdatedAt      time.Time `json:"updated_at"`
+	SchemaVersion  int32     `json:"schema_version"`
 }
 
 type ProjectMember struct {

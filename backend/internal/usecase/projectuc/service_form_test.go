@@ -2,7 +2,6 @@ package projectuc
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
@@ -122,6 +121,7 @@ func formTestService(forms *fakeForms, tasks *fakeFormTasks) *Service {
 		Columns:  &fakeFormColumns{},
 		Tasks:    tasks,
 		Forms:    forms,
+		Intake:   newFakeIntake(),
 	})
 }
 
@@ -161,37 +161,6 @@ func TestCreateForm_Validation(t *testing.T) {
 		if _, _, err := s.CreateForm(ctx, "o", "u", "p1", in, tenant.RoleMember); err != domain.ErrValidation {
 			t.Errorf("%s: err = %v, want ErrValidation", name, err)
 		}
-	}
-}
-
-func TestSubmitForm_HappyPath(t *testing.T) {
-	ctx := context.Background()
-	raw := "test-token-1"
-	forms := newFakeForms(&project.ProjectForm{
-		ID: "f1", OrgID: "o", ProjectID: "p1", Name: "Bugs",
-		TargetColumnID: "c1", TokenHash: token.Hash(raw), CreatedBy: "owner-1", IsActive: true,
-	})
-	tasks := &fakeFormTasks{}
-	s := formTestService(forms, tasks)
-
-	got, err := s.SubmitForm(ctx, raw, SubmitFormInput{
-		Title: "Login broken", Description: "500 on submit",
-		Priority: "high", SubmitterName: "Ada", SubmitterEmail: "ada@example.com",
-	})
-	if err != nil {
-		t.Fatalf("SubmitForm: %v", err)
-	}
-	if got.Title != "Login broken" || got.Priority != project.PriorityHigh {
-		t.Errorf("task = %+v", got)
-	}
-	if got.CreatedBy != "owner-1" {
-		t.Errorf("created_by = %s, want form owner", got.CreatedBy)
-	}
-	if !strings.Contains(got.Description, "Ada <ada@example.com>") || !strings.Contains(got.Description, "500 on submit") {
-		t.Errorf("description missing attribution/body: %q", got.Description)
-	}
-	if got.Number != 1 {
-		t.Errorf("number = %d, want 1", got.Number)
 	}
 }
 

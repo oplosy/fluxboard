@@ -64,6 +64,10 @@ const (
 	ActionAgentKeyCreate Action = "agent.key_create"
 	ActionAgentKeyRevoke Action = "agent.key_revoke"
 
+	// Request inbox (triage decisions by org users; submitters never act).
+	ActionIntakeAccept  Action = "intake.accept"
+	ActionIntakeDecline Action = "intake.decline"
+
 	// Governed AI layer (ADR-025, FR-AI-005). Every AI write logs ai.run with
 	// model+tokens in metadata; risk dismissals log ai.risk_dismiss.
 	ActionAIRun         Action = "ai.run"

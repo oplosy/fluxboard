@@ -10,20 +10,23 @@ VALUES (@id, @org_id, @project_id, @name, @description, @target_column_id, @toke
 
 -- name: GetProjectForm :one
 SELECT id, org_id, project_id, name, description, target_column_id, token_hash,
-       created_by, is_active, created_at, updated_at
+       created_by, is_active, created_at, updated_at, schema_version
 FROM project_forms
 WHERE org_id = @org_id AND id = @id;
 
 -- name: ListProjectFormsByProject :many
 SELECT id, org_id, project_id, name, description, target_column_id, token_hash,
-       created_by, is_active, created_at, updated_at
+       created_by, is_active, created_at, updated_at, schema_version
 FROM project_forms
 WHERE org_id = @org_id AND project_id = @project_id
 ORDER BY created_at;
 
 -- name: UpdateProjectForm :execrows
 UPDATE project_forms
-SET name = @name, description = @description, target_column_id = @target_column_id,
+SET schema_version = CASE WHEN name = @name AND description = @description
+                            AND target_column_id = @target_column_id
+                       THEN schema_version ELSE schema_version + 1 END,
+    name = @name, description = @description, target_column_id = @target_column_id,
     is_active = @is_active, updated_at = now()
 WHERE org_id = @org_id AND id = @id;
 

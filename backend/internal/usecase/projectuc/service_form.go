@@ -2,14 +2,13 @@ package projectuc
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/json"
 	"strings"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
-	"github.com/mesutokul/fluxboard/backend/internal/domain/automation"
-	"github.com/mesutokul/fluxboard/backend/internal/domain/notify"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/project"
 	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
-	"github.com/mesutokul/fluxboard/backend/internal/pkg/rank"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/token"
 )
 
@@ -201,80 +200,69 @@ func (s *Service) GetPublicForm(ctx context.Context, rawToken string) (*PublicFo
 	return &PublicForm{Name: f.Name, Description: f.Description}, nil
 }
 
-// SubmitForm files an anonymous task through the form. Returns the created
-// task so the page can confirm receipt (number for human reference).
-func (s *Service) SubmitForm(ctx context.Context, rawToken string, in SubmitFormInput) (*project.Task, error) {
+// SubmitForm records an anonymous request through the form and returns its id.
+// A repeat of the same form + email + content within IntakeDedupeWindow returns
+// the original id; a form past IntakeRatePerForm per IntakeRateWindow is 429.
+func (s *Service) SubmitForm(ctx context.Context, rawToken string, in SubmitFormInput) (string, error) {
 	if !s.formsEnabled() {
-		return nil, domain.ErrNotFound
+		return "", domain.ErrNotFound
 	}
 	f, err := s.forms.ResolveByToken(ctx, token.Hash(rawToken))
 	if err != nil {
-		return nil, domain.ErrNotFound // never leak which tokens exist
+		return "", domain.ErrNotFound // never leak which tokens exist
 	}
 	if !f.IsActive {
-		return nil, domain.ErrNotFound
+		return "", domain.ErrNotFound
 	}
 	p, err := s.projects.Get(ctx, f.OrgID, f.ProjectID)
 	if err != nil || p.Archived() {
-		return nil, domain.ErrNotFound
+		return "", domain.ErrNotFound
 	}
 	title := strings.TrimSpace(in.Title)
 	if title == "" || len(title) > project.MaxTitleLen {
-		return nil, domain.ErrValidation
+		return "", domain.ErrValidation
 	}
 	priority := project.Priority(strings.TrimSpace(in.Priority))
 	if priority == "" {
 		priority = project.PriorityNone
 	}
 	if !priority.Valid() {
-		return nil, domain.ErrValidation
+		return "", domain.ErrValidation
 	}
 	name := strings.TrimSpace(in.SubmitterName)
 	email := strings.TrimSpace(in.SubmitterEmail)
 	if len(name) > MaxSubmitterLen || len(email) > MaxSubmitterLen {
-		return nil, domain.ErrValidation
+		return "", domain.ErrValidation
 	}
 	if email != "" && !strings.Contains(email, "@") {
-		return nil, domain.ErrValidation
+		return "", domain.ErrValidation
 	}
-	col, err := s.columns.Get(ctx, f.OrgID, f.TargetColumnID)
+	if s.intake == nil {
+		return "", domain.ErrNotFound
+	}
+	if err := s.checkTargetColumn(ctx, f.OrgID, f.ProjectID, f.TargetColumnID); err != nil {
+		return "", err
+	}
+	cur, err := s.forms.Get(ctx, f.OrgID, f.ID) // schema_version is not in the token projection
 	if err != nil {
-		return nil, domain.ErrValidation // target column gone — owner must re-point the form
+		return "", err
 	}
-	board, err := s.boards.GetByProject(ctx, f.OrgID, f.ProjectID)
+	desc := strings.TrimSpace(in.Description)
+	snap, _ := json.Marshal(map[string]string{"name": cur.Name, "description": cur.Description, "target_column_id": cur.TargetColumnID})
+	sum := sha256.Sum256([]byte(title + "|" + desc + "|" + string(priority)))
+	id, _, err := s.intake.Submit(ctx, f.OrgID, &project.IntakeRequest{
+		ID: newID(), ProjectID: f.ProjectID, FormID: f.ID, FormSchemaVersion: cur.SchemaVersion, FormSnapshot: snap,
+		Title: title, Description: desc, Priority: priority, SubmitterName: name, SubmitterEmail: email,
+		ContentHash: sum[:],
+	}, IntakeDedupeWindow, IntakeRatePerForm, IntakeRateWindow)
 	if err != nil {
-		return nil, domain.ErrValidation
+		return "", err
 	}
-	if col.BoardID != board.ID {
-		return nil, domain.ErrValidation
-	}
-	existing, err := s.tasks.ListByColumn(ctx, f.OrgID, f.TargetColumnID)
-	if err != nil {
-		return nil, err
-	}
-	last := ""
-	if n := len(existing); n > 0 {
-		last = existing[n-1].Rank
-	}
-	t := &project.Task{
-		ID: newID(), OrgID: f.OrgID, ProjectID: f.ProjectID, ColumnID: f.TargetColumnID,
-		Title: title, Description: intakeBody(name, email, strings.TrimSpace(in.Description)),
-		Priority: priority, Rank: rank.Append(last), CreatedBy: f.CreatedBy,
-	}
-	if err := s.tasks.Create(ctx, f.OrgID, t); err != nil {
-		return nil, err
-	}
-	s.publish(ctx, f.OrgID, notify.EventTaskCreated, f.CreatedBy, map[string]any{
-		"task_id": t.ID, "project_id": t.ProjectID, "column_id": t.ColumnID, "title": t.Title,
-	})
-	s.automate(ctx, automation.Event{
-		OrgID: f.OrgID, Trigger: automation.TriggerTaskCreated, TaskID: t.ID, ActorID: f.CreatedBy,
-	})
-	return s.tasks.Get(ctx, f.OrgID, t.ID)
+	return id, nil
 }
 
-// intakeBody stamps the anonymous submitter into the description so the owner
-// can follow up (tasks.created_by points at the form owner instead).
+// intakeBody stamps the submitter into the accepted task's description so the
+// assignee can follow up.
 func intakeBody(name, email, body string) string {
 	var who string
 	switch {

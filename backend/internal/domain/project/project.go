@@ -304,6 +304,7 @@ type ProjectForm struct {
 	TokenHash      []byte
 	CreatedBy      string
 	IsActive       bool
+	SchemaVersion  int // bumped when name/description/target column change; snapshotted on requests
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }

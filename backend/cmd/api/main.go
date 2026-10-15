@@ -486,6 +486,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
 		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Fields: fieldRepo, Labels: labelRepo,
 		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
+		Intake: postgres.NewIntakeRepo(tenantPool), Audit: auditRepo,
 		Automation: automationSvc, Concurrency: taskRepo,
 		Agents: agentLookup, Commenter: taskSvc, // review notes (ADR-033)
 		Seeder: postgres.NewProjectSeedRepo(tenantPool), Idem: redisx.NewIdempotencyStore(rdb),
