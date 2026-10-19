@@ -39,3 +39,6 @@ Thumbs.db
 
 # Local code-graph index (codegraph init)
 .codegraph/
+
+# Claude Code local state (worktrees, todos, settings)
+.claude/
