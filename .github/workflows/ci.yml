@@ -12,7 +12,7 @@ on:
 # on main's branch protection; renaming a job breaks merging until the
 # protection rule is updated (docs/12-TESTING.md §9).
 env:
-  GO_VERSION: "1.26"
+  GO_VERSION: "1.26.10"
   # Pinned: "latest" resolves at run time, so a new release could fail lint on
   # an unchanged tree. Bump deliberately (and fix what it flags) in its own PR.
   GOLANGCI_LINT_VERSION: v2.14.0
