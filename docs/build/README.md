@@ -35,6 +35,9 @@ Update these four lines whenever a section closes.
 
 ---
 
+> **New feature work** (post-v1) is tracked in [ROADMAP.md](ROADMAP.md):
+> pick the next `todo` item there. This file stays the record of the v1 build.
+
 ## Resume protocol (do this at the start of every session)
 
 1. Read **Current Position** above → note the phase and next-check ID.
