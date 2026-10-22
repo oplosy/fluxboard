@@ -30,7 +30,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR |
 |---|---|---|---|---|---|
-| R-01 | Epics / task hierarchy | todo | | | |
+| R-01 | Epics / task hierarchy | in progress | | `feat/epics` | |
 | R-02 | Story points / estimates | todo | | | |
 
 - **R-01 Epics / task hierarchy.** A task can have a parent (epic). Today
