@@ -22,6 +22,7 @@ import { TaskLinks } from './links';
 import { TaskRecurrence } from './recurrence';
 import { TaskApprovals } from './approvals';
 import { TaskWatchers } from './watchers';
+import { TaskEpic } from './epic-field';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -280,6 +281,9 @@ export function TaskDetail({
               )}
             </Field>
 
+            <Field label="Epic">
+              <TaskEpic taskId={taskId} projectId={projectId} epicId={task.epic_id} canEdit={canEdit} />
+            </Field>
             <Field label="Labels">
               <div className="flex flex-wrap gap-1.5">
                 {attached.map((l) => (
