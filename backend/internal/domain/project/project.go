@@ -408,6 +408,14 @@ type TaskLink struct {
 	CreatedAt    time.Time
 }
 
+// Watcher is a user following a task (FR-TASK-014).
+type Watcher struct {
+	UserID    string
+	Email     string
+	Name      string
+	CreatedAt time.Time
+}
+
 // Custom field types (FR-FIELDS).
 const (
 	FieldText   = "text"
