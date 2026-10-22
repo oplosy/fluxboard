@@ -53,6 +53,7 @@ type Deps struct {
 	Links        project.TaskLinkRepository   // dependencies; nil ⇒ link endpoints disabled
 	Recurrences  project.RecurrenceRepository // recurring tasks; nil ⇒ recurrence disabled
 	Approvals    project.ApprovalRepository   // approvals; nil ⇒ approval endpoints disabled
+	Watchers     project.WatcherRepository    // watchers; nil ⇒ watcher endpoints disabled
 	Audit        audit.Writer                 // approval audit rows; nil ⇒ none
 	Projects     project.ProjectRepository
 	Members      project.ProjectMemberRepository
@@ -88,6 +89,7 @@ type Service struct {
 	links        project.TaskLinkRepository
 	recurrences  project.RecurrenceRepository
 	approvals    project.ApprovalRepository
+	watchers     project.WatcherRepository
 	audit        audit.Writer
 	projects     project.ProjectRepository
 	members      project.ProjectMemberRepository
@@ -117,7 +119,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		tasks: d.Tasks, subtasks: d.Subtasks, labels: d.Labels, comments: d.Comments,
-		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, recurrences: d.Recurrences, approvals: d.Approvals, audit: d.Audit, projects: d.Projects,
+		activity: d.Activity, attachments: d.Attachments, timeEntries: d.TimeEntries, links: d.Links, recurrences: d.Recurrences, approvals: d.Approvals, watchers: d.Watchers, audit: d.Audit, projects: d.Projects,
 		members: d.Members, boards: d.Boards, columns: d.Columns, store: d.Store,
 		entitlements: d.Entitlements, events: d.Events, notifier: d.Notifier,
 		automation: d.Automation, conc: d.Concurrency, agents: d.Agents, people: d.People,
