@@ -1,4 +1,4 @@
--- 0047_task_watchers -- Users who follow a task (FR-TASK-016). A watcher gets
+-- 0047_task_watchers -- Users who follow a task (FR-TASK-014). A watcher gets
 -- comment notifications for the task like its creator and assignee do. One row
 -- per (task, user); the row disappears with the task or the user.
 -- DDL only; RLS lands in 0048 (the DDL/RLS split).
