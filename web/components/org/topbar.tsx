@@ -252,12 +252,12 @@ function NotificationBell({ slug }: { slug: string }) {
       aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
     >
       <Bell
-        key={ring}
+        key={`ring-${ring}`}
         className={cn('h-4 w-4 origin-top group-hover:animate-[bell-swing_0.8s_var(--ease-out-expo)]', ring > 0 && 'animate-[bell-swing_0.8s_var(--ease-out-expo)]')}
       />
       {unread && unread > 0 ? (
         <span
-          key={unread}
+          key={`badge-${unread}`}
           className="absolute right-1 top-1 flex h-4 min-w-4 animate-scale-in items-center justify-center rounded-full bg-signal px-1 font-mono text-[9px] font-semibold text-signal-foreground"
         >
           {unread > 99 ? '99+' : unread}
