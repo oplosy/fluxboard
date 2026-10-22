@@ -18,6 +18,7 @@ import { Comments } from './comments';
 import { TaskLinks } from './links';
 import { TaskRecurrence } from './recurrence';
 import { TaskApprovals } from './approvals';
+import { TaskWatchers } from './watchers';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -180,6 +181,9 @@ export function TaskDetail({
         <ReviewPanel taskId={taskId} projectId={projectId} columnId={task.column_id} canEdit={canEdit} />
         <Field label="Approval">
           <TaskApprovals taskId={taskId} canEdit={canEdit} />
+        </Field>
+        <Field label="Watchers">
+          <TaskWatchers taskId={taskId} />
         </Field>
         <Field label="Assignee">
           {canEdit ? (
