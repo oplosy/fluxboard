@@ -144,7 +144,7 @@ export default function ProjectListPage(props: { params: Promise<{ projectKey: s
                           </Link>
                         </td>
                         <td className="px-3 py-2">
-                          <span className={cn('inline-block max-w-full truncate rounded-full px-2 py-0.5 text-[11px] font-medium', g.tone.pill)}>
+                          <span className={cn('inline-block max-w-full truncate rounded-full px-2 py-0.5 align-middle text-[11px] font-medium', g.tone.pill)}>
                             {g.name}
                           </span>
                         </td>

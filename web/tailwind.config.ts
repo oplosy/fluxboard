@@ -14,6 +14,8 @@ const config: Config = {
       screens: { '2xl': '1280px' },
     },
     extend: {
+      // Tinted pills use /12 (e.g. bg-cobalt/12); the default scale steps by 5.
+      opacity: { 12: '0.12' },
       fontFamily: {
         sans: ['var(--font-inter)', 'Inter', 'system-ui', '-apple-system', 'Segoe UI', 'sans-serif'],
         display: ['var(--font-display)', 'var(--font-inter)', 'system-ui', 'sans-serif'],
