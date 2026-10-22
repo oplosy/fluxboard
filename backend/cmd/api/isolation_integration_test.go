@@ -147,14 +147,14 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	e.bParams = map[string]string{
 		"projectId": e.bIDs["project"], "taskId": e.bIDs["task"], "linkedId": e.bIDs["task2"],
 		"columnId": e.bIDs["column"], "labelId": e.bIDs["label"], "userId": e.bIDs["member"],
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
-		"sprintId": e.bIDs["sprint"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
+		"sprintId": e.bIDs["sprint"], "epicId": e.bIDs["epic"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
 		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"], "approvalId": e.bIDs["approval"],
 	}
@@ -225,6 +225,8 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{b["attachment"], e.orgB, b["task"], owner}},
 		{`INSERT INTO sprints (id, org_id, project_id, name, created_by) VALUES ($1, $2, $3, 'Beta sprint', $4)`,
 			[]any{b["sprint"], e.orgB, b["project"], owner}},
+		{`INSERT INTO epics (id, org_id, project_id, name, created_by) VALUES ($1, $2, $3, 'Beta epic', $4)`,
+			[]any{b["epic"], e.orgB, b["project"], owner}},
 		{`INSERT INTO custom_fields (id, org_id, project_id, name, type, created_by) VALUES ($1, $2, $3, 'Beta field', 'text', $4)`,
 			[]any{b["field"], e.orgB, b["project"], owner}},
 		{`INSERT INTO project_forms (id, org_id, project_id, name, target_column_id, token_hash, created_by)
