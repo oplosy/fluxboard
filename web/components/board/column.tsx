@@ -6,6 +6,7 @@ import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable'
 import { Plus } from 'lucide-react';
 
 import type { BoardColumn, Label, Priority, TaskCard } from '@/lib/api/types';
+import type { Epic } from '@/lib/api/epics';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import type { StatusTone } from '@/lib/board/status';
 import { cn } from '@/lib/utils';
@@ -41,6 +42,7 @@ export function Column({
   members,
   orgId,
   labels,
+  epics,
   onMutated,
   composeSignal,
   flash = false,
@@ -58,6 +60,7 @@ export function Column({
   members: AssigneeOption[];
   orgId: string;
   labels: Label[];
+  epics: Epic[];
   onMutated: () => void;
   composeSignal?: number;
   /** Briefly pulses the column (e.g. a card was just shipped into it). */
@@ -159,6 +162,7 @@ export function Column({
               orgId={orgId}
               members={members}
               labels={labels}
+              epic={t.epic_id ? epics.find((e) => e.id === t.epic_id) : undefined}
               onMutated={onMutated}
             />
           ))}

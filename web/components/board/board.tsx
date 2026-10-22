@@ -316,6 +316,7 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
               members={members}
               orgId={orgId}
               labels={labels ?? []}
+              epics={epics ?? []}
               onMutated={() => queryClient.invalidateQueries({ queryKey: boardKey })}
               composeSignal={i === 0 ? composeSignal : 0}
               flash={flashCol === col.id}
