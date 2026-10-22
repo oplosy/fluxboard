@@ -115,6 +115,10 @@ PATCH  /orgs/{orgId}/tasks/{taskId}/position         {column_id, rank, version?}
                                                      → 403 human_approval_required (agent → done column)
 POST   /orgs/{orgId}/tasks/{taskId}/review           {decision: approve|changes, comment?} (people only; comment required for changes)
 PUT    /orgs/{orgId}/projects/{projectId}/columns/{columnId}/role  {role: backlog|todo|in_progress|review|done|""} (LEAD)
+GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progress {total, done} (VIEWER; FR-PROJ-008)
+POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #rrggbb} (LEAD)
+PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
+POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
 POST   /orgs/{orgId}/tasks/bulk                      {task_ids[], op: move|assign|label, ...}
 DELETE /orgs/{orgId}/tasks/{taskId}                  → trash
 POST   /orgs/{orgId}/tasks/{taskId}/restore

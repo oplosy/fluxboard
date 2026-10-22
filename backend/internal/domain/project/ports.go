@@ -267,6 +267,21 @@ type TaskLinkRepository interface {
 	Blocked(ctx context.Context, orgID, taskID string) ([]TaskLink, error)
 }
 
+// EpicRepository persists project epics and task assignment (FR-PROJ-008).
+type EpicRepository interface {
+	Create(ctx context.Context, orgID string, e *Epic) error
+	Get(ctx context.Context, orgID, id string) (*Epic, error)
+	// ListByProject returns a project's epics oldest-first (Total/Done unset).
+	ListByProject(ctx context.Context, orgID, projectID string) ([]Epic, error)
+	// Update writes name and color. ErrNotFound if absent.
+	Update(ctx context.Context, orgID string, e *Epic) error
+	// Delete removes an epic; its tasks keep living with epic_id NULL.
+	Delete(ctx context.Context, orgID, id string) error
+	// SetTaskEpic assigns (nil clears) a live task's epic. ErrNotFound if the
+	// task is absent.
+	SetTaskEpic(ctx context.Context, orgID, taskID string, epicID *string) error
+}
+
 // WatcherRepository persists task watchers (FR-TASK-014).
 type WatcherRepository interface {
 	// Add makes userID watch taskID (idempotent).

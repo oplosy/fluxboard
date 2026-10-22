@@ -248,6 +248,7 @@ export interface TaskCard {
   subtask_total: number;
   subtask_done: number;
   sprint_id?: string | null;
+  epic_id?: string | null;
   created_at: string;
   rank: string;
   /** Increases on every content change; send it back to refuse stale writes. */
@@ -484,6 +485,7 @@ export interface Task {
   priority: string;
   start_date?: string;
   due_date?: string;
+  epic_id?: string | null;
   rank: string;
   created_by: string;
   created_at: string;

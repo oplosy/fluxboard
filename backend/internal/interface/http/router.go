@@ -278,6 +278,12 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Post("/sprints/{sprintId}/complete", d.Projects.CompleteSprint)
 					p.With(read(tenant.ObjOrg)).Delete("/sprints/{sprintId}", d.Projects.DeleteSprint)
 					p.With(read(tenant.ObjOrg)).Post("/sprints/assign", d.Projects.AssignSprint)
+					// Epics (docs/08, FR-PROJ-008). Fine-grained gates in projectuc.
+					p.With(read(tenant.ObjOrg)).Get("/epics", d.Projects.ListEpics)
+					p.With(read(tenant.ObjOrg)).Post("/epics", d.Projects.CreateEpic)
+					p.With(read(tenant.ObjOrg)).Post("/epics/assign", d.Projects.AssignEpic)
+					p.With(read(tenant.ObjOrg)).Patch("/epics/{epicId}", d.Projects.UpdateEpic)
+					p.With(read(tenant.ObjOrg)).Delete("/epics/{epicId}", d.Projects.DeleteEpic)
 					// Custom fields (docs/08, FR-FIELDS). Fine-grained gates in projectuc.
 					p.With(read(tenant.ObjOrg)).Get("/fields", d.Projects.ListFields)
 					p.With(read(tenant.ObjOrg)).Post("/fields", d.Projects.CreateField)

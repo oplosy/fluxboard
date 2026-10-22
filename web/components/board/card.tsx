@@ -3,10 +3,11 @@
 import Link from 'next/link';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { Bot, CalendarDays, MessageSquare, MoreHorizontal } from 'lucide-react';
+import { Bot, CalendarDays, Layers, MessageSquare, MoreHorizontal } from 'lucide-react';
 import { useState, type MouseEvent as ReactMouseEvent, type SyntheticEvent } from 'react';
 
 import type { Label, Priority, Task, TaskCard } from '@/lib/api/types';
+import type { Epic } from '@/lib/api/epics';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
 import { attachLabel, conflictCurrent, detachLabel, getTask, updateTask } from '@/lib/api/tasks';
 import { claimLive } from '@/lib/org/use-agents';
@@ -63,6 +64,7 @@ export function Card({
   orgId,
   members,
   labels,
+  epic,
   onMutated,
   index = 0,
   projectKey,
@@ -78,6 +80,8 @@ export function Card({
   orgId: string;
   members: { user_id: string; name: string }[];
   labels: Label[];
+  /** The card's epic, when it has one (FR-PROJ-008). */
+  epic?: Epic;
   onMutated: () => void;
   /** Position in the column — staggers the first-paint entrance. */
   index?: number;
@@ -140,8 +144,9 @@ export function Card({
               <QuickMenu task={task} orgId={orgId} members={members} labels={labels} onMutated={onMutated} />
             ) : null}
           </div>
-          {task.labels.length > 0 ? (
+          {task.labels.length > 0 || epic ? (
             <div className="mt-2 flex flex-wrap gap-1">
+              {epic ? <EpicChip epic={epic} /> : null}
               {task.labels.slice(0, 3).map((l) => (
                 <span
                   key={l.id}
@@ -394,5 +399,23 @@ function QuickMenu({
         </>
       ) : null}
     </div>
+  );
+}
+
+/** Jira-style epic lozenge: the epic's colour as a tint behind its name. */
+export function EpicChip({ epic }: { epic: Pick<Epic, 'name' | 'color'> }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex items-center gap-1 rounded-sm px-1.5 py-[1px] text-[10.5px] font-medium text-foreground',
+        !epic.color && 'bg-secondary',
+      )}
+      // #rrggbb + "1f" alpha ≈ 12% tint.
+      style={epic.color ? { backgroundColor: `${epic.color}1f` } : undefined}
+      title={`Epic: ${epic.name}`}
+    >
+      <Layers className="h-3 w-3 shrink-0" style={epic.color ? { color: epic.color } : undefined} aria-hidden />
+      <span className="max-w-28 truncate">{epic.name}</span>
+    </span>
   );
 }

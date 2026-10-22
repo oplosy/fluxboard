@@ -1,10 +1,11 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, CheckSquare, ChevronDown, Search, User, Users, X, Zap } from 'lucide-react';
+import { Check, CheckSquare, ChevronDown, Layers, Search, User, Users, X, Zap } from 'lucide-react';
 
 import type { BoardColumn, Label, Priority } from '@/lib/api/types';
 import type { Sprint } from '@/lib/api/sprints';
+import type { Epic } from '@/lib/api/epics';
 import { PRIORITIES, priorityLabel, priorityLevel } from '@/lib/board/priority';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -15,9 +16,10 @@ export interface BoardFilter {
   priority: Priority | '';
   assignee: 'any' | 'me' | 'unassigned';
   sprint: '' | 'backlog' | string;
+  epic: '' | 'none' | string;
 }
 
-export const EMPTY_FILTER: BoardFilter = { text: '', priority: '', assignee: 'any', sprint: '' };
+export const EMPTY_FILTER: BoardFilter = { text: '', priority: '', assignee: 'any', sprint: '', epic: '' };
 
 interface PillOption {
   value: string;
@@ -120,7 +122,7 @@ function FilterPill({
   );
 }
 
-// Board toolbar: client-side filters (text / priority / assignee / sprint — the
+// Board toolbar: client-side filters (text / priority / assignee / sprint / epic — the
 // board projection carries no labels, so label is not a filter, ADR-017) plus
 // the multi-select mode toggle and, when a selection exists, the bulk action bar.
 export function BoardToolbar({
@@ -132,6 +134,7 @@ export function BoardToolbar({
   columns,
   labels,
   sprints,
+  epics,
   bulkPending,
   onBulkMove,
   onBulkAssignMe,
@@ -147,6 +150,7 @@ export function BoardToolbar({
   columns: BoardColumn[];
   labels: Label[];
   sprints: Sprint[];
+  epics: Epic[];
   bulkPending: boolean;
   onBulkMove: (columnId: string) => void;
   onBulkAssignMe: () => void;
@@ -158,7 +162,8 @@ export function BoardToolbar({
     (filter.text.trim() ? 1 : 0) +
     (filter.priority ? 1 : 0) +
     (filter.assignee !== 'any' ? 1 : 0) +
-    (filter.sprint ? 1 : 0);
+    (filter.sprint ? 1 : 0) +
+    (filter.epic ? 1 : 0);
 
   return (
     <div className="mb-4 space-y-3">
@@ -236,6 +241,18 @@ export function BoardToolbar({
             { value: '', label: 'All sprints' },
             { value: 'backlog', label: 'Backlog' },
             ...sprints.map((s) => ({ value: s.id, label: s.name })),
+          ]}
+        />
+        <FilterPill
+          label="Epic"
+          icon={<Layers />}
+          value={filter.epic}
+          defaultValue=""
+          onChange={(v) => onFilter({ ...filter, epic: v })}
+          options={[
+            { value: '', label: 'All epics' },
+            { value: 'none', label: 'No epic' },
+            ...epics.map((e) => ({ value: e.id, label: e.name })),
           ]}
         />
 

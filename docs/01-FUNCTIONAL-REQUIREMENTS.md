@@ -52,6 +52,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-PROJ-005 | M | Kanban board: drag-and-drop tasks within/between columns. Ordering uses **lexicographic rank keys** (LexoRank-style) so a move touches exactly one row. Optimistic UI with rollback on 409. |
 | FR-PROJ-006 | M | Project archive (read-only, excluded from default lists) and unarchive. |
 | FR-PROJ-007 | S | Project templates: create a project from a predefined column/label set. |
+| FR-PROJ-008 | S | Epics: a project LEAD creates, renames and deletes epics (name + optional color) in a project; deleting an epic keeps its tasks. A CONTRIBUTOR+ assigns tasks of the same project to one epic or clears it. Every VIEWER+ sees each epic with its progress (tasks in the done column / all its tasks), the epic on board cards and task detail, and can filter the board by epic. |
 
 ## TASK — Tasks, Subtasks, Comments, Attachments
 

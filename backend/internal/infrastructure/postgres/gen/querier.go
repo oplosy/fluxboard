@@ -99,6 +99,8 @@ type Querier interface {
 	CreateComment(ctx context.Context, arg CreateCommentParams) error
 	// Custom fields ([T], tenant-scoped, FR-FIELDS) ----------------------------
 	CreateCustomField(ctx context.Context, arg CreateCustomFieldParams) error
+	// Epics ([T], tenant-scoped, FR-PROJ-008) ----------------------------------
+	CreateEpic(ctx context.Context, arg CreateEpicParams) error
 	// Invitations ([T], tenant-scoped) ------------------------------------------
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) error
 	// Labels + task attachments ([T], tenant-scoped, FR-TASK-004) ---------------
@@ -142,6 +144,7 @@ type Querier interface {
 	DeleteAutomationRule(ctx context.Context, arg DeleteAutomationRuleParams) (int64, error)
 	DeleteColumn(ctx context.Context, arg DeleteColumnParams) (int64, error)
 	DeleteCustomField(ctx context.Context, arg DeleteCustomFieldParams) (int64, error)
+	DeleteEpic(ctx context.Context, arg DeleteEpicParams) (int64, error)
 	// The FK cascade on task_labels detaches this label from every task.
 	DeleteLabel(ctx context.Context, arg DeleteLabelParams) (int64, error)
 	DeleteMembership(ctx context.Context, arg DeleteMembershipParams) (int64, error)
@@ -183,6 +186,7 @@ type Querier interface {
 	GetColumn(ctx context.Context, arg GetColumnParams) (BoardColumn, error)
 	GetComment(ctx context.Context, arg GetCommentParams) (Comment, error)
 	GetCustomField(ctx context.Context, arg GetCustomFieldParams) (CustomField, error)
+	GetEpic(ctx context.Context, arg GetEpicParams) (Epic, error)
 	GetIntakeRequest(ctx context.Context, arg GetIntakeRequestParams) (GetIntakeRequestRow, error)
 	GetInvitation(ctx context.Context, arg GetInvitationParams) (Invitation, error)
 	GetInvitationByEmail(ctx context.Context, arg GetInvitationByEmailParams) (Invitation, error)
@@ -280,6 +284,7 @@ type Querier interface {
 	ListCommentsByTask(ctx context.Context, arg ListCommentsByTaskParams) ([]Comment, error)
 	ListCustomFieldsByProject(ctx context.Context, arg ListCustomFieldsByProjectParams) ([]CustomField, error)
 	ListEnabledAutomationRules(ctx context.Context, arg ListEnabledAutomationRulesParams) ([]AutomationRule, error)
+	ListEpicsByProject(ctx context.Context, arg ListEpicsByProjectParams) ([]Epic, error)
 	// Feature flags — Phase 6 (FR-ADM-006). feature_flags is [T] (RLS via TenantPool).
 	ListFeatureFlags(ctx context.Context, orgID uuid.UUID) ([]FeatureFlag, error)
 	// Requests owing the submitter an acknowledgment, or an outcome mail once
@@ -424,6 +429,7 @@ type Querier interface {
 	SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error)
 	SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)
+	SetTaskEpic(ctx context.Context, arg SetTaskEpicParams) (int64, error)
 	SetTaskSprint(ctx context.Context, arg SetTaskSprintParams) (int64, error)
 	// Sets (or clears, via empty secret) the encrypted TOTP secret and its enabled
 	// flag together (docs/04-AUTH.md §4 TOTP step).
@@ -448,6 +454,7 @@ type Querier interface {
 	UpdateColumn(ctx context.Context, arg UpdateColumnParams) (int64, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (int64, error)
 	UpdateCustomField(ctx context.Context, arg UpdateCustomFieldParams) (int64, error)
+	UpdateEpic(ctx context.Context, arg UpdateEpicParams) (int64, error)
 	UpdateInvitationToken(ctx context.Context, arg UpdateInvitationTokenParams) (int64, error)
 	UpdateLabel(ctx context.Context, arg UpdateLabelParams) (int64, error)
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (int64, error)

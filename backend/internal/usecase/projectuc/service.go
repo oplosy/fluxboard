@@ -34,6 +34,7 @@ type Deps struct {
 	Columns    project.ColumnRepository
 	Tasks      project.TaskRepository
 	Sprints    project.SprintRepository      // sprints; nil ⇒ sprint endpoints disabled
+	Epics      project.EpicRepository        // epics; nil ⇒ epic endpoints disabled
 	Fields     project.CustomFieldRepository // custom fields; nil ⇒ field endpoints disabled
 	Forms      project.FormRepository        // intake forms; nil ⇒ form endpoints disabled
 	Intake     project.IntakeRepository      // request inbox; nil ⇒ public submit + inbox disabled
@@ -71,6 +72,7 @@ type Service struct {
 	columns    project.ColumnRepository
 	tasks      project.TaskRepository
 	sprints    project.SprintRepository
+	epics      project.EpicRepository
 	fields     project.CustomFieldRepository
 	forms      project.FormRepository
 	intake     project.IntakeRepository
@@ -103,7 +105,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		projects: d.Projects, members: d.Members, boards: d.Boards,
-		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, fields: d.Fields, forms: d.Forms, intake: d.Intake, audit: d.Audit, intakeMail: d.IntakeMail, labels: d.Labels, subtasks: d.Subtasks,
+		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, epics: d.Epics, fields: d.Fields, forms: d.Forms, intake: d.Intake, audit: d.Audit, intakeMail: d.IntakeMail, labels: d.Labels, subtasks: d.Subtasks,
 		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, agents: d.Agents, commenter: d.Commenter, seeder: d.Seeder, idem: d.Idem, logger: logger, now: now,
 	}
 }
