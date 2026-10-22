@@ -30,7 +30,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR |
 |---|---|---|---|---|---|
-| R-01 | Epics / task hierarchy | in progress | FR-PROJ-008 | `feat/epics` | |
+| R-01 | Epics / task hierarchy | done | FR-PROJ-008 | `feat/epics` | oplosy/fluxboard#82 |
 | R-02 | Story points / estimates | todo | | | |
 
 - **R-01 Epics / task hierarchy.** A task can have a parent (epic). Today
@@ -116,3 +116,4 @@ Ideas not yet placed in a wave.
 |---|---|---|
 | Task watchers | FR-TASK-014 | oplosy/fluxboard#78 |
 | Canvas redesign (board, list, task detail, shell) | — | oplosy/fluxboard#79 |
+| Epics (R-01) | FR-PROJ-008 | oplosy/fluxboard#82 |
