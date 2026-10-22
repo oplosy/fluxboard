@@ -298,6 +298,7 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
               key={col.id}
               column={col}
               tasks={visible(col.tasks)}
+              projectKey={projectKey}
               cardHref={cardHref}
               selectMode={selectMode}
               selectedIds={selectedIds}
@@ -359,12 +360,14 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
 
         <DragOverlay dropAnimation={{ duration: 320, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
           {activeTask ? (
-            <div className="w-[256px] origin-center animate-[card-lift_0.25s_var(--ease-out-expo)_forwards] cursor-grabbing rounded-md border border-foreground/40 bg-card p-3 text-sm shadow-[0_30px_60px_-20px_hsl(var(--ink)/0.5)]">
-              <div className="mb-1.5 flex items-center gap-2">
-                <span className="font-mono text-[10.5px] text-muted-foreground">#{activeTask.number}</span>
+            <div className="w-[256px] origin-center animate-[card-lift_0.25s_var(--ease-out-expo)_forwards] cursor-grabbing rounded-md border border-foreground/30 bg-card px-3 py-2.5 text-sm shadow-[0_24px_48px_-20px_hsl(var(--ink)/0.5)]">
+              <p className="line-clamp-3 leading-snug">{activeTask.title}</p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <span className="font-mono text-[11px] font-medium text-muted-foreground">
+                  {projectKey}-{activeTask.number}
+                </span>
                 <PriorityBars priority={activeTask.priority} />
               </div>
-              <p className="line-clamp-3 font-medium leading-snug">{activeTask.title}</p>
             </div>
           ) : null}
         </DragOverlay>
