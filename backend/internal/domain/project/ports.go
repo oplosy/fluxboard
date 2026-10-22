@@ -267,6 +267,16 @@ type TaskLinkRepository interface {
 	Blocked(ctx context.Context, orgID, taskID string) ([]TaskLink, error)
 }
 
+// WatcherRepository persists task watchers (FR-TASK-014).
+type WatcherRepository interface {
+	// Add makes userID watch taskID (idempotent).
+	Add(ctx context.Context, orgID, taskID, userID string) error
+	// Remove stops userID watching taskID (idempotent).
+	Remove(ctx context.Context, orgID, taskID, userID string) error
+	// ListByTask returns a task's watchers, oldest first.
+	ListByTask(ctx context.Context, orgID, taskID string) ([]Watcher, error)
+}
+
 // FormRepository persists project intake forms (ADR-023).
 type FormRepository interface {
 	Create(ctx context.Context, orgID string, f *ProjectForm) error

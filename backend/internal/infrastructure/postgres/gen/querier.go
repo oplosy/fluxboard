@@ -17,6 +17,8 @@ type Querier interface {
 	AcceptIntakeRequest(ctx context.Context, arg AcceptIntakeRequestParams) (int64, error)
 	// Project members ([T], tenant-scoped, FR-PROJ-003) ------------------------
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
+	// Task watchers ([T], tenant-scoped, FR-TASK-014) ------------------------------
+	AddTaskWatcher(ctx context.Context, arg AddTaskWatcherParams) error
 	AdvanceRecurrence(ctx context.Context, arg AdvanceRecurrenceParams) error
 	// Task activity log ([T], tenant-scoped, FR-TASK-002) -----------------------
 	AppendActivity(ctx context.Context, arg AppendActivityParams) error
@@ -150,6 +152,7 @@ type Querier interface {
 	DeleteTaskCustomValue(ctx context.Context, arg DeleteTaskCustomValueParams) (int64, error)
 	DeleteTaskLink(ctx context.Context, arg DeleteTaskLinkParams) (int64, error)
 	DeleteTaskRecurrence(ctx context.Context, arg DeleteTaskRecurrenceParams) (int64, error)
+	DeleteTaskWatcher(ctx context.Context, arg DeleteTaskWatcherParams) error
 	DeleteTimeEntry(ctx context.Context, arg DeleteTimeEntryParams) (int64, error)
 	// Hard-deletes the account (docs/08 §3 DELETE /me). Memberships/sessions cascade
 	// via ON DELETE CASCADE. Callers MUST enforce the sole-owner guard first.
@@ -336,6 +339,7 @@ type Querier interface {
 	ListTaskBlocked(ctx context.Context, arg ListTaskBlockedParams) ([]ListTaskBlockedRow, error)
 	ListTaskBlockers(ctx context.Context, arg ListTaskBlockersParams) ([]ListTaskBlockersRow, error)
 	ListTaskCustomValues(ctx context.Context, arg ListTaskCustomValuesParams) ([]ListTaskCustomValuesRow, error)
+	ListTaskWatchers(ctx context.Context, arg ListTaskWatchersParams) ([]ListTaskWatchersRow, error)
 	ListTasksByColumn(ctx context.Context, arg ListTasksByColumnParams) ([]ListTasksByColumnRow, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]ListTasksByProjectRow, error)
 	// Open, live tasks due in [from_at, to_at) that the rule has not yet fired on.

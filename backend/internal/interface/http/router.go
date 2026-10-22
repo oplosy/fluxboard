@@ -336,6 +336,10 @@ func NewRouter(d Deps) http.Handler {
 					t.With(read(tenant.ObjOrg)).Get("/links", d.Tasks.ListTaskLinks)
 					t.With(read(tenant.ObjOrg)).Post("/links", d.Tasks.AddTaskLink)
 					t.With(read(tenant.ObjOrg)).Delete("/links/{linkedId}", d.Tasks.RemoveTaskLink)
+					// Watchers (docs/08, FR-TASK-014). Self-only; gates in taskuc.
+					t.With(read(tenant.ObjOrg)).Get("/watchers", d.Tasks.ListTaskWatchers)
+					t.With(read(tenant.ObjOrg)).Put("/watchers/me", d.Tasks.WatchTask)
+					t.With(read(tenant.ObjOrg)).Delete("/watchers/me", d.Tasks.UnwatchTask)
 					// Recurring tasks (research report P1). Fine-grained gates in taskuc.
 					t.With(read(tenant.ObjOrg)).Get("/recurrence", d.Tasks.GetTaskRecurrence)
 					t.With(read(tenant.ObjOrg)).Put("/recurrence", d.Tasks.SetTaskRecurrence)

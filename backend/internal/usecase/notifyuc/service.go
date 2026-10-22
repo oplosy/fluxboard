@@ -257,7 +257,7 @@ func commentCopy(cat notify.Category, _ string) (title, body string) {
 	if cat == notify.CategoryMention {
 		return "You were mentioned in a comment", "Someone mentioned you in a task comment."
 	}
-	return "New comment on a task you follow", "There is a new comment on a task you created or are assigned to."
+	return "New comment on a task you follow", "There is a new comment on a task you created, are assigned to or watch."
 }
 
 // NotifyAssigned notifies a task's new assignee (skips self-assignment).

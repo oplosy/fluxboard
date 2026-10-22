@@ -70,6 +70,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-TASK-011 | C | Recurring tasks. |
 | FR-TASK-012 | S | CSV task import (Excel/Sheets/Trello): upload → column mapping preview (title, description, status/column, assignee by email, due date, priority, labels) with per-row errors → import through the normal create path (numbering, ranks, events, automation). CONTRIBUTOR+. `Idempotency-Key` required; task ids derive from (org, project, key, payload hash, row), so a retry never duplicates rows. ≤ 1000 rows. |
 | FR-TASK-013 | S | Project export: tasks as CSV (re-importable, formula-safe) and JSON with comments, labels and attachment metadata. VIEWER+ via the project-access policy. |
+| FR-TASK-014 | S | Task watchers: any project VIEWER+ can watch or unwatch a task for themselves and see who watches it. Watchers receive comment notifications (category `comment`) like the task creator and assignee; the commenter never notifies themselves. |
 
 ## BILL — Billing & Payments (full spec: 06-BILLING.md)
 

@@ -123,6 +123,7 @@ GET    /orgs/{orgId}/trash                            POST /orgs/{orgId}/trash/{
 GET/POST /orgs/{orgId}/tasks/{taskId}/subtasks       PATCH/DELETE .../subtasks/{id}
 GET/POST /orgs/{orgId}/tasks/{taskId}/comments       PATCH/DELETE .../comments/{id}
 GET      /orgs/{orgId}/tasks/{taskId}/activity       paginated
+GET      /orgs/{orgId}/tasks/{taskId}/watchers       PUT/DELETE .../watchers/me (self only, VIEWER+; FR-TASK-014)
 
 POST   /orgs/{orgId}/tasks/{taskId}/relations        {blocked_id} → 422 cycle_detected + path
 DELETE /orgs/{orgId}/tasks/{taskId}/relations/{blockedId}

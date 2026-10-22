@@ -554,6 +554,13 @@ type TaskRecurrence struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
+type TaskWatcher struct {
+	TaskID    uuid.UUID `json:"task_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type TimeEntry struct {
 	ID        uuid.UUID          `json:"id"`
 	OrgID     uuid.UUID          `json:"org_id"`
