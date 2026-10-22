@@ -122,7 +122,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
       <nav
         ref={navRef}
-        className={cn('relative flex flex-1 flex-col px-3 py-4', collapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden')}
+        className={cn('relative flex flex-1 flex-col px-3 py-3', collapsed ? 'overflow-visible' : 'overflow-y-auto overflow-x-hidden')}
       >
         {/* Sliding highlight */}
         <span
@@ -154,7 +154,7 @@ export function Sidebar({ collapsed, onToggle }: { collapsed: boolean; onToggle:
 
         {admin.length > 0 ? (
           <>
-            <SectionLabel collapsed={collapsed} className="mt-6">
+            <SectionLabel collapsed={collapsed} className="mt-5">
               Administration
             </SectionLabel>
             {admin.map((it, i) => (
@@ -222,7 +222,7 @@ const NavLink = function NavLink({
       href={item.href}
       aria-current={active ? 'page' : undefined}
       className={cn(
-        'group relative z-[1] flex h-9 items-center gap-3 rounded-md px-3 text-[13.5px] transition-colors duration-200',
+        'group relative z-[1] flex h-8 items-center gap-2.5 rounded-md px-2.5 text-[13px] transition-colors duration-200',
         'animate-[slide-in-left_0.5s_var(--ease-out-expo)_backwards]',
         active ? 'font-medium text-sidebar-foreground' : 'text-sidebar-foreground/60 hover:text-sidebar-foreground',
         collapsed && 'justify-center px-0',
