@@ -161,7 +161,7 @@ export function BoardToolbar({
     (filter.sprint ? 1 : 0);
 
   return (
-    <div className="mb-5 space-y-3">
+    <div className="mb-4 space-y-3">
       <div className="flex flex-wrap items-center gap-2">
         <div className="group relative w-full sm:w-64">
           <Search
