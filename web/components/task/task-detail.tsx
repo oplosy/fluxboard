@@ -197,18 +197,12 @@ export function TaskDetail({
       </div>
 
       {/* Meta sidebar */}
-      <aside className="space-y-4">
+      <aside className="space-y-4 lg:mt-9">
         <ReviewPanel taskId={taskId} projectId={projectId} columnId={task.column_id} canEdit={canEdit} />
         {/* Jira-style details panel: label | value rows. */}
         <div className="rounded-lg border border-border bg-card">
           <p className="border-b border-border px-4 py-2.5 text-[13px] font-semibold">Details</p>
           <div className="space-y-3 p-4">
-            <Field label="Approval">
-              <TaskApprovals taskId={taskId} canEdit={canEdit} />
-            </Field>
-            <Field label="Watchers">
-              <TaskWatchers taskId={taskId} />
-            </Field>
             <Field label="Assignee">
               {canEdit ? (
                 <Select
@@ -286,10 +280,6 @@ export function TaskDetail({
               )}
             </Field>
 
-            <Field label="Repeat">
-              <TaskRecurrence taskId={taskId} canEdit={canEdit} />
-            </Field>
-
             <Field label="Labels">
               <div className="flex flex-wrap gap-1.5">
                 {attached.map((l) => (
@@ -312,18 +302,27 @@ export function TaskDetail({
                   </span>
                 ))}
                 {attached.length === 0 ? <span className="text-sm text-muted-foreground">None</span> : null}
-          </div>
-          {canEdit && available.length > 0 ? (
-            <Select
-              className="mt-1.5"
-              aria-label="Add label"
-              value=""
-              placeholder="Add label…"
-              onValueChange={(v) => v && attach.mutate(v)}
-              options={available.map((l) => ({ value: l.id, label: l.name }))}
-            />
-          ) : null}
-        </Field>
+              </div>
+              {canEdit && available.length > 0 ? (
+                <Select
+                  className="mt-1.5"
+                  aria-label="Add label"
+                  value=""
+                  placeholder="Add label…"
+                  onValueChange={(v) => v && attach.mutate(v)}
+                  options={available.map((l) => ({ value: l.id, label: l.name }))}
+                />
+              ) : null}
+            </Field>
+            <Field label="Repeat">
+              <TaskRecurrence taskId={taskId} canEdit={canEdit} />
+            </Field>
+            <Field label="Watchers">
+              <TaskWatchers taskId={taskId} />
+            </Field>
+            <Field label="Approval">
+              <TaskApprovals taskId={taskId} canEdit={canEdit} />
+            </Field>
           </div>
         </div>
 
