@@ -21,6 +21,7 @@ import { getBoard, bulkTasks, createColumn, createTask, moveTask } from '@/lib/a
 import { listLabels } from '@/lib/api/labels';
 import { listOrgMembers } from '@/lib/api/orgs';
 import { listSprints } from '@/lib/api/sprints';
+import { listEpics } from '@/lib/api/epics';
 import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
 import { useOrgAgents } from '@/lib/org/use-agents';
@@ -76,6 +77,10 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
   const { data: sprints } = useQuery({
     queryKey: ['sprints', projectId],
     queryFn: () => listSprints(orgId, projectId),
+  });
+  const { data: epics } = useQuery({
+    queryKey: ['epics', projectId],
+    queryFn: () => listEpics(orgId, projectId),
   });
   const { data: membersPage } = useQuery({
     queryKey: ['members', orgId],
@@ -189,6 +194,8 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
       if (filter.assignee === 'unassigned' && t.assignee_id) return false;
       if (filter.sprint === 'backlog' && t.sprint_id) return false;
       if (filter.sprint !== '' && filter.sprint !== 'backlog' && t.sprint_id !== filter.sprint) return false;
+      if (filter.epic === 'none' && t.epic_id) return false;
+      if (filter.epic !== '' && filter.epic !== 'none' && t.epic_id !== filter.epic) return false;
       return true;
     });
   }
@@ -274,6 +281,7 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
         columns={board.columns}
         labels={labels ?? []}
         sprints={sprints ?? []}
+        epics={epics ?? []}
         bulkPending={bulkMutation.isPending}
         onBulkMove={(columnId) => bulkMutation.mutate({ action: 'move', task_ids: [...selectedIds], column_id: columnId })}
         onBulkAssignMe={() =>
