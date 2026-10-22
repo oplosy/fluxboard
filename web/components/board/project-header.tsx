@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Archive } from 'lucide-react';
 
@@ -32,14 +31,6 @@ export function ProjectHeader({ project }: { project: Project }) {
 
   return (
     <header className="mb-4">
-      {/* Jira-style breadcrumb above a compact title. */}
-      <nav aria-label="Breadcrumb" className="mb-1 flex h-5 items-center gap-1.5 text-xs text-muted-foreground">
-        <Link href={`/app/${slug}/projects`} className="hover:text-foreground hover:underline">
-          Projects
-        </Link>
-        <span aria-hidden>/</span>
-        <span className="truncate">{project.name}</span>
-      </nav>
       <div className="flex min-h-8 flex-wrap items-center gap-x-2.5 gap-y-1">
         <span
           className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-semibold text-white"
