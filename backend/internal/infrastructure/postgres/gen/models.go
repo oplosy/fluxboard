@@ -175,6 +175,16 @@ type EntitlementOverride struct {
 	CreatedAt time.Time   `json:"created_at"`
 }
 
+type Epic struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+	Name      string    `json:"name"`
+	Color     string    `json:"color"`
+	CreatedBy uuid.UUID `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type FeatureFlag struct {
 	OrgID   uuid.UUID `json:"org_id"`
 	Flag    string    `json:"flag"`
@@ -478,6 +488,7 @@ type Task struct {
 	CompletedAt    pgtype.Timestamptz `json:"completed_at"`
 	RecurrenceID   pgtype.UUID        `json:"recurrence_id"`
 	OccurrenceOn   pgtype.Date        `json:"occurrence_on"`
+	EpicID         pgtype.UUID        `json:"epic_id"`
 }
 
 type TaskActivity struct {
