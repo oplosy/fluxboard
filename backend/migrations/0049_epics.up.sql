@@ -1,4 +1,4 @@
--- 0049_epics -- Epics (FR-PROJ-012, roadmap R-01). An epic groups related
+-- 0049_epics -- Epics (FR-PROJ-008, roadmap R-01). An epic groups related
 -- tasks of one project; tasks join via tasks.epic_id (nullable: no epic).
 -- Progress (done / total) is derived from the tasks, never stored.
 -- DDL only; RLS lands in 0050 (the DDL/RLS split).
