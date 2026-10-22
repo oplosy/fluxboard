@@ -480,8 +480,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Store: objectStore, Entitlements: billingSvc, TimeEntries: timeEntryRepo, Links: linkRepo,
 		Events: eventBus, Notifier: notifySvc, Automation: automationSvc, Concurrency: taskRepo,
 		Agents: agentLookup, Recurrences: postgres.NewRecurrenceRepo(tenantPool), Approvals: postgres.NewApprovalRepo(tenantPool),
-		Watchers: postgres.NewTaskWatcherRepo(tenantPool),
-		Audit: auditRepo, People: membershipRepo, Logger: logger,
+		Watchers: postgres.NewTaskWatcherRepo(tenantPool), Audit: auditRepo, People: membershipRepo, Logger: logger,
 	})
 	automationSvc.SetActions(taskSvc) // actions take the normal task write path (ADR-036)
 	projectSvc := projectuc.New(projectuc.Deps{
