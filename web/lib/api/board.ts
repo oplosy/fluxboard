@@ -20,6 +20,7 @@ export async function getBoard(orgId: string, projectId: string): Promise<Board>
         subtask_total: t.subtask_total ?? 0,
         subtask_done: t.subtask_done ?? 0,
         sprint_id: t.sprint_id ?? null,
+        epic_id: t.epic_id ?? null,
       })),
     })),
   };
