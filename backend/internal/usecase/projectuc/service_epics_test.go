@@ -49,6 +49,12 @@ func (f *fakeEpics) ListByProject(_ context.Context, _, projectID string) ([]pro
 	return out, nil
 }
 
+func (f *fakeEpics) Update(_ context.Context, _ string, e *project.Epic) error {
+	cp := *e
+	f.epics[e.ID] = &cp
+	return nil
+}
+
 func (f *fakeEpics) SetTaskEpic(_ context.Context, _, taskID string, epicID *string) error {
 	f.set[taskID] = epicID
 	return nil
@@ -147,4 +153,16 @@ func TestAssignEpic(t *testing.T) {
 			t.Fatal("want an access error")
 		}
 	})
+}
+
+func TestUpdateEpic_KeepsProgress(t *testing.T) {
+	eid := "e1"
+	s := epicTestService(project.RoleLead, newFakeEpics(&project.Epic{ID: eid, ProjectID: "p1", Name: "Old"}),
+		&project.Task{ID: "t-done", ProjectID: "p1", ColumnID: "c2", EpicID: &eid},
+		&project.Task{ID: "t-open", ProjectID: "p1", ColumnID: "c1", EpicID: &eid},
+	)
+	e, err := s.UpdateEpic(context.Background(), "o", "u", "p1", eid, "New", "", tenant.RoleMember)
+	if err != nil || e.Name != "New" || e.Total != 2 || e.Done != 1 {
+		t.Fatalf("UpdateEpic = %+v, %v", e, err)
+	}
 }

@@ -40,12 +40,23 @@ func (s *Service) ListEpics(ctx context.Context, orgID, userID, projectID string
 		return nil, err
 	}
 	epics, err := s.epics.ListByProject(ctx, orgID, projectID)
-	if err != nil || len(epics) == 0 {
-		return epics, err
+	if err != nil {
+		return nil, err
+	}
+	if err := s.withProgress(ctx, orgID, projectID, epics); err != nil {
+		return nil, err
+	}
+	return epics, nil
+}
+
+// withProgress fills Total/Done on epics of one project from its tasks.
+func (s *Service) withProgress(ctx context.Context, orgID, projectID string, epics []project.Epic) error {
+	if len(epics) == 0 {
+		return nil
 	}
 	tasks, err := s.tasks.ListByProject(ctx, orgID, projectID)
 	if err != nil {
-		return nil, err
+		return err
 	}
 	idx := make(map[string]int, len(epics))
 	for i := range epics {
@@ -64,7 +75,7 @@ func (s *Service) ListEpics(ctx context.Context, orgID, userID, projectID string
 			}
 		}
 	}
-	return epics, nil
+	return nil
 }
 
 // UpdateEpic renames or recolors an epic (LEAD).
@@ -85,7 +96,11 @@ func (s *Service) UpdateEpic(ctx context.Context, orgID, userID, projectID, epic
 	if err := s.epics.Update(ctx, orgID, e); err != nil {
 		return nil, err
 	}
-	return e, nil
+	one := []project.Epic{*e}
+	if err := s.withProgress(ctx, orgID, projectID, one); err != nil {
+		return nil, err
+	}
+	return &one[0], nil
 }
 
 // DeleteEpic removes an epic (LEAD); its tasks stay, without an epic.
