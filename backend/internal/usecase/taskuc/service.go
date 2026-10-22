@@ -542,13 +542,15 @@ func (s *Service) AddComment(ctx context.Context, orgID, userID, taskID, body st
 	s.publish(ctx, orgID, notify.EventCommentCreated, userID, map[string]any{
 		"task_id": taskID, "comment_id": c.ID, "project_id": t.ProjectID,
 	})
-	// Fan out @mentions (project members) + comment targets (task creator +
-	// assignee) to the notification center + email (FR-TASK-005 → FR-NTF-002).
+	// Fan out @mentions (project members) + comment targets (task creator,
+	// assignee, watchers) to the notification center + email (FR-TASK-005 →
+	// FR-NTF-002, FR-TASK-014).
 	if s.notifier != nil {
 		targets := []string{t.CreatedBy}
 		if t.AssigneeID != nil {
 			targets = append(targets, *t.AssigneeID)
 		}
+		targets = append(targets, s.watcherIDs(ctx, orgID, taskID)...)
 		s.notifier.FanOutComment(ctx, orgID, userID, t.ProjectID, taskID, c.ID, body, targets)
 	}
 	return s.comments.Get(ctx, orgID, c.ID)
