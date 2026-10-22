@@ -32,7 +32,7 @@ var (
 // than one row type.
 func taskFrom(
 	id, orgID, projectID, columnID uuid.UUID, number int32, title, description string,
-	assignee pgtype.UUID, priority string, start pgtype.Timestamptz, due pgtype.Timestamptz, sprint pgtype.UUID, rankv string,
+	assignee pgtype.UUID, priority string, start pgtype.Timestamptz, due pgtype.Timestamptz, sprint, epic pgtype.UUID, rankv string,
 	createdBy uuid.UUID, createdAt, updatedAt time.Time,
 ) project.Task {
 	return project.Task{
@@ -40,8 +40,8 @@ func taskFrom(
 		ColumnID: columnID.String(), Number: int(number), Title: title,
 		Description: description, AssigneeID: uuidStrPtr(assignee),
 		Priority: project.Priority(priority), StartDate: tsPtr(start), DueDate: tsPtr(due),
-		SprintID: uuidStrPtr(sprint),
-		Rank:     rankv, CreatedBy: createdBy.String(),
+		SprintID: uuidStrPtr(sprint), EpicID: uuidStrPtr(epic),
+		Rank: rankv, CreatedBy: createdBy.String(),
 		CreatedAt: createdAt, UpdatedAt: updatedAt,
 	}
 }
@@ -115,7 +115,7 @@ func (r *TaskRepo) Get(ctx context.Context, orgID, id string) (*project.Task, er
 			return err
 		}
 		t := withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number, row.Title,
-			row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
+			row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.EpicID, row.Rank,
 			row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt)
 		out = &t
 		return nil
@@ -140,7 +140,7 @@ func (r *TaskRepo) ListByColumn(ctx context.Context, orgID, columnID string) ([]
 		}
 		for _, row := range rows {
 			out = append(out, withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
-				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
+				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.EpicID, row.Rank,
 				row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt))
 		}
 		return nil
@@ -162,7 +162,7 @@ func (r *TaskRepo) ListByProject(ctx context.Context, orgID, projectID string) (
 		}
 		for _, row := range rows {
 			out = append(out, withClaim(taskFrom(row.ID, row.OrgID, row.ProjectID, row.ColumnID, row.Number,
-				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.Rank,
+				row.Title, row.Description, row.AssigneeID, row.Priority, row.StartDate, row.DueDate, row.SprintID, row.EpicID, row.Rank,
 				row.CreatedBy, row.CreatedAt, row.UpdatedAt), row.Version, row.ClaimedBy, row.LeaseExpiresAt))
 		}
 		return nil
@@ -393,8 +393,8 @@ func (r *TaskRepo) GetTrashed(ctx context.Context, orgID, id string) (*project.T
 			ColumnID: row.ColumnID.String(), Number: int(row.Number), Title: row.Title,
 			Description: row.Description, AssigneeID: uuidStrPtr(row.AssigneeID),
 			Priority: project.Priority(row.Priority), StartDate: tsPtr(row.StartDate), DueDate: tsPtr(row.DueDate),
-			SprintID: uuidStrPtr(row.SprintID),
-			Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
+			SprintID: uuidStrPtr(row.SprintID), EpicID: uuidStrPtr(row.EpicID),
+			Rank: row.Rank, CreatedBy: row.CreatedBy.String(),
 			CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 			Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 		}
@@ -422,8 +422,8 @@ func (r *TaskRepo) ListTrashed(ctx context.Context, orgID, projectID string) ([]
 				ColumnID: row.ColumnID.String(), Number: int(row.Number), Title: row.Title,
 				Description: row.Description, AssigneeID: uuidStrPtr(row.AssigneeID),
 				Priority: project.Priority(row.Priority), StartDate: tsPtr(row.StartDate), DueDate: tsPtr(row.DueDate),
-				SprintID: uuidStrPtr(row.SprintID),
-				Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
+				SprintID: uuidStrPtr(row.SprintID), EpicID: uuidStrPtr(row.EpicID),
+				Rank: row.Rank, CreatedBy: row.CreatedBy.String(),
 				CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 				Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 			})
@@ -492,8 +492,8 @@ func (r *TaskRepo) Search(ctx context.Context, orgID string, f project.SearchFil
 				ColumnID: row.ColumnID.String(), Number: int(row.Number), Title: row.Title,
 				Description: row.Description, AssigneeID: uuidStrPtr(row.AssigneeID),
 				Priority: project.Priority(row.Priority), StartDate: tsPtr(row.StartDate), DueDate: tsPtr(row.DueDate),
-				SprintID: uuidStrPtr(row.SprintID),
-				Rank:     row.Rank, CreatedBy: row.CreatedBy.String(),
+				SprintID: uuidStrPtr(row.SprintID), EpicID: uuidStrPtr(row.EpicID),
+				Rank: row.Rank, CreatedBy: row.CreatedBy.String(),
 				CreatedAt: row.CreatedAt, UpdatedAt: row.UpdatedAt,
 				Version: row.Version, ClaimedBy: uuidStrPtr(row.ClaimedBy), LeaseExpiresAt: tsPtr(row.LeaseExpiresAt),
 			})
