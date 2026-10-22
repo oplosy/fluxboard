@@ -83,7 +83,7 @@ export default function ProjectEpicsPage(props: { params: Promise<{ projectKey: 
           Group related tasks under an epic and follow how much of it is done. File a task under an
           epic from its detail panel.
         </p>
-        <Button size="sm" onClick={() => setShowForm((v) => !v)}>
+        <Button size="sm" className="shrink-0" onClick={() => setShowForm((v) => !v)}>
           <Plus className="h-4 w-4" /> New epic
         </Button>
       </div>
