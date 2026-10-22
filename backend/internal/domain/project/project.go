@@ -204,6 +204,7 @@ type Task struct {
 	StartDate   *time.Time
 	DueDate     *time.Time
 	SprintID    *string
+	EpicID      *string // nil = no epic (FR-PROJ-008)
 	Rank        string
 	CreatedBy   string
 	CreatedAt   time.Time
