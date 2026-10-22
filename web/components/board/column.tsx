@@ -31,6 +31,7 @@ export interface AssigneeOption {
 export function Column({
   column,
   tasks,
+  projectKey,
   cardHref,
   selectMode,
   selectedIds,
@@ -47,6 +48,7 @@ export function Column({
 }: {
   column: BoardColumn;
   tasks: TaskCard[];
+  projectKey: string;
   cardHref: (task: TaskCard) => string;
   selectMode: boolean;
   selectedIds: Set<string>;
@@ -149,6 +151,7 @@ export function Column({
               index={i}
               task={t}
               href={cardHref(t)}
+              projectKey={projectKey}
               selectMode={selectMode}
               selected={selectedIds.has(t.id)}
               onToggle={onToggleSelect}
