@@ -17,7 +17,7 @@ export function ProjectFrame({
   children: ReactNode;
 }) {
   return (
-    <div className="px-6 py-6">
+    <div className="px-4 py-5 sm:px-6">
       <ProjectHeader project={project} />
       <div className={cn(narrow && 'max-w-4xl')}>{children}</div>
     </div>

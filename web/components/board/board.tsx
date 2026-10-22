@@ -27,6 +27,7 @@ import { useOrgAgents } from '@/lib/org/use-agents';
 import { ApiError } from '@/lib/api/client';
 import { useToast } from '@/components/ui/toast';
 import { between } from '@/lib/board/rank';
+import { doneColumnId, statusTone } from '@/lib/board/status';
 import { burst } from '@/components/canvas/burst-layer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Column, type QuickTaskInput } from './column';
@@ -38,12 +39,6 @@ interface MoveVars {
   columnId: string;
   rank: string;
   snapshot: BoardData;
-}
-
-// A column counts as "done" when its name says so; otherwise the last column is.
-function doneColumnId(board: BoardData): string | undefined {
-  const named = board.columns.find((c) => /\b(done|complete[d]?|shipped|closed|released)\b/i.test(c.name));
-  return (named ?? board.columns[board.columns.length - 1])?.id;
 }
 
 // Move `taskId` to (destColId, newRank) in the cached board projection, keeping
@@ -260,7 +255,6 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
     }
   }
 
-  const doneId = doneColumnId(board);
   const cardHref = (t: TaskCard) => `/app/${slug}/projects/${projectKey}/tasks/${t.number}`;
   const activeTask = activeId
     ? board.columns.flatMap((c) => c.tasks).find((t) => t.id === activeId)
@@ -298,12 +292,13 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
         onDragStart={onDragStart}
         onDragEnd={onDragEnd}
       >
-        <div className="scrollbar-thin -mx-1 flex items-start gap-3 overflow-x-auto px-1 pb-5">
+        <div className="scrollbar-thin -mx-1 flex items-start gap-2.5 overflow-x-auto px-1 pb-5">
           {board.columns.map((col, i) => (
             <Column
               key={col.id}
               column={col}
               tasks={visible(col.tasks)}
+              projectKey={projectKey}
               cardHref={cardHref}
               selectMode={selectMode}
               selectedIds={selectedIds}
@@ -316,12 +311,12 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
               onMutated={() => queryClient.invalidateQueries({ queryKey: boardKey })}
               composeSignal={i === 0 ? composeSignal : 0}
               flash={flashCol === col.id}
-              isDone={col.id === doneId}
+              tone={statusTone(board, col.id)}
             />
           ))}
 
           {isAdmin ? (
-            <div className="w-[300px] shrink-0">
+            <div className="w-[272px] shrink-0">
               {addingColumn ? (
                 <div className="origin-top animate-scale-in rounded-lg border border-foreground/30 bg-card p-3">
                   <input
@@ -354,9 +349,9 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
               ) : (
                 <button
                   onClick={() => setAddingColumn(true)}
-                  className="group/col flex h-12 w-full items-center gap-2 rounded-lg border border-dashed border-foreground/20 px-3 text-sm text-muted-foreground transition-[border-color,color,background-color] duration-300 hover:border-foreground/50 hover:bg-secondary/40 hover:text-foreground"
+                  className="flex h-9 w-full items-center gap-2 rounded-lg px-3 text-[13px] text-muted-foreground transition-[color,background-color] duration-300 hover:bg-secondary/60 hover:text-foreground"
                 >
-                  <Plus className="h-4 w-4 transition-transform duration-500 ease-spring group-hover/col:rotate-90" /> Add column
+                  <Plus className="h-4 w-4" /> Add column
                 </button>
               )}
             </div>
@@ -365,12 +360,14 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
 
         <DragOverlay dropAnimation={{ duration: 320, easing: 'cubic-bezier(0.16, 1, 0.3, 1)' }}>
           {activeTask ? (
-            <div className="w-[284px] origin-center animate-[card-lift_0.25s_var(--ease-out-expo)_forwards] cursor-grabbing rounded-md border border-foreground/40 bg-card p-3 text-sm shadow-[0_30px_60px_-20px_hsl(var(--ink)/0.5)]">
-              <div className="mb-1.5 flex items-center gap-2">
-                <span className="font-mono text-[10.5px] text-muted-foreground">#{activeTask.number}</span>
+            <div className="w-[256px] origin-center animate-[card-lift_0.25s_var(--ease-out-expo)_forwards] cursor-grabbing rounded-md border border-foreground/30 bg-card px-3 py-2.5 text-sm shadow-[0_24px_48px_-20px_hsl(var(--ink)/0.5)]">
+              <p className="line-clamp-3 leading-snug">{activeTask.title}</p>
+              <div className="mt-2.5 flex items-center gap-2">
+                <span className="font-mono text-[11px] font-medium text-muted-foreground">
+                  {projectKey}-{activeTask.number}
+                </span>
                 <PriorityBars priority={activeTask.priority} />
               </div>
-              <p className="line-clamp-3 font-medium leading-snug">{activeTask.title}</p>
             </div>
           ) : null}
         </DragOverlay>
@@ -383,7 +380,7 @@ function BoardSkeleton() {
   return (
     <div className="flex gap-3 overflow-hidden" aria-busy="true" aria-label="Loading board">
       {[4, 2, 3, 1].map((n, c) => (
-        <div key={c} className="w-[300px] shrink-0 rounded-lg bg-secondary/50 p-2">
+        <div key={c} className="w-[272px] shrink-0 rounded-lg bg-secondary/45 p-2">
           <Skeleton className="mx-1 mb-3 mt-1 h-4 w-24" />
           <div className="space-y-2">
             {Array.from({ length: n }).map((_, i) => (

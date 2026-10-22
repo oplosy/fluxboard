@@ -7,6 +7,7 @@ import { Plus } from 'lucide-react';
 
 import type { BoardColumn, Label, Priority, TaskCard } from '@/lib/api/types';
 import { PRIORITIES, priorityLabel } from '@/lib/board/priority';
+import type { StatusTone } from '@/lib/board/status';
 import { cn } from '@/lib/utils';
 import { Card } from './card';
 import { Select } from '@/components/ui/select';
@@ -30,6 +31,7 @@ export interface AssigneeOption {
 export function Column({
   column,
   tasks,
+  projectKey,
   cardHref,
   selectMode,
   selectedIds,
@@ -42,10 +44,11 @@ export function Column({
   onMutated,
   composeSignal,
   flash = false,
-  isDone = false,
+  tone,
 }: {
   column: BoardColumn;
   tasks: TaskCard[];
+  projectKey: string;
   cardHref: (task: TaskCard) => string;
   selectMode: boolean;
   selectedIds: Set<string>;
@@ -59,8 +62,8 @@ export function Column({
   composeSignal?: number;
   /** Briefly pulses the column (e.g. a card was just shipped into it). */
   flash?: boolean;
-  /** Treat as the board's "done" lane (signal accent). */
-  isDone?: boolean;
+  /** Status colour of this lane (lib/board/status). */
+  tone: StatusTone;
 }) {
   const { setNodeRef, isOver } = useDroppable({ id: column.id });
   const [composingManual, setComposing] = useState(false);
@@ -105,20 +108,22 @@ export function Column({
   return (
     <div
       className={cn(
-        'flex w-[300px] shrink-0 flex-col rounded-lg border bg-secondary/50 p-1.5 transition-[border-color,background-color,box-shadow] duration-300',
-        isOver ? 'border-dashed border-signal/70 bg-signal/[0.04]' : 'border-transparent',
+        'flex w-[272px] shrink-0 flex-col rounded-lg bg-secondary/45 p-1.5 transition-[background-color,box-shadow] duration-300',
+        isOver && 'bg-signal/[0.05] ring-1 ring-inset ring-signal/40',
         flash && 'animate-[column-flash_0.9s_var(--ease-out-expo)]',
       )}
     >
-      <div className="px-2.5 pb-2.5 pt-2">
-        <div className="flex items-center gap-2">
-          <span className={cn('h-2 w-2 rounded-full', isDone ? 'bg-signal' : 'bg-foreground/30')} />
-          <h3 className="truncate font-display text-[14px] font-semibold tracking-[-0.01em]">{column.name}</h3>
+      <div className="px-2 pb-2 pt-1.5">
+        <div className="flex h-6 items-center gap-2">
+          <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+          <h3 className="truncate font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+            {column.name}
+          </h3>
           <span
             key={tasks.length}
             className={cn(
-              'ml-auto animate-scale-in rounded-sm px-1.5 py-0.5 font-mono text-[10px] tabular-nums',
-              overLimit ? 'bg-warning/25 text-foreground' : 'bg-background text-muted-foreground',
+              'animate-scale-in rounded-full px-1.5 text-[11px] font-medium tabular-nums',
+              overLimit ? 'bg-warning/25 text-foreground' : 'text-muted-foreground',
             )}
           >
             {tasks.length}
@@ -126,9 +131,9 @@ export function Column({
           </span>
         </div>
         {column.wip_limit != null ? (
-          <div className="mt-2 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>
+          <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>
             <div
-              className={cn('h-full origin-left rounded-full transition-[transform,background-color] duration-700 ease-out-expo', overLimit ? 'bg-warning' : 'bg-foreground/50')}
+              className={cn('h-full origin-left rounded-full transition-[transform,background-color] duration-700 ease-out-expo', overLimit ? 'bg-warning' : 'bg-foreground/40')}
               style={{ transform: `scaleX(${fill})` }}
             />
           </div>
@@ -137,7 +142,7 @@ export function Column({
 
       <div
         ref={setNodeRef}
-        className="flex min-h-[3rem] flex-1 flex-col gap-2 px-0.5 pb-1"
+        className="flex min-h-[3rem] flex-1 flex-col gap-1.5 pb-0.5"
       >
         <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
           {tasks.map((t, i) => (
@@ -146,6 +151,7 @@ export function Column({
               index={i}
               task={t}
               href={cardHref(t)}
+              projectKey={projectKey}
               selectMode={selectMode}
               selected={selectedIds.has(t.id)}
               onToggle={onToggleSelect}
@@ -225,9 +231,9 @@ export function Column({
         ) : (
           <button
             onClick={() => setComposing(true)}
-            className="group/add flex items-center gap-1.5 rounded-md border border-dashed border-transparent px-2.5 py-2 text-left text-xs text-muted-foreground transition-[border-color,background-color,color] hover:border-foreground/25 hover:bg-background hover:text-foreground"
+            className="group/add flex items-center gap-1.5 rounded-md px-2 py-1.5 text-left text-[13px] text-muted-foreground transition-[background-color,color] hover:bg-foreground/[0.06] hover:text-foreground"
           >
-            <Plus className="h-3.5 w-3.5 transition-transform duration-500 ease-spring group-hover/add:rotate-90" /> Add task
+            <Plus className="h-3.5 w-3.5" /> Create task
           </button>
         )}
       </div>

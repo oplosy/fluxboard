@@ -50,7 +50,7 @@ export default function InterceptedTaskModal(props: {
   return (
     <div
       className={cn(
-        'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:p-8',
+        'fixed inset-0 z-50 flex items-start justify-center overflow-y-auto p-3 sm:p-7',
         'bg-ink/55 backdrop-blur-[3px] transition-opacity duration-300',
         closing ? 'opacity-0' : 'animate-fade-in',
       )}
@@ -61,14 +61,13 @@ export default function InterceptedTaskModal(props: {
     >
       <div
         className={cn(
-          'relative w-full max-w-3xl rounded-lg border border-border bg-background p-6 shadow-[0_40px_80px_-30px_hsl(var(--ink)/0.6)] sm:p-8',
+          'relative w-full max-w-5xl rounded-xl border border-border bg-background p-5 shadow-[0_40px_80px_-30px_hsl(var(--ink)/0.6)] sm:p-7',
           closing
             ? 'translate-y-4 scale-[0.98] opacity-0 transition-[transform,opacity] duration-[260ms] ease-in-out-quart'
             : 'animate-[modal-in_0.55s_var(--ease-out-expo)_backwards]',
         )}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="absolute left-6 top-0 h-[2px] w-16 bg-signal sm:left-8" aria-hidden />
         <button
           onClick={close}
           aria-label="Close"

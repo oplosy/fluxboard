@@ -65,9 +65,12 @@ export function Card({
   labels,
   onMutated,
   index = 0,
+  projectKey,
 }: {
   task: TaskCard;
   href: string;
+  /** Prefix for the Jira-style task key (e.g. WEB-12). */
+  projectKey: string;
   selectMode: boolean;
   selected: boolean;
   onToggle: (id: string) => void;
@@ -97,24 +100,19 @@ export function Card({
       ref={setNodeRef}
       style={style}
       className={cn(
-        'group relative animate-[card-in_0.5s_var(--ease-out-expo)_backwards] rounded-md border bg-card p-3 text-sm',
-        'transition-[box-shadow,border-color,opacity,transform] duration-300 ease-out-expo',
+        'group relative animate-[card-in_0.5s_var(--ease-out-expo)_backwards] rounded-md border bg-card px-3 py-2.5 text-sm',
+        'transition-[box-shadow,border-color,opacity] duration-200',
         isDragging
           ? 'border-dashed border-foreground/30 bg-transparent opacity-50 shadow-none [&>*]:invisible'
-          : 'border-border shadow-[0_1px_2px_hsl(var(--ink)/0.05)]',
+          : 'border-border/70 shadow-[0_1px_1px_hsl(var(--ink)/0.06)]',
         selected && 'border-signal ring-2 ring-signal/30',
         !isDragging &&
           !selectMode &&
-          'cursor-grab hover:-translate-y-0.5 hover:border-foreground/25 hover:shadow-[0_12px_28px_-14px_hsl(var(--ink)/0.35)] active:cursor-grabbing',
+          'cursor-grab hover:border-foreground/20 hover:shadow-[0_4px_12px_-6px_hsl(var(--ink)/0.25)] active:cursor-grabbing',
       )}
       {...(selectMode ? {} : attributes)}
       {...(selectMode ? {} : listeners)}
     >
-      {/* Signal edge grows on hover */}
-      <span
-        aria-hidden
-        className="absolute inset-y-2 left-0 w-[2px] origin-center scale-y-0 rounded-full bg-signal transition-transform duration-300 ease-out-expo group-hover:scale-y-100"
-      />
       <div className="flex items-start gap-2">
         {selectMode ? (
           <input
@@ -126,32 +124,28 @@ export function Card({
           />
         ) : null}
         <div className="min-w-0 flex-1">
-          <div className="mb-1.5 flex items-center gap-2">
-            <span className="font-mono text-[10.5px] text-muted-foreground">#{task.number}</span>
-            <PriorityBars priority={task.priority} />
-            <span className="ml-auto">
-              {!selectMode ? (
-                <QuickMenu task={task} orgId={orgId} members={members} labels={labels} onMutated={onMutated} />
-              ) : null}
-            </span>
+          <div className="flex items-start gap-2">
+            {selectMode ? (
+              <p className="line-clamp-3 min-w-0 flex-1 leading-snug">{task.title}</p>
+            ) : (
+              <Link
+                href={href}
+                onClick={(e) => e.stopPropagation()}
+                className="line-clamp-3 min-w-0 flex-1 leading-snug hover:underline hover:underline-offset-2"
+              >
+                {task.title}
+              </Link>
+            )}
+            {!selectMode ? (
+              <QuickMenu task={task} orgId={orgId} members={members} labels={labels} onMutated={onMutated} />
+            ) : null}
           </div>
-          {selectMode ? (
-            <p className="line-clamp-3 font-medium leading-snug">{task.title}</p>
-          ) : (
-            <Link
-              href={href}
-              onClick={(e) => e.stopPropagation()}
-              className="line-clamp-3 font-medium leading-snug decoration-signal decoration-2 underline-offset-[3px] hover:underline"
-            >
-              {task.title}
-            </Link>
-          )}
           {task.labels.length > 0 ? (
-            <div className="mt-2.5 flex flex-wrap gap-1">
+            <div className="mt-2 flex flex-wrap gap-1">
               {task.labels.slice(0, 3).map((l) => (
                 <span
                   key={l.id}
-                  className="inline-flex items-center gap-1 rounded-sm border border-border px-1.5 py-[1px] text-[10px] font-medium text-foreground/80"
+                  className="inline-flex items-center gap-1 rounded-sm bg-secondary px-1.5 py-[1px] text-[10.5px] font-medium text-secondary-foreground"
                   title={l.name}
                 >
                   <span className="h-1.5 w-1.5 shrink-0 rounded-full" style={{ backgroundColor: l.color }} />
@@ -159,47 +153,50 @@ export function Card({
                 </span>
               ))}
               {task.labels.length > 3 ? (
-                <span className="rounded-sm px-1 py-[1px] font-mono text-[10px] text-muted-foreground">+{task.labels.length - 3}</span>
+                <span className="rounded-sm px-1 py-[1px] text-[10.5px] text-muted-foreground">+{task.labels.length - 3}</span>
               ) : null}
             </div>
           ) : null}
-          {due || task.comment_count > 0 || task.subtask_total > 0 || task.assignee_id || working ? (
-            <div className="mt-3 flex items-center gap-2.5 text-[11px] text-muted-foreground">
-              {due ? (
-                <span
-                  className={cn('inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 font-mono text-[10px] font-medium', due.className)}
-                  title={`Due ${new Date(task.due_date as string).toLocaleDateString()}`}
-                >
-                  <CalendarDays className="h-3 w-3" />
-                  {due.label}
-                </span>
-              ) : null}
-              {task.comment_count > 0 ? (
-                <span className="inline-flex items-center gap-1 font-mono" title={`${task.comment_count} comments`}>
-                  <MessageSquare className="h-3 w-3" />
-                  {task.comment_count}
-                </span>
-              ) : null}
-              {task.subtask_total > 0 ? (
-                <span className="inline-flex items-center gap-1 font-mono" title={`${task.subtask_done}/${task.subtask_total} subtasks done`}>
-                  <SubtaskRing done={task.subtask_done} total={task.subtask_total} />
-                  {task.subtask_done}/{task.subtask_total}
-                </span>
-              ) : null}
+          {/* Jira-style footer: key + priority left, signals and assignee right. */}
+          <div className="mt-2.5 flex h-6 items-center gap-2 text-[11px] text-muted-foreground">
+            <span className="font-mono text-[11px] font-medium">
+              {projectKey}-{task.number}
+            </span>
+            <PriorityBars priority={task.priority} />
+            {due ? (
+              <span
+                className={cn('inline-flex items-center gap-1 rounded-sm px-1.5 py-0.5 text-[10.5px] font-medium', due.className)}
+                title={`Due ${new Date(task.due_date as string).toLocaleDateString()}`}
+              >
+                <CalendarDays className="h-3 w-3" />
+                {due.label}
+              </span>
+            ) : null}
+            {task.comment_count > 0 ? (
+              <span className="inline-flex items-center gap-1" title={`${task.comment_count} comments`}>
+                <MessageSquare className="h-3 w-3" />
+                {task.comment_count}
+              </span>
+            ) : null}
+            {task.subtask_total > 0 ? (
+              <span className="inline-flex items-center gap-1" title={`${task.subtask_done}/${task.subtask_total} subtasks done`}>
+                <SubtaskRing done={task.subtask_done} total={task.subtask_total} />
+                {task.subtask_done}/{task.subtask_total}
+              </span>
+            ) : null}
+            <span className="ml-auto flex items-center gap-1.5">
               {working ? (
                 <span
-                  className="ml-auto inline-flex items-center gap-1 font-medium text-primary"
+                  className="inline-flex items-center gap-1 font-medium text-primary"
                   title={`${assigneeName?.replace(/ \(agent\)$/, '') ?? 'An agent'} is working on this`}
                 >
                   <Bot className="h-3 w-3 animate-pulse" aria-hidden />
                   working
                 </span>
               ) : null}
-              {task.assignee_id ? (
-                <Avatar name={assigneeName ?? task.assignee_id} size="sm" className={working ? undefined : 'ml-auto'} />
-              ) : null}
-            </div>
-          ) : null}
+              {task.assignee_id ? <Avatar name={assigneeName ?? task.assignee_id} size="sm" /> : null}
+            </span>
+          </div>
         </div>
       </div>
     </div>

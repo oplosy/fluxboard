@@ -30,15 +30,17 @@ export function ProjectHeader({ project }: { project: Project }) {
   const onBoard = pathname === base || /\/tasks\/\d+$/.test(pathname);
 
   return (
-    <header className="mb-6">
-      <div className="flex min-h-10 flex-wrap items-center gap-x-3 gap-y-1">
+    <header className="mb-4">
+      <div className="flex min-h-8 flex-wrap items-center gap-x-2.5 gap-y-1">
         <span
-          className="h-3.5 w-3.5 shrink-0 rounded-sm"
+          className="flex h-6 w-6 shrink-0 items-center justify-center rounded-md font-mono text-[10px] font-semibold text-white"
           style={{ backgroundColor: project.color || 'hsl(var(--muted-foreground))' }}
           aria-hidden
-        />
-        <h1 className="min-w-0 truncate text-2xl font-semibold tracking-[-0.04em] md:text-3xl">{project.name}</h1>
-        <span className="rounded-sm border border-border px-1.5 py-0.5 font-mono text-xs text-muted-foreground">
+        >
+          {project.key.slice(0, 2)}
+        </span>
+        <h1 className="min-w-0 truncate text-xl font-semibold tracking-[-0.02em]">{project.name}</h1>
+        <span className="rounded-sm bg-secondary px-1.5 py-0.5 font-mono text-[11px] text-muted-foreground">
           {project.key}
         </span>
         {project.archived_at ? (
@@ -47,7 +49,7 @@ export function ProjectHeader({ project }: { project: Project }) {
           </span>
         ) : null}
       </div>
-      <div className="mt-4 overflow-x-auto border-b border-border pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      <div className="mt-3 overflow-x-auto border-b border-border pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
         <SlidingTabs
           tabs={tabs.map((t) => ({
             href: t.href,
