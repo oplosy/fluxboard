@@ -20,6 +20,7 @@ Start with the [project overview](00-PROJECT-OVERVIEW.md), then use the [working
 ## Build and operations
 
 - [Build phase index](build/README.md)
+- [Feature roadmap](build/ROADMAP.md): what to build next and what is in flight
 - [Local development](runbooks/local-development.md)
 - [Restore runbook](runbooks/restore.md)
 - [Security review runbook](runbooks/security-review.md)
