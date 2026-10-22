@@ -27,6 +27,7 @@ import { useOrgAgents } from '@/lib/org/use-agents';
 import { ApiError } from '@/lib/api/client';
 import { useToast } from '@/components/ui/toast';
 import { between } from '@/lib/board/rank';
+import { doneColumnId } from '@/lib/board/status';
 import { burst } from '@/components/canvas/burst-layer';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Column, type QuickTaskInput } from './column';
@@ -38,12 +39,6 @@ interface MoveVars {
   columnId: string;
   rank: string;
   snapshot: BoardData;
-}
-
-// A column counts as "done" when its name says so; otherwise the last column is.
-function doneColumnId(board: BoardData): string | undefined {
-  const named = board.columns.find((c) => /\b(done|complete[d]?|shipped|closed|released)\b/i.test(c.name));
-  return (named ?? board.columns[board.columns.length - 1])?.id;
 }
 
 // Move `taskId` to (destColId, newRank) in the cached board projection, keeping
