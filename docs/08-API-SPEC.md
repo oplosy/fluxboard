@@ -124,6 +124,11 @@ GET    /orgs/{orgId}/projects/{projectId}/releases             releases with {re
 POST   /orgs/{orgId}/projects/{projectId}/releases             {name, description?, release_date?: YYYY-MM-DD} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/releases/{releaseId} {name, description, release_date|null, released: bool} released=true stamps released_at once, false reopens (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/releases/assign      {task_ids, release_id|null} (CONTRIBUTOR)
+GET    /orgs/{orgId}/projects/{projectId}/wiki?q=               pages {id, title, version, created_by, updated_by, created_at, updated_at} by title, no bodies; q = title substring (VIEWER; FR-PROJ-013)
+POST   /orgs/{orgId}/projects/{projectId}/wiki               {title, body?} -> page with body, version 1 and tasks (CONTRIBUTOR); body <= 50000 chars, title <= 200
+GET    /orgs/{orgId}/projects/{projectId}/wiki/{wikiId}      page with body and tasks: [{number, title}] = live tasks of this project named as KEY-N in the body (VIEWER)
+PATCH  /orgs/{orgId}/projects/{projectId}/wiki/{wikiId}      {title, body, version} 409 when version is not the stored one (CONTRIBUTOR)    DELETE same path (project LEAD or author)
+GET    /orgs/{orgId}/projects/{projectId}/wiki/mentions?task_number=N  pages naming task N, no bodies (VIEWER)
 GET    /orgs/{orgId}/projects/{projectId}/field-values         every custom value of the project's live tasks: {values:[{task_id, field_id, name, type, text?, number?, date?}]} (VIEWER; FR-PROJ-012)
 GET    /orgs/{orgId}/projects/{projectId}/views                shared views + the caller's personal ones: {id, name, shared, mine, filters:{text, priority, assignee, sprint, epic, group_by}} (VIEWER; FR-PROJ-011)
 POST   /orgs/{orgId}/projects/{projectId}/views                {name, shared, filters} personal: VIEWER, shared: LEAD
