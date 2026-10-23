@@ -9,14 +9,14 @@ VALUES (@id, @org_id, @project_id, @column_id, @number, @title, @description,
 -- name: GetTask :one
 -- Live tasks only; trashed tasks are addressable through the Trash queries.
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL;
 
 -- name: ListTasksByColumn :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND column_id = @column_id AND deleted_at IS NULL
@@ -24,7 +24,7 @@ ORDER BY rank;
 
 -- name: ListTasksByProject :many
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.rank, t.created_by, t.created_at, t.updated_at,
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.rank, t.created_by, t.created_at, t.updated_at,
        t.version, t.claimed_by, t.lease_expires_at
 FROM tasks t
 JOIN board_columns c ON c.id = t.column_id
@@ -35,7 +35,8 @@ ORDER BY c.rank, t.rank;
 UPDATE tasks
 SET title = @title, description = @description,
     assignee_id = sqlc.narg('assignee_id'), priority = @priority,
-    start_date = sqlc.narg('start_date'), due_date = sqlc.narg('due_date')
+    start_date = sqlc.narg('start_date'), due_date = sqlc.narg('due_date'),
+    estimate = sqlc.narg('estimate')
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL
   -- Optimistic concurrency (FR-AGT-005): with a version, a stale write matches
   -- no row and the repo reports a conflict.
@@ -62,14 +63,14 @@ WHERE org_id = @org_id AND id = @id AND deleted_at IS NOT NULL;
 
 -- name: GetTrashedTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NOT NULL;
 
 -- name: ListTrashedTasks :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = @org_id AND project_id = @project_id AND deleted_at IS NOT NULL
@@ -93,7 +94,7 @@ WHERE org_id = @org_id AND deleted_at IS NOT NULL AND deleted_at < @cutoff;
 -- joining task_labels returned a task once per label (duplicate hits, inflated
 -- total).
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.rank, t.created_by,
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.rank, t.created_by,
        t.created_at, t.updated_at, t.version, t.claimed_by, t.lease_expires_at,
        count(*) OVER() AS total_count
 FROM tasks t
