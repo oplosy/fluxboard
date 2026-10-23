@@ -199,6 +199,7 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
         ) : (
           sprints.map((s) => {
             const mine = tasksOf(s.id);
+            const points = mine.reduce((sum, t) => sum + (t.estimate ?? 0), 0);
             return (
               <Card key={s.id}>
                 <CardContent className="flex flex-wrap items-center gap-3 py-4">
@@ -212,6 +213,7 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
                     {s.goal ? <p className="truncate text-xs text-muted-foreground">{s.goal}</p> : null}
                     <p className="mt-1 text-xs text-muted-foreground">
                       {mine.length} tasks
+                      {points > 0 ? ` · ${points} pts` : ''}
                       {s.status === 'completed'
                         ? ` · velocity ${s.completed_done}/${s.completed_total}`
                         : ''}

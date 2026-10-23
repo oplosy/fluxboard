@@ -177,6 +177,14 @@ export default function ProjectEpicsPage(props: { params: Promise<{ projectKey: 
                   <span className="w-20 shrink-0 text-right font-mono text-[11px] text-muted-foreground">
                     {e.done}/{e.total} done
                   </span>
+                  {e.points > 0 ? (
+                    <span
+                      className="w-20 shrink-0 text-right font-mono text-[11px] text-muted-foreground"
+                      title="Story points done / total"
+                    >
+                      {e.done_points}/{e.points} pts
+                    </span>
+                  ) : null}
                 </div>
                 <div className="flex items-center gap-1">
                   <button
