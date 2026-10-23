@@ -119,6 +119,7 @@ GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progre
 POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #rrggbb} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
+GET    /orgs/{orgId}/projects/{projectId}/workload?from=YYYY-MM-DD&to=YYYY-MM-DD  {from, to, rows:[{user_id|null, open_tasks, open_points, scheduled_tasks, scheduled_points, scheduled_unestimated, overdue_tasks, logged_minutes}]} UTC days, to inclusive, ≤ 92 days (VIEWER; FR-AN-004)
 GET    /orgs/{orgId}/projects/{projectId}/releases             releases with {release_date: YYYY-MM-DD|null, released_at|null, total, done, points, done_points} (VIEWER; FR-PROJ-010)
 POST   /orgs/{orgId}/projects/{projectId}/releases             {name, description?, release_date?: YYYY-MM-DD} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/releases/{releaseId} {name, description, release_date|null, released: bool} released=true stamps released_at once, false reopens (LEAD)    DELETE same path keeps its tasks (LEAD)
