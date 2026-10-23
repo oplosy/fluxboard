@@ -64,7 +64,7 @@ Most later items build on these two.
 |---|---|---|---|---|---|---|
 | R-07 | Saved views and filters | done | FR-PROJ-011 | `feat/saved-views` | oplosy/fluxboard#88 | |
 | R-08 | Editable table view | done | FR-PROJ-012 | `feat/editable-table` | oplosy/fluxboard#89 | |
-| R-09 | Cross-project dashboards | in progress | FR-AN-005 | `claude/cross-project-dashboards-d0618e` | | |
+| R-09 | Cross-project dashboards | done | FR-AN-005 | `claude/cross-project-dashboards-d0618e` | oplosy/fluxboard#91 | |
 
 - **R-07 Saved views and filters.** Save board / list filters as personal or
   project-shared views.
@@ -127,3 +127,4 @@ Ideas not yet placed in a wave.
 | Saved board views (R-07) | FR-PROJ-011 | oplosy/fluxboard#88 |
 | Editable table view (R-08) | FR-PROJ-012 | oplosy/fluxboard#89 |
 | Docs / wiki pages (R-13; flat, no history) | FR-PROJ-013 | oplosy/fluxboard#90 |
+| Cross-project dashboards (R-09) | FR-AN-005 | oplosy/fluxboard#91 |
