@@ -1,4 +1,4 @@
--- 0058_dashboard_layouts_rls -- Row-Level Security for dashboard_layouts. Same
+-- 0060_dashboard_layouts_rls -- Row-Level Security for dashboard_layouts. Same
 -- pattern as 0056: predicate on the per-transaction GUC app.current_tenant set
 -- via SET LOCAL by TenantPool. Unset GUC means zero rows (fail-closed). ENABLE
 -- (not FORCE). Whose layout a caller may touch is decided in the application.

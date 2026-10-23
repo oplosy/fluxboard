@@ -1,2 +1,2 @@
--- 0057_dashboard_layouts rollback.
+-- 0059_dashboard_layouts rollback.
 DROP TABLE IF EXISTS dashboard_layouts;

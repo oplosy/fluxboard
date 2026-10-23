@@ -98,7 +98,7 @@ can begin area-by-area once the backing API for that area (its phase) is done.
 - sqlc v1.27.0 pinned (CI + `make sqlc` use the same version): queries in `internal/infrastructure/postgres/queries/*.sql` are the
   source of truth → `sqlc generate` from `backend/`. Never hand-edit `gen/`.
 - Migrations split DDL from RLS (e.g. 0007/0008, 0009/0010, 0015/0016, 0030/0031). Next free
-  number: **0057** (0055/0056 added saved views).
+  number: **0061** (0059/0060 added dashboard layouts).
 - Error → HTTP mapping (single place): `ErrValidation→422`, `ErrConflict→409`,
   `ErrNotFound→404`, `ErrForbidden→403`. Billing adds `402 plan_limit_exceeded`.
 - Asynq worker + scheduler already run (`cmd/worker`); add handlers to its mux and
