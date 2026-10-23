@@ -54,6 +54,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/authuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/automationuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/billinguc"
+	"github.com/mesutokul/fluxboard/backend/internal/usecase/githubuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/notifyuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/projectuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/taskuc"
@@ -484,6 +485,9 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Watchers: postgres.NewTaskWatcherRepo(tenantPool), Audit: auditRepo, People: membershipRepo, Logger: logger,
 	})
 	automationSvc.SetActions(taskSvc) // actions take the normal task write path (ADR-036)
+	githubHandlers := handlers.NewGithubHandlers(githubuc.New(githubuc.Deps{
+		Repo: postgres.NewGithubRepo(tenantPool), Orgs: orgRepo, Tasks: taskSvc, Cipher: cipher, Logger: logger,
+	}), logger)
 	projectSvc := projectuc.New(projectuc.Deps{
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
 		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Epics: postgres.NewEpicRepo(tenantPool), Releases: postgres.NewReleaseRepo(tenantPool), Wiki: postgres.NewWikiRepo(tenantPool), Time: timeEntryRepo, Views: postgres.NewSavedViewRepo(tenantPool), Fields: fieldRepo, Labels: labelRepo,
@@ -557,6 +561,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 		Tasks:            taskHandlers,
 		PublicForms:      publicFormHandlers,
 		Automations:      automationHandlers,
+		Github:           githubHandlers,
 		AI:               aiHandlers,
 		MCP:              mcpServer,
 		Billing:          billingHandlers,
