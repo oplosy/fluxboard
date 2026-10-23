@@ -64,7 +64,7 @@ Most later items build on these two.
 |---|---|---|---|---|---|---|
 | R-07 | Saved views and filters | done | FR-PROJ-011 | `feat/saved-views` | oplosy/fluxboard#88 | |
 | R-08 | Editable table view | done | FR-PROJ-012 | `feat/editable-table` | oplosy/fluxboard#89 | |
-| R-09 | Cross-project dashboards | todo | | | | |
+| R-09 | Cross-project dashboards | in progress | FR-AN-005 | `claude/cross-project-dashboards-d0618e` | | |
 
 - **R-07 Saved views and filters.** Save board / list filters as personal or
   project-shared views.
