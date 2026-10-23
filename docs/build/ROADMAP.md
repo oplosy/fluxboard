@@ -79,7 +79,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-10 | GitHub pull-request linking | done | FR-TASK-016 | `claude/github-pr-linking-8cdab0` | oplosy/fluxboard#92 | |
-| R-11 | Slack / Teams notifications | todo | | | | |
+| R-11 | Slack / Teams notifications | in progress | FR-NTF-005 | `feat/chat-notifications` | | |
 
 - **R-10 GitHub pull-request linking.** A task key such as `WEB-12` in a PR
   title, branch or commit links the PR to the task; merging can move the task.
