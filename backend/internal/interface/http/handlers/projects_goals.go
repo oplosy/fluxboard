@@ -16,18 +16,23 @@ import (
 )
 
 type goalResp struct {
-	ID          string         `json:"id"`
-	Title       string         `json:"title"`
-	Description string         `json:"description"`
-	OwnerID     string         `json:"owner_id"`
-	TargetDate  *string        `json:"target_date"` // YYYY-MM-DD
-	Status      string         `json:"status"`
-	Total       int            `json:"total"`
-	Done        int            `json:"done"`
-	Points      int            `json:"points"`
-	DonePoints  int            `json:"done_points"`
-	CreatedAt   time.Time      `json:"created_at"`
-	Items       []goalItemResp `json:"items,omitempty"`
+	ID          string    `json:"id"`
+	Title       string    `json:"title"`
+	Description string    `json:"description"`
+	OwnerID     string    `json:"owner_id"`
+	TargetDate  *string   `json:"target_date"` // YYYY-MM-DD
+	Status      string    `json:"status"`
+	Total       int       `json:"total"`
+	Done        int       `json:"done"`
+	Points      int       `json:"points"`
+	DonePoints  int       `json:"done_points"`
+	CreatedAt   time.Time `json:"created_at"`
+}
+
+// goalDetailResp adds the linked items; always present (empty list, never null).
+type goalDetailResp struct {
+	goalResp
+	Items []goalItemResp `json:"items"`
 }
 
 type goalItemResp struct {
@@ -54,9 +59,8 @@ func toGoalResp(g *project.Goal) goalResp {
 	}
 }
 
-func toGoalViewResp(v *projectuc.GoalView) goalResp {
-	out := toGoalResp(&v.Goal)
-	out.Items = make([]goalItemResp, 0, len(v.Items))
+func toGoalViewResp(v *projectuc.GoalView) goalDetailResp {
+	out := goalDetailResp{goalResp: toGoalResp(&v.Goal), Items: make([]goalItemResp, 0, len(v.Items))}
 	for _, it := range v.Items {
 		out.Items = append(out.Items, goalItemResp{
 			Kind: string(it.Kind), ID: it.ID, ProjectID: it.ProjectID, ProjectKey: it.ProjectKey,
