@@ -24,6 +24,7 @@ import { TaskApprovals } from './approvals';
 import { TaskWatchers } from './watchers';
 import { TaskEpic } from './epic-field';
 import { TaskRelease } from './release-field';
+import { WikiMentions } from './wiki-mentions';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -188,6 +189,8 @@ export function TaskDetail({
             onSave={(description) => patch.mutateAsync({ description })}
           />
         </div>
+
+        <WikiMentions projectId={projectId} projectKey={projectKey} taskNumber={task.number} />
 
         <Subtasks taskId={taskId} canEdit={canEdit} />
         <TaskLinks taskId={taskId} canEdit={canEdit} />
