@@ -47,7 +47,7 @@ Most later items build on these two.
 | R-03 | Sprint burndown and velocity | done | FR-AN-003 | `feat/sprint-burndown` | oplosy/fluxboard#84 | R-02 |
 | R-04 | Board swimlanes | done | FR-PROJ-009 | `feat/board-swimlanes` | oplosy/fluxboard#85 | R-01 |
 | R-05 | Releases / versions | done | FR-PROJ-010 | `feat/releases` | oplosy/fluxboard#86 | |
-| R-06 | Workload / capacity view | todo | | | | R-02 |
+| R-06 | Workload / capacity view | in progress | FR-AN-004 | `feat/workload` | | R-02 |
 
 - **R-03 Sprint burndown and velocity.** Burndown per sprint and velocity over
   past sprints. Check what `analytics` already shows before starting.
