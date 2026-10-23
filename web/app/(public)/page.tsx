@@ -1,4 +1,5 @@
 import { Hero } from '@/components/marketing/landing/hero';
+import { AgentsSection } from '@/components/marketing/landing/agents-section';
 import { BoardStory } from '@/components/marketing/landing/board-story';
 import {
   BillingSection,
@@ -17,6 +18,7 @@ export default function LandingPage() {
       <Ticker />
       <BoardStory />
       <RealtimeSection />
+      <AgentsSection />
       <BillingSection />
       <SecuritySection />
 
@@ -25,7 +27,7 @@ export default function LandingPage() {
           <div className="mb-14 grid gap-6 lg:grid-cols-[0.9fr_1.1fr] lg:items-end">
             <div>
               <Reveal variant="fade" className="kicker">
-                06 — Pricing
+                07 — Pricing
               </Reveal>
               <h2 className="mt-4 text-[clamp(2.2rem,4.6vw,4rem)] font-semibold leading-[0.95] tracking-[-0.045em]">
                 <SplitText text="Pay for the work you do." />
