@@ -190,6 +190,14 @@ export function Card({
               </span>
             ) : null}
             <span className="ml-auto flex items-center gap-1.5">
+              {task.estimate != null ? (
+                <span
+                  className="rounded-full bg-secondary px-1.5 py-[1px] text-[10.5px] font-medium tabular-nums text-secondary-foreground"
+                  title={`${task.estimate} story points`}
+                >
+                  {task.estimate}
+                </span>
+              ) : null}
               {working ? (
                 <span
                   className="inline-flex items-center gap-1 font-medium text-primary"
