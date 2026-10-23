@@ -1,7 +1,7 @@
--- 0057_goals -- Goals (FR-PROJ-013, roadmap R-12). An org-level goal links
+-- 0063_goals -- Goals (FR-PROJ-014, roadmap R-12). An org-level goal links
 -- epics and tasks of any project; progress and status are derived on read from
 -- the linked work, never stored. Deleting an epic or task drops its link.
--- DDL only; RLS lands in 0058 (the DDL/RLS split).
+-- DDL only; RLS lands in 0064 (the DDL/RLS split).
 -- Times = timestamptz UTC; target_date is a calendar date (no time of day).
 
 CREATE TABLE goals (                               -- [T]

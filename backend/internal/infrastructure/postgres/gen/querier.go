@@ -106,7 +106,7 @@ type Querier interface {
 	CreateCustomField(ctx context.Context, arg CreateCustomFieldParams) error
 	// Epics ([T], tenant-scoped, FR-PROJ-008) ----------------------------------
 	CreateEpic(ctx context.Context, arg CreateEpicParams) error
-	// Goals ([T], tenant-scoped, FR-PROJ-013) -----------------------------------
+	// Goals ([T], tenant-scoped, FR-PROJ-014) -----------------------------------
 	CreateGoal(ctx context.Context, arg CreateGoalParams) error
 	// Invitations ([T], tenant-scoped) ------------------------------------------
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) error

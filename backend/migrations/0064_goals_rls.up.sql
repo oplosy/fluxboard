@@ -1,4 +1,4 @@
--- 0058_goals_rls -- Row-Level Security for goals and goal_links. Same pattern as
+-- 0064_goals_rls -- Row-Level Security for goals and goal_links. Same pattern as
 -- 0050: predicate on the per-transaction GUC app.current_tenant set via SET
 -- LOCAL by TenantPool. Unset GUC means zero rows (fail-closed). ENABLE (not FORCE).
 

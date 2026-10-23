@@ -9,7 +9,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain"
 )
 
-// GoalStatus is derived on read from progress and the target date (FR-PROJ-013).
+// GoalStatus is derived on read from progress and the target date (FR-PROJ-014).
 type GoalStatus string
 
 const (
@@ -19,7 +19,7 @@ const (
 )
 
 // Goal ties epics and tasks of any project of the org into one objective
-// (FR-PROJ-013). Counters and Status are derived from the linked work the
+// (FR-PROJ-014). Counters and Status are derived from the linked work the
 // viewer may see, never stored.
 type Goal struct {
 	ID          string
@@ -104,7 +104,7 @@ func DeriveGoalStatus(total, done int, target *time.Time, now time.Time) GoalSta
 	return GoalOnTrack
 }
 
-// GoalRepository persists goals and their links (FR-PROJ-013).
+// GoalRepository persists goals and their links (FR-PROJ-014).
 type GoalRepository interface {
 	Create(ctx context.Context, orgID string, g *Goal) error
 	Get(ctx context.Context, orgID, id string) (*Goal, error)

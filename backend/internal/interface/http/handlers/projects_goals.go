@@ -1,4 +1,4 @@
-// Goal endpoints (FR-PROJ-013). Org-level; any org member reads, creation needs
+// Goal endpoints (FR-PROJ-014). Org-level; any org member reads, creation needs
 // MEMBER+, changes need the goal owner or ADMIN+ (gated in projectuc).
 package handlers
 

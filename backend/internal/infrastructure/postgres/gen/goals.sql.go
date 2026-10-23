@@ -52,7 +52,7 @@ type CreateGoalParams struct {
 	TargetDate  pgtype.Date `json:"target_date"`
 }
 
-// Goals ([T], tenant-scoped, FR-PROJ-013) -----------------------------------
+// Goals ([T], tenant-scoped, FR-PROJ-014) -----------------------------------
 func (q *Queries) CreateGoal(ctx context.Context, arg CreateGoalParams) error {
 	_, err := q.db.Exec(ctx, createGoal,
 		arg.ID,

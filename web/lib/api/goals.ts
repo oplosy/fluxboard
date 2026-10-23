@@ -46,7 +46,7 @@ export interface GoalInput {
   target_date?: string | null;
 }
 
-/** List the org's goals oldest-first (FR-PROJ-013). */
+/** List the org's goals oldest-first (FR-PROJ-014). */
 export async function listGoals(orgId: string): Promise<Goal[]> {
   const res = await apiFetch<{ goals: Goal[] }>(`/orgs/${orgId}/goals`);
   return res.goals ?? [];

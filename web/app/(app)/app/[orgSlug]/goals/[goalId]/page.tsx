@@ -104,7 +104,7 @@ function LinkPicker({ onLink, linked, pending }: { onLink: (kind: GoalItem['kind
   );
 }
 
-// Goal page (FR-PROJ-013): progress, the linked epics and tasks, and — for the
+// Goal page (FR-PROJ-014): progress, the linked epics and tasks, and — for the
 // owner or an org admin — editing and linking.
 export default function GoalPage(props: { params: Promise<{ goalId: string }> }) {
   const { goalId } = use(props.params);

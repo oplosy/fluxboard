@@ -15,7 +15,7 @@ import { useToast } from '@/components/ui/toast';
 import { GoalForm } from '@/components/goals/goal-form';
 import { GoalProgress, GoalStatusBadge, formatDay } from '@/components/goals/goal-progress';
 
-// Goals (FR-PROJ-013): org-level objectives whose progress comes from the epics
+// Goals (FR-PROJ-014): org-level objectives whose progress comes from the epics
 // and tasks linked to them. Guests read; members create their own.
 export default function GoalsPage() {
   const { orgId, slug, role } = useOrg();

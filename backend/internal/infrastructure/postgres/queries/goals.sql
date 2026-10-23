@@ -1,4 +1,4 @@
--- Goals ([T], tenant-scoped, FR-PROJ-013) -----------------------------------
+-- Goals ([T], tenant-scoped, FR-PROJ-014) -----------------------------------
 
 -- name: CreateGoal :exec
 INSERT INTO goals (id, org_id, title, description, owner_id, target_date)

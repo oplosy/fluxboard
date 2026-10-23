@@ -9,7 +9,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 )
 
-// ---- Goals (FR-PROJ-013) -----------------------------------------------------
+// ---- Goals (FR-PROJ-014) -----------------------------------------------------
 // Goals are org-level. An org MEMBER+ creates one and owns it; the owner or an
 // org ADMIN+ edits, deletes and links work. Everyone in the org reads goals,
 // but linked work of a project the viewer cannot see is skipped entirely, so
