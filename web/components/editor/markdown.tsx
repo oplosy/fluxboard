@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import { Fragment, type ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
@@ -6,7 +7,8 @@ import { cn } from '@/lib/utils';
 // HTML), so markup typed by a user is shown as text. Links are limited to
 // http(s) and mailto. Supported: headings, paragraphs, bold/italic/strike,
 // inline code, fenced code, links + bare URLs, @mentions, quotes, rules,
-// bullet/numbered/task lists (nested by indentation).
+// bullet/numbered/task lists (nested by indentation). With `taskRefs`, task keys
+// of the project (WEB-12) that exist link to the task.
 
 type Item = {
   text: string;
@@ -23,6 +25,9 @@ type Block =
   | { t: 'quote'; blocks: Block[] }
   | { t: 'hr' }
   | ListBlock;
+
+/** Task keys to link in a text: only `key`-N for a number in `numbers` becomes a link. */
+export type TaskRefs = { key: string; numbers: ReadonlySet<number>; href: (number: number) => string };
 
 const SAFE_PROTOCOLS = new Set(['http:', 'https:', 'mailto:']);
 
@@ -141,11 +146,11 @@ export function parseMarkdown(src: string): Block[] {
 }
 
 // Groups: 2 code, 3/4 bold, 5 strike, 6/7 em, 8 link text, 9 link url,
-// 10 bare url, 11 mention, 12 escaped char.
+// 10 bare url, 11 mention, 12 escaped char, 13/14 task key + number.
 const INLINE =
-  /(`+)([^`]+?)\1(?!`)|\*\*(?=\S)([\s\S]+?)\*\*|__(?=\S)([\s\S]+?)__|~~(?=\S)([\s\S]+?)~~|\*(?=[^\s*])([\s\S]*?[^\s*])\*|(?<![\w])_(?=[^\s_])([\s\S]*?[^\s_])_(?![\w])|\[([^\]\n]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>]+[^\s<>.,;:!?)\]'"])|(?<![\w@])@([A-Za-z0-9](?:[\w.-]*\w)?)|\\([\\`*_{}[\]()#+\-.!~>@])/g;
+  /(`+)([^`]+?)\1(?!`)|\*\*(?=\S)([\s\S]+?)\*\*|__(?=\S)([\s\S]+?)__|~~(?=\S)([\s\S]+?)~~|\*(?=[^\s*])([\s\S]*?[^\s*])\*|(?<![\w])_(?=[^\s_])([\s\S]*?[^\s_])_(?![\w])|\[([^\]\n]+)\]\(([^)\s]+)\)|(https?:\/\/[^\s<>]+[^\s<>.,;:!?)\]'"])|(?<![\w@])@([A-Za-z0-9](?:[\w.-]*\w)?)|\\([\\`*_{}[\]()#+\-.!~>@])|(?<![\w@-])([A-Z]{2,6})-(\d{1,9})(?!\w)/g;
 
-function renderInline(text: string, depth = 0): ReactNode[] {
+function renderInline(text: string, refs?: TaskRefs, depth = 0): ReactNode[] {
   const out: ReactNode[] = [];
   const re = new RegExp(INLINE.source, 'g');
   let last = 0;
@@ -155,7 +160,7 @@ function renderInline(text: string, depth = 0): ReactNode[] {
     if (m.index > last) out.push(text.slice(last, m.index));
     last = m.index + m[0].length;
     const key = `i${k++}`;
-    const nest = (s: string) => (depth < 4 ? renderInline(s, depth + 1) : [s]);
+    const nest = (s: string) => (depth < 4 ? renderInline(s, refs, depth + 1) : [s]);
     if (m[2] !== undefined) {
       out.push(
         <code key={key} className="rounded-sm bg-secondary px-1 py-0.5 font-mono text-[0.85em]">
@@ -218,6 +223,17 @@ function renderInline(text: string, depth = 0): ReactNode[] {
       );
     } else if (m[12] !== undefined) {
       out.push(m[12]);
+    } else if (m[13] !== undefined) {
+      const num = Number(m[14]);
+      if (refs && m[13] === refs.key && refs.numbers.has(num)) {
+        out.push(
+          <Link key={key} href={refs.href(num)} className="font-medium text-signal underline underline-offset-2 hover:no-underline">
+            {m[0]}
+          </Link>,
+        );
+      } else {
+        out.push(m[0]);
+      }
     }
   }
   if (last < text.length) out.push(text.slice(last));
@@ -234,7 +250,7 @@ const HEADING_CLASS = [
   'mt-3 mb-1 text-sm font-medium text-muted-foreground first:mt-0',
 ];
 
-function renderList(list: ListBlock, onToggle: ((line: number) => void) | undefined, key: number): ReactNode {
+function renderList(list: ListBlock, onToggle: ((line: number) => void) | undefined, key: number, refs?: TaskRefs): ReactNode {
   const Tag = list.ordered ? 'ol' : 'ul';
   return (
     <Tag key={key} className={cn('my-2 space-y-1 pl-5 marker:text-muted-foreground', list.ordered ? 'list-decimal' : 'list-disc')}>
@@ -251,8 +267,8 @@ function renderList(list: ListBlock, onToggle: ((line: number) => void) | undefi
             />
           ) : null}
           <div className={cn('min-w-0', it.task?.checked && 'text-muted-foreground line-through')}>
-            {renderInline(it.text)}
-            {it.children.map((c, ci) => renderList(c, onToggle, ci))}
+            {renderInline(it.text, refs)}
+            {it.children.map((c, ci) => renderList(c, onToggle, ci, refs))}
           </div>
         </li>
       ))}
@@ -260,14 +276,14 @@ function renderList(list: ListBlock, onToggle: ((line: number) => void) | undefi
   );
 }
 
-function renderBlocks(blocks: Block[], onToggle: ((line: number) => void) | undefined): ReactNode[] {
+function renderBlocks(blocks: Block[], onToggle: ((line: number) => void) | undefined, refs?: TaskRefs): ReactNode[] {
   return blocks.map((b, i) => {
     switch (b.t) {
       case 'h': {
         const Tag = `h${Math.min(b.level, 6)}` as 'h1';
         return (
           <Tag key={i} className={HEADING_CLASS[b.level]}>
-            {renderInline(b.text)}
+            {renderInline(b.text, refs)}
           </Tag>
         );
       }
@@ -277,7 +293,7 @@ function renderBlocks(blocks: Block[], onToggle: ((line: number) => void) | unde
             {b.lines.map((l, li) => (
               <Fragment key={li}>
                 {li > 0 ? <br /> : null}
-                {renderInline(l)}
+                {renderInline(l, refs)}
               </Fragment>
             ))}
           </p>
@@ -294,13 +310,13 @@ function renderBlocks(blocks: Block[], onToggle: ((line: number) => void) | unde
       case 'quote':
         return (
           <blockquote key={i} className="my-3 border-l-2 border-signal pl-4 text-muted-foreground">
-            {renderBlocks(b.blocks, undefined)}
+            {renderBlocks(b.blocks, undefined, refs)}
           </blockquote>
         );
       case 'hr':
         return <hr key={i} className="my-4 border-border" />;
       case 'list':
-        return renderList(b, onToggle, i);
+        return renderList(b, onToggle, i, refs);
     }
   });
 }
@@ -322,12 +338,15 @@ export function toggleTaskLine(src: string, line: number): string {
 export function Markdown({
   source,
   onToggleTask,
+  taskRefs,
   className,
 }: {
   source: string;
   /** Called with the 0-based source line of a clicked task checkbox. */
   onToggleTask?: (line: number) => void;
+  /** Link the project's task keys that exist (wiki pages). */
+  taskRefs?: TaskRefs;
   className?: string;
 }) {
-  return <div className={cn('break-words text-sm leading-relaxed', className)}>{renderBlocks(parseMarkdown(source), onToggleTask)}</div>;
+  return <div className={cn('break-words text-sm leading-relaxed', className)}>{renderBlocks(parseMarkdown(source), onToggleTask, taskRefs)}</div>;
 }
