@@ -19,6 +19,7 @@ type Querier interface {
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	// Task watchers ([T], tenant-scoped, FR-TASK-014) ------------------------------
 	AddTaskWatcher(ctx context.Context, arg AddTaskWatcherParams) error
+	AddWikiPageTask(ctx context.Context, arg AddWikiPageTaskParams) error
 	AdvanceRecurrence(ctx context.Context, arg AdvanceRecurrenceParams) error
 	// Task activity log ([T], tenant-scoped, FR-TASK-002) -----------------------
 	AppendActivity(ctx context.Context, arg AppendActivityParams) error
@@ -42,6 +43,7 @@ type Querier interface {
 	// query because coalesce() above cannot express "set NULL".
 	ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
 	ClearProjectSprints(ctx context.Context, arg ClearProjectSprintsParams) (int64, error)
+	ClearWikiPageTasks(ctx context.Context, arg ClearWikiPageTasksParams) error
 	// Current open (non-trashed) task count per column for a project.
 	ColumnOpenCounts(ctx context.Context, arg ColumnOpenCountsParams) ([]ColumnOpenCountsRow, error)
 	// Flip a pending row to committed (idempotency: no-op if already committed via
@@ -142,6 +144,8 @@ type Querier interface {
 	// Time entries ([T], tenant-scoped, FR-TIME) -------------------------------
 	CreateTimeEntry(ctx context.Context, arg CreateTimeEntryParams) error
 	CreateUser(ctx context.Context, arg CreateUserParams) error
+	// Project wiki ([T], tenant-scoped, FR-PROJ-013) ----------------------------
+	CreateWikiPage(ctx context.Context, arg CreateWikiPageParams) error
 	DeclineIntakeRequest(ctx context.Context, arg DeclineIntakeRequestParams) (int64, error)
 	DeleteAgent(ctx context.Context, arg DeleteAgentParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
@@ -168,6 +172,7 @@ type Querier interface {
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	// Clears any prior codes before a fresh batch is issued (activate / regenerate).
 	DeleteUserRecoveryCodes(ctx context.Context, userID uuid.UUID) error
+	DeleteWikiPage(ctx context.Context, arg DeleteWikiPageParams) (int64, error)
 	DetachLabel(ctx context.Context, arg DetachLabelParams) (int64, error)
 	// Finish a claim but keep the assignment: the agent handed the task over for
 	// review and stays its assignee for attribution.
@@ -236,6 +241,7 @@ type Querier interface {
 	GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) (GetTrashedTaskRow, error)
 	GetUserByEmail(ctx context.Context, email string) (GetUserByEmailRow, error)
 	GetUserByID(ctx context.Context, id uuid.UUID) (GetUserByIDRow, error)
+	GetWikiPage(ctx context.Context, arg GetWikiPageParams) (WikiPage, error)
 	// Extend a live claim the agent holds; a lapsed or foreign claim matches nothing.
 	HeartbeatTask(ctx context.Context, arg HeartbeatTaskParams) (int64, error)
 	// Run history ([T], FR-AUTO) --------------------------------------------------
@@ -376,6 +382,10 @@ type Querier interface {
 	// The project's shared views plus the caller's own personal ones.
 	ListVisibleSavedViews(ctx context.Context, arg ListVisibleSavedViewsParams) ([]SavedView, error)
 	ListWaitingApprovals(ctx context.Context, arg ListWaitingApprovalsParams) ([]ListWaitingApprovalsRow, error)
+	// The live tasks a page mentions (soft-deleted tasks drop out).
+	ListWikiPageTaskRefs(ctx context.Context, arg ListWikiPageTaskRefsParams) ([]ListWikiPageTaskRefsRow, error)
+	ListWikiPagesByProject(ctx context.Context, arg ListWikiPagesByProjectParams) ([]ListWikiPagesByProjectRow, error)
+	ListWikiPagesMentioningTask(ctx context.Context, arg ListWikiPagesMentioningTaskParams) ([]ListWikiPagesMentioningTaskRow, error)
 	// Request inbox ([T], tenant-scoped, research report §6.3/§7) -----------------
 	// Serializes concurrent identical submissions (same form + email + content) for
 	// the rest of the tx so the duplicate check below cannot be raced.
@@ -493,6 +503,8 @@ type Querier interface {
 	UpdateUserAvatarKey(ctx context.Context, arg UpdateUserAvatarKeyParams) error
 	UpdateUserName(ctx context.Context, arg UpdateUserNameParams) error
 	UpdateUserPasswordHash(ctx context.Context, arg UpdateUserPasswordHashParams) error
+	// Optimistic concurrency: a stale if_version matches no row.
+	UpdateWikiPage(ctx context.Context, arg UpdateWikiPageParams) (int64, error)
 	UpsertFeatureFlag(ctx context.Context, arg UpsertFeatureFlagParams) error
 	UpsertInvoice(ctx context.Context, arg UpsertInvoiceParams) error
 	UpsertNotificationPref(ctx context.Context, arg UpsertNotificationPrefParams) error

@@ -352,3 +352,23 @@ type ActivityRepository interface {
 	// ListByTask returns a task's activity newest-first.
 	ListByTask(ctx context.Context, orgID, taskID string) ([]Activity, error)
 }
+
+// WikiRepository persists wiki pages and their task-mention index (FR-PROJ-013).
+type WikiRepository interface {
+	// Create stores a page (version 1) and its mentioned task numbers.
+	Create(ctx context.Context, orgID string, p *WikiPage, taskNumbers []int) error
+	// Get returns a page with its body; ErrNotFound when missing.
+	Get(ctx context.Context, orgID, id string) (*WikiPage, error)
+	// ListByProject returns a project's pages by title (bodies unset); a
+	// non-empty query keeps titles containing it, case-insensitively.
+	ListByProject(ctx context.Context, orgID, projectID, query string) ([]WikiPage, error)
+	// Update writes title and body, bumps the version and replaces the mention
+	// index in one transaction, only when the stored version equals
+	// expectedVersion: ErrConflict when stale, ErrNotFound when missing.
+	Update(ctx context.Context, orgID string, p *WikiPage, expectedVersion int, taskNumbers []int) error
+	Delete(ctx context.Context, orgID, id string) error
+	// TaskRefs returns the live tasks the page mentions, by number.
+	TaskRefs(ctx context.Context, orgID, pageID string) ([]WikiTaskRef, error)
+	// MentioningTask returns the project's pages naming task number (bodies unset).
+	MentioningTask(ctx context.Context, orgID, projectID string, number int) ([]WikiPage, error)
+}

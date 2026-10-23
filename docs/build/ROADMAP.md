@@ -92,7 +92,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-12 | Goals / OKRs | todo | | | | R-01 |
-| R-13 | Docs / wiki pages | todo | | | | |
+| R-13 | Docs / wiki pages | done | FR-PROJ-013 | `feat/project-wiki` | oplosy/fluxboard#90 | |
 
 - **R-12 Goals / OKRs.** Goals with progress computed from linked tasks or
   epics.
@@ -126,3 +126,4 @@ Ideas not yet placed in a wave.
 | Workload view (R-06; capacity targets not included) | FR-AN-004 | oplosy/fluxboard#87 |
 | Saved board views (R-07) | FR-PROJ-011 | oplosy/fluxboard#88 |
 | Editable table view (R-08) | FR-PROJ-012 | oplosy/fluxboard#89 |
+| Docs / wiki pages (R-13; flat, no history) | FR-PROJ-013 | oplosy/fluxboard#90 |

@@ -8,7 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Tooltip } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 import { continueList, insertLink, toggleLines, wrapSelection, type Edit, type LineKind } from './format';
-import { Markdown, toggleTaskLine } from './markdown';
+import { Markdown, toggleTaskLine, type TaskRefs } from './markdown';
 
 const COLLAPSED_PX = 288;
 const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform);
@@ -43,11 +43,13 @@ export function DescriptionEditor({
   canEdit,
   onSave,
   placeholder = 'Add a description…',
+  taskRefs,
 }: {
   value: string;
   canEdit: boolean;
   onSave: (text: string) => Promise<unknown>;
   placeholder?: string;
+  taskRefs?: TaskRefs;
 }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState('');
@@ -209,6 +211,7 @@ export function DescriptionEditor({
           >
             <Markdown
               source={value}
+              taskRefs={taskRefs}
               onToggleTask={canEdit && !saving ? (line) => {
                 setSaving(true);
                 onSave(toggleTaskLine(value, line))
@@ -300,7 +303,7 @@ export function DescriptionEditor({
         />
       ) : (
         <div className="min-h-[7rem] px-3.5 py-2.5">
-          {draft.trim() ? <Markdown source={draft} /> : <p className="text-sm text-muted-foreground">Nothing to preview.</p>}
+          {draft.trim() ? <Markdown source={draft} taskRefs={taskRefs} /> : <p className="text-sm text-muted-foreground">Nothing to preview.</p>}
         </div>
       )}
 

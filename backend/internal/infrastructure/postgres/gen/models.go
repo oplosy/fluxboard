@@ -632,3 +632,23 @@ type User struct {
 	CreatedAt     time.Time          `json:"created_at"`
 	UpdatedAt     time.Time          `json:"updated_at"`
 }
+
+type WikiPage struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	Version   int32     `json:"version"`
+	CreatedBy uuid.UUID `json:"created_by"`
+	UpdatedBy uuid.UUID `json:"updated_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type WikiPageTask struct {
+	OrgID      uuid.UUID `json:"org_id"`
+	ProjectID  uuid.UUID `json:"project_id"`
+	PageID     uuid.UUID `json:"page_id"`
+	TaskNumber int32     `json:"task_number"`
+}

@@ -96,3 +96,34 @@ describe('format helpers', () => {
     expect(continueList('plain', 5)).toBeNull();
   });
 });
+
+describe('Markdown task keys', () => {
+  const refs = { key: 'WEB', numbers: new Set([12, 3]), href: (n: number) => `/t/${n}` };
+
+  it('links existing tasks of the project, several per text', () => {
+    render(<Markdown source="Fix WEB-12 and (WEB-3)." taskRefs={refs} />);
+    expect(screen.getByRole('link', { name: 'WEB-12' })).toHaveAttribute('href', '/t/12');
+    expect(screen.getByRole('link', { name: 'WEB-3' })).toHaveAttribute('href', '/t/3');
+  });
+
+  it('leaves other projects, unknown numbers, lowercase and code as text', () => {
+    const { container } = render(<Markdown source={'OPS-12 WEB-99 web-12 `WEB-12` XWEB-12'} taskRefs={refs} />);
+    expect(container.querySelector('a')).toBeNull();
+    expect(container.textContent).toContain('OPS-12 WEB-99 web-12 WEB-12 XWEB-12');
+  });
+
+  it('links nothing without taskRefs', () => {
+    const { container } = render(<Markdown source="WEB-12" />);
+    expect(container.querySelector('a')).toBeNull();
+  });
+
+  it('keeps a hostile page body inert while linking keys', () => {
+    const body = '<script>alert(1)</script> [x](javascript:alert(1)) <a href="javascript:alert(1)">WEB-12</a> WEB-3';
+    const { container } = render(<Markdown source={body} taskRefs={refs} />);
+    expect(container.querySelector('script')).toBeNull();
+    const hrefs = Array.from(container.querySelectorAll('a')).map((a) => a.getAttribute('href'));
+    expect(hrefs.every((h) => h === '/t/12' || h === '/t/3')).toBe(true);
+    expect(container.textContent).toContain('<script>alert(1)</script>');
+    expect(container.textContent).toContain('[x](javascript:alert(1))');
+  });
+});

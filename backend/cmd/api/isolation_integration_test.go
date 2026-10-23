@@ -147,14 +147,14 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "release", "view", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "release", "wiki", "view", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	e.bParams = map[string]string{
 		"projectId": e.bIDs["project"], "taskId": e.bIDs["task"], "linkedId": e.bIDs["task2"],
 		"columnId": e.bIDs["column"], "labelId": e.bIDs["label"], "userId": e.bIDs["member"],
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
-		"sprintId": e.bIDs["sprint"], "epicId": e.bIDs["epic"], "releaseId": e.bIDs["release"], "viewId": e.bIDs["view"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
+		"sprintId": e.bIDs["sprint"], "epicId": e.bIDs["epic"], "releaseId": e.bIDs["release"], "wikiId": e.bIDs["wiki"], "viewId": e.bIDs["view"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
 		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"], "approvalId": e.bIDs["approval"],
 	}
@@ -229,6 +229,10 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{b["epic"], e.orgB, b["project"], owner}},
 		{`INSERT INTO releases (id, org_id, project_id, name, created_by) VALUES ($1, $2, $3, 'Beta release', $4)`,
 			[]any{b["release"], e.orgB, b["project"], owner}},
+		{`INSERT INTO wiki_pages (id, org_id, project_id, title, body, created_by, updated_by) VALUES ($1, $2, $3, 'Beta page', 'Beta WEB-1', $4, $4)`,
+			[]any{b["wiki"], e.orgB, b["project"], owner}},
+		{`INSERT INTO wiki_page_tasks (org_id, project_id, page_id, task_number) VALUES ($1, $2, $3, 1)`,
+			[]any{e.orgB, b["project"], b["wiki"]}},
 		{`INSERT INTO saved_views (id, org_id, project_id, owner_id, name, shared) VALUES ($1, $2, $3, $4, 'Beta view', true)`,
 			[]any{b["view"], e.orgB, b["project"], owner}},
 		{`INSERT INTO custom_fields (id, org_id, project_id, name, type, created_by) VALUES ($1, $2, $3, 'Beta field', 'text', $4)`,
