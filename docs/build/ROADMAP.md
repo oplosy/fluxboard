@@ -31,7 +31,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR |
 |---|---|---|---|---|---|
 | R-01 | Epics / task hierarchy | done | FR-PROJ-008 | `feat/epics` | oplosy/fluxboard#82 |
-| R-02 | Story points / estimates | todo | | | |
+| R-02 | Story points / estimates | in progress | FR-TASK-015 | `feat/story-points` | |
 
 - **R-01 Epics / task hierarchy.** A task can have a parent (epic). Today
   subtasks are checklist items only, and there is no `parent_id` on tasks. Epic

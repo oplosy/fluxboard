@@ -72,6 +72,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-TASK-012 | S | CSV task import (Excel/Sheets/Trello): upload → column mapping preview (title, description, status/column, assignee by email, due date, priority, labels) with per-row errors → import through the normal create path (numbering, ranks, events, automation). CONTRIBUTOR+. `Idempotency-Key` required; task ids derive from (org, project, key, payload hash, row), so a retry never duplicates rows. ≤ 1000 rows. |
 | FR-TASK-013 | S | Project export: tasks as CSV (re-importable, formula-safe) and JSON with comments, labels and attachment metadata. VIEWER+ via the project-access policy. |
 | FR-TASK-014 | S | Task watchers: any project VIEWER+ can watch or unwatch a task for themselves and see who watches it. Watchers receive comment notifications (category `comment`) like the task creator and assignee; the commenter never notifies themselves. |
+| FR-TASK-015 | S | Story points: a CONTRIBUTOR+ sets or clears an optional whole-number estimate (0–1000 points) on a task; a change is logged in the task activity. Every VIEWER+ sees the estimate on board cards and task detail, the points summed per board column and per sprint, and per epic as total and done points. An update that does not send the estimate keeps it. |
 
 ## BILL — Billing & Payments (full spec: 06-BILLING.md)
 
