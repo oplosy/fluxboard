@@ -16,7 +16,7 @@ func TestCompressJSON(t *testing.T) {
 			w.Header().Set("Content-Type", contentType)
 			_, _ = io.WriteString(w, body)
 		}))
-		req := httptest.NewRequest(http.MethodGet, "/", nil)
+		req := httptest.NewRequestWithContext(t.Context(), http.MethodGet, "/", nil)
 		req.Header.Set("Accept-Encoding", "gzip")
 		rec := httptest.NewRecorder()
 		h.ServeHTTP(rec, req)
