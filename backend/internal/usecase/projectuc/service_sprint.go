@@ -126,8 +126,14 @@ func (s *Service) CompleteSprint(ctx context.Context, orgID, userID, projectID, 
 			continue
 		}
 		total++
+		pts := 0
+		if t.Estimate != nil {
+			pts = *t.Estimate
+		}
+		sp.CompletedPointsTotal += pts
 		if t.ColumnID == doneColumn {
 			done++
+			sp.CompletedPointsDone += pts
 			continue
 		}
 		if err := s.sprints.SetTaskSprint(ctx, orgID, t.ID, nil); err != nil {
@@ -143,6 +149,47 @@ func (s *Service) CompleteSprint(ctx context.Context, orgID, userID, projectID, 
 		return nil, err
 	}
 	return sp, nil
+}
+
+// SprintBurndown returns remaining work per day of an active or completed
+// sprint (VIEWER, FR-AN-003). An active sprint runs to today over its current
+// tasks; a completed one runs to its end over the scope it snapshotted, since
+// completing returned the unfinished tasks to the backlog.
+func (s *Service) SprintBurndown(ctx context.Context, orgID, userID, projectID, sprintID string, orgRole tenant.OrgRole) (*project.Burndown, error) {
+	if !s.sprintsEnabled() {
+		return nil, domain.ErrForbidden // sprints disabled
+	}
+	if _, _, err := s.access(ctx, orgID, projectID, userID, orgRole, project.RoleViewer); err != nil {
+		return nil, err
+	}
+	sp, err := s.sprintInProject(ctx, orgID, projectID, sprintID)
+	if err != nil {
+		return nil, err
+	}
+	if sp.Status == project.SprintPlanned || sp.StartedAt == nil {
+		return nil, domain.ErrConflict // not started: nothing to burn down yet
+	}
+	tasks, err := s.sprints.BurndownTasks(ctx, orgID, sprintID)
+	if err != nil {
+		return nil, err
+	}
+	var done []project.BurndownTask
+	totalPoints, totalTasks := 0, len(tasks)
+	for _, t := range tasks {
+		totalPoints += t.Points
+		if t.CompletedAt != nil {
+			done = append(done, t)
+		}
+	}
+	last := s.now().UTC()
+	if sp.Status == project.SprintCompleted {
+		totalPoints, totalTasks = sp.CompletedPointsTotal, sp.CompletedTotal
+		if sp.EndedAt != nil {
+			last = *sp.EndedAt
+		}
+	}
+	b := project.ComputeBurndown(*sp.StartedAt, sp.EndedAt, last, totalPoints, totalTasks, done)
+	return &b, nil
 }
 
 // DeleteSprint removes a planned sprint (LEAD). Active/completed sprints are
