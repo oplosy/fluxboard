@@ -63,7 +63,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-07 | Saved views and filters | done | FR-PROJ-011 | `feat/saved-views` | oplosy/fluxboard#88 | |
-| R-08 | Editable table view | in progress | FR-PROJ-012 | `feat/editable-table` | | |
+| R-08 | Editable table view | done | FR-PROJ-012 | `feat/editable-table` | oplosy/fluxboard#89 | |
 | R-09 | Cross-project dashboards | todo | | | | |
 
 - **R-07 Saved views and filters.** Save board / list filters as personal or
@@ -125,3 +125,4 @@ Ideas not yet placed in a wave.
 | Releases (R-05) | FR-PROJ-010 | oplosy/fluxboard#86 |
 | Workload view (R-06; capacity targets not included) | FR-AN-004 | oplosy/fluxboard#87 |
 | Saved board views (R-07) | FR-PROJ-011 | oplosy/fluxboard#88 |
+| Editable table view (R-08) | FR-PROJ-012 | oplosy/fluxboard#89 |
