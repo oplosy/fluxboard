@@ -41,6 +41,12 @@ type OutboxWriter interface {
 	InsertEmail(ctx context.Context, orgID string, payload json.RawMessage) error
 }
 
+// ChatFanout queues a Slack / Teams channel message for a delivered
+// notification (chatuc.Service; ADR-038). Best-effort: it never returns an error.
+type ChatFanout interface {
+	Notify(ctx context.Context, orgID string, cat notify.Category, title, body, entityType, entityID string)
+}
+
 // EmailPayload is the Phase-5 notification variant of the email:send outbox
 // payload. The email:send worker rechecks the (UserID, Category) preference
 // before sending (09 §3). Distinguished from the billing payload by UserID being
@@ -61,6 +67,7 @@ type Deps struct {
 	Bus    notify.EventBus // nil ⇒ no realtime publish (tests / SSE disabled)
 	Dir    Directory       // nil ⇒ no @mention resolution
 	Outbox OutboxWriter    // nil ⇒ no email fan-out
+	Chat   ChatFanout      // nil ⇒ no chat-channel fan-out
 	Logger *slog.Logger
 	Now    func() time.Time
 }
@@ -72,6 +79,7 @@ type Service struct {
 	bus    notify.EventBus
 	dir    Directory
 	outbox OutboxWriter
+	chat   ChatFanout
 	logger *slog.Logger
 	now    func() time.Time
 }
@@ -88,7 +96,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		notifs: d.Notifs, prefs: d.Prefs, bus: d.Bus, dir: d.Dir,
-		outbox: d.Outbox, logger: logger, now: now,
+		outbox: d.Outbox, chat: d.Chat, logger: logger, now: now,
 	}
 }
 
@@ -347,6 +355,17 @@ func (s *Service) deliver(ctx context.Context, orgID, actorID string, ts []targe
 		}
 		if err := s.outbox.InsertEmail(ctx, orgID, raw); err != nil {
 			s.logger.Error("notify: outbox insert failed", "err", err, "user", t.ref.ID)
+		}
+	}
+	// Org chat channels (Slack / Teams) get one message per notification, naming
+	// the recipient; channel subscriptions are team-level and bypass personal prefs.
+	if s.chat != nil {
+		for _, t := range ts {
+			body := t.body
+			if t.ref.Name != "" {
+				body = "For " + t.ref.Name + ": " + body
+			}
+			s.chat.Notify(ctx, orgID, t.cat, t.title, body, t.entityType, t.entityID)
 		}
 	}
 }
