@@ -92,7 +92,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-12 | Goals / OKRs | todo | | | | R-01 |
-| R-13 | Docs / wiki pages | todo | | | | |
+| R-13 | Docs / wiki pages | in progress | FR-PROJ-013 | `feat/project-wiki` | | |
 
 - **R-12 Goals / OKRs.** Goals with progress computed from linked tasks or
   epics.
