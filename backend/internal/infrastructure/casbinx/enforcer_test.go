@@ -42,6 +42,7 @@ func TestPermissionMatrix(t *testing.T) {
 		{tenant.RoleAdmin, tenant.ObjAudit, tenant.ActRead, true},
 		{tenant.RoleAdmin, tenant.ObjProjects, tenant.ActWrite, true},
 		{tenant.RoleAdmin, tenant.ObjAutomations, tenant.ActWrite, true},
+		{tenant.RoleAdmin, tenant.ObjChat, tenant.ActWrite, true},
 		{tenant.RoleAdmin, tenant.ObjAgents, tenant.ActWrite, true},
 
 		// MEMBER: create projects + manage labels + read org; nothing admin.
@@ -54,6 +55,7 @@ func TestPermissionMatrix(t *testing.T) {
 		{tenant.RoleMember, tenant.ObjBilling, tenant.ActWrite, false},
 		{tenant.RoleMember, tenant.ObjOwnership, tenant.ActWrite, false},
 		{tenant.RoleMember, tenant.ObjAutomations, tenant.ActWrite, false},
+		{tenant.RoleMember, tenant.ObjChat, tenant.ActWrite, false},
 		{tenant.RoleMember, tenant.ObjAgents, tenant.ActRead, true},
 		{tenant.RoleMember, tenant.ObjAgents, tenant.ActWrite, false},
 
