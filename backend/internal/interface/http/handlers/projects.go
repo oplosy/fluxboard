@@ -80,6 +80,7 @@ type taskCardResp struct {
 	SubtaskDone  int         `json:"subtask_done"`
 	SprintID     *string     `json:"sprint_id,omitempty"`
 	EpicID       *string     `json:"epic_id,omitempty"`
+	ReleaseID    *string     `json:"release_id,omitempty"`
 	Estimate     *int        `json:"estimate,omitempty"`
 	CreatedAt    time.Time   `json:"created_at"`
 	Rank         string      `json:"rank"`
@@ -375,7 +376,7 @@ func (h *ProjectHandlers) GetBoard(w http.ResponseWriter, r *http.Request) {
 				Labels:       []labelResp{},
 				CommentCount: cv.Comments[t.ID],
 				SubtaskTotal: cv.Subtasks[t.ID].Total, SubtaskDone: cv.Subtasks[t.ID].Done,
-				SprintID: t.SprintID, EpicID: t.EpicID, Estimate: t.Estimate,
+				SprintID: t.SprintID, EpicID: t.EpicID, Estimate: t.Estimate, ReleaseID: t.ReleaseID,
 				CreatedAt: t.CreatedAt,
 				Version:   t.Version,
 			}

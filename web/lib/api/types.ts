@@ -251,6 +251,7 @@ export interface TaskCard {
   epic_id?: string | null;
   /** Story points; null = not estimated (FR-TASK-015). */
   estimate?: number | null;
+  release_id?: string | null;
   created_at: string;
   rank: string;
   /** Increases on every content change; send it back to refuse stale writes. */
@@ -492,6 +493,7 @@ export interface Task {
   epic_id?: string | null;
   /** Story points; null = not estimated (FR-TASK-015). */
   estimate?: number | null;
+  release_id?: string | null;
   rank: string;
   created_by: string;
   created_at: string;

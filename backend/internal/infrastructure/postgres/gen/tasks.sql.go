@@ -140,7 +140,7 @@ func (q *Queries) EndTaskClaim(ctx context.Context, arg EndTaskClaimParams) (int
 
 const getTask = `-- name: GetTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, release_id, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND id = $2 AND deleted_at IS NULL
@@ -166,6 +166,7 @@ type GetTaskRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -194,6 +195,7 @@ func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, e
 		&i.SprintID,
 		&i.EpicID,
 		&i.Estimate,
+		&i.ReleaseID,
 		&i.Rank,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -207,7 +209,7 @@ func (q *Queries) GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, e
 
 const getTrashedTask = `-- name: GetTrashedTask :one
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, release_id, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND id = $2 AND deleted_at IS NOT NULL
@@ -233,6 +235,7 @@ type GetTrashedTaskRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -260,6 +263,7 @@ func (q *Queries) GetTrashedTask(ctx context.Context, arg GetTrashedTaskParams) 
 		&i.SprintID,
 		&i.EpicID,
 		&i.Estimate,
+		&i.ReleaseID,
 		&i.Rank,
 		&i.CreatedBy,
 		&i.CreatedAt,
@@ -300,7 +304,7 @@ func (q *Queries) HeartbeatTask(ctx context.Context, arg HeartbeatTaskParams) (i
 
 const listTasksByColumn = `-- name: ListTasksByColumn :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, release_id, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND column_id = $2 AND deleted_at IS NULL
@@ -327,6 +331,7 @@ type ListTasksByColumnRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -360,6 +365,7 @@ func (q *Queries) ListTasksByColumn(ctx context.Context, arg ListTasksByColumnPa
 			&i.SprintID,
 			&i.EpicID,
 			&i.Estimate,
+			&i.ReleaseID,
 			&i.Rank,
 			&i.CreatedBy,
 			&i.CreatedAt,
@@ -380,7 +386,7 @@ func (q *Queries) ListTasksByColumn(ctx context.Context, arg ListTasksByColumnPa
 
 const listTasksByProject = `-- name: ListTasksByProject :many
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.rank, t.created_by, t.created_at, t.updated_at,
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.release_id, t.rank, t.created_by, t.created_at, t.updated_at,
        t.version, t.claimed_by, t.lease_expires_at
 FROM tasks t
 JOIN board_columns c ON c.id = t.column_id
@@ -408,6 +414,7 @@ type ListTasksByProjectRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -441,6 +448,7 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 			&i.SprintID,
 			&i.EpicID,
 			&i.Estimate,
+			&i.ReleaseID,
 			&i.Rank,
 			&i.CreatedBy,
 			&i.CreatedAt,
@@ -461,7 +469,7 @@ func (q *Queries) ListTasksByProject(ctx context.Context, arg ListTasksByProject
 
 const listTrashedTasks = `-- name: ListTrashedTasks :many
 SELECT id, org_id, project_id, column_id, number, title, description,
-       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, rank, created_by, created_at, updated_at,
+       assignee_id, priority, start_date, due_date, sprint_id, epic_id, estimate, release_id, rank, created_by, created_at, updated_at,
        version, claimed_by, lease_expires_at
 FROM tasks
 WHERE org_id = $1 AND project_id = $2 AND deleted_at IS NOT NULL
@@ -488,6 +496,7 @@ type ListTrashedTasksRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -521,6 +530,7 @@ func (q *Queries) ListTrashedTasks(ctx context.Context, arg ListTrashedTasksPara
 			&i.SprintID,
 			&i.EpicID,
 			&i.Estimate,
+			&i.ReleaseID,
 			&i.Rank,
 			&i.CreatedBy,
 			&i.CreatedAt,
@@ -649,7 +659,7 @@ func (q *Queries) RestoreTask(ctx context.Context, arg RestoreTaskParams) (int64
 const searchTasks = `-- name: SearchTasks :many
 
 SELECT t.id, t.org_id, t.project_id, t.column_id, t.number, t.title, t.description,
-       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.rank, t.created_by,
+       t.assignee_id, t.priority, t.start_date, t.due_date, t.sprint_id, t.epic_id, t.estimate, t.release_id, t.rank, t.created_by,
        t.created_at, t.updated_at, t.version, t.claimed_by, t.lease_expires_at,
        count(*) OVER() AS total_count
 FROM tasks t
@@ -704,6 +714,7 @@ type SearchTasksRow struct {
 	SprintID       pgtype.UUID        `json:"sprint_id"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 	Rank           string             `json:"rank"`
 	CreatedBy      uuid.UUID          `json:"created_by"`
 	CreatedAt      time.Time          `json:"created_at"`
@@ -761,6 +772,7 @@ func (q *Queries) SearchTasks(ctx context.Context, arg SearchTasksParams) ([]Sea
 			&i.SprintID,
 			&i.EpicID,
 			&i.Estimate,
+			&i.ReleaseID,
 			&i.Rank,
 			&i.CreatedBy,
 			&i.CreatedAt,

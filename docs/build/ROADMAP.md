@@ -46,7 +46,7 @@ Most later items build on these two.
 |---|---|---|---|---|---|---|
 | R-03 | Sprint burndown and velocity | done | FR-AN-003 | `feat/sprint-burndown` | oplosy/fluxboard#84 | R-02 |
 | R-04 | Board swimlanes | done | FR-PROJ-009 | `feat/board-swimlanes` | oplosy/fluxboard#85 | R-01 |
-| R-05 | Releases / versions | todo | | | | |
+| R-05 | Releases / versions | done | FR-PROJ-010 | `feat/releases` | oplosy/fluxboard#86 | |
 | R-06 | Workload / capacity view | todo | | | | R-02 |
 
 - **R-03 Sprint burndown and velocity.** Burndown per sprint and velocity over
@@ -120,3 +120,4 @@ Ideas not yet placed in a wave.
 | Story points (R-02) | FR-TASK-015 | oplosy/fluxboard#83 |
 | Sprint burndown and velocity (R-03) | FR-AN-003 | oplosy/fluxboard#84 |
 | Board swimlanes (R-04) | FR-PROJ-009 | oplosy/fluxboard#85 |
+| Releases (R-05) | FR-PROJ-010 | oplosy/fluxboard#86 |

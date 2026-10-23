@@ -208,6 +208,7 @@ type Task struct {
 	SprintID    *string
 	EpicID      *string // nil = no epic (FR-PROJ-008)
 	Estimate    *int    // story points; nil = not estimated (FR-TASK-015)
+	ReleaseID   *string // nil = no release (FR-PROJ-010)
 	Rank        string
 	CreatedBy   string
 	CreatedAt   time.Time

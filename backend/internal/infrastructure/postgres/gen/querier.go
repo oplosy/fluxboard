@@ -126,6 +126,8 @@ type Querier interface {
 	// form repo).
 	CreateProjectForm(ctx context.Context, arg CreateProjectFormParams) error
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error
+	// Releases ([T], tenant-scoped, FR-PROJ-010) --------------------------------
+	CreateRelease(ctx context.Context, arg CreateReleaseParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	// Sprints ([T], tenant-scoped, FR-SPRINT) ----------------------------------
 	CreateSprint(ctx context.Context, arg CreateSprintParams) error
@@ -150,6 +152,7 @@ type Querier interface {
 	DeleteMembership(ctx context.Context, arg DeleteMembershipParams) (int64, error)
 	DeleteOverride(ctx context.Context, arg DeleteOverrideParams) (int64, error)
 	DeleteProjectForm(ctx context.Context, arg DeleteProjectFormParams) (int64, error)
+	DeleteRelease(ctx context.Context, arg DeleteReleaseParams) (int64, error)
 	DeleteSprint(ctx context.Context, arg DeleteSprintParams) (int64, error)
 	DeleteSubtask(ctx context.Context, arg DeleteSubtaskParams) (int64, error)
 	DeleteTaskCustomValue(ctx context.Context, arg DeleteTaskCustomValueParams) (int64, error)
@@ -208,6 +211,7 @@ type Querier interface {
 	GetProject(ctx context.Context, arg GetProjectParams) (GetProjectRow, error)
 	GetProjectForm(ctx context.Context, arg GetProjectFormParams) (ProjectForm, error)
 	GetProjectMember(ctx context.Context, arg GetProjectMemberParams) (GetProjectMemberRow, error)
+	GetRelease(ctx context.Context, arg GetReleaseParams) (Release, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (GetSessionByIDRow, error)
 	GetSessionByTokenHashForUpdate(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashForUpdateRow, error)
 	// Resolve a stale slug to its org within the 30-day 301 window (FR-TEN-007).
@@ -329,6 +333,7 @@ type Querier interface {
 	// every project; otherwise the user's memberships plus, with see_org_visible
 	// (org MEMBER+, never GUEST), the 'org'-visible ones.
 	ListProjects(ctx context.Context, arg ListProjectsParams) ([]ListProjectsRow, error)
+	ListReleasesByProject(ctx context.Context, arg ListReleasesByProjectParams) ([]Release, error)
 	// Project stats rollup (FR-AN-001). project_stats_daily [T]: nightly
 	// recompute of yesterday's grain (set-semantics UPSERT): created and completed
 	// counts, cycle time, and a current per-column open-task snapshot.
@@ -433,6 +438,7 @@ type Querier interface {
 	SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)
 	SetTaskEpic(ctx context.Context, arg SetTaskEpicParams) (int64, error)
+	SetTaskRelease(ctx context.Context, arg SetTaskReleaseParams) (int64, error)
 	SetTaskSprint(ctx context.Context, arg SetTaskSprintParams) (int64, error)
 	// Sets (or clears, via empty secret) the encrypted TOTP secret and its enabled
 	// flag together (docs/04-AUTH.md §4 TOTP step).
@@ -466,6 +472,7 @@ type Querier interface {
 	UpdateProject(ctx context.Context, arg UpdateProjectParams) (int64, error)
 	UpdateProjectForm(ctx context.Context, arg UpdateProjectFormParams) (int64, error)
 	UpdateProjectFormToken(ctx context.Context, arg UpdateProjectFormTokenParams) (int64, error)
+	UpdateRelease(ctx context.Context, arg UpdateReleaseParams) (int64, error)
 	UpdateSprint(ctx context.Context, arg UpdateSprintParams) (int64, error)
 	UpdateSubtask(ctx context.Context, arg UpdateSubtaskParams) (int64, error)
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error)

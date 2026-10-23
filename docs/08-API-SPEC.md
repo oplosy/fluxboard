@@ -119,6 +119,10 @@ GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progre
 POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #rrggbb} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
+GET    /orgs/{orgId}/projects/{projectId}/releases             releases with {release_date: YYYY-MM-DD|null, released_at|null, total, done, points, done_points} (VIEWER; FR-PROJ-010)
+POST   /orgs/{orgId}/projects/{projectId}/releases             {name, description?, release_date?: YYYY-MM-DD} (LEAD)
+PATCH  /orgs/{orgId}/projects/{projectId}/releases/{releaseId} {name, description, release_date|null, released: bool} released=true stamps released_at once, false reopens (LEAD)    DELETE same path keeps its tasks (LEAD)
+POST   /orgs/{orgId}/projects/{projectId}/releases/assign      {task_ids, release_id|null} (CONTRIBUTOR)
 GET    /orgs/{orgId}/projects/{projectId}/sprints              sprints oldest-first; completed ones carry {completed_total, completed_done, completed_points_total, completed_points_done} (VIEWER; FR-AN-003)
 GET    /orgs/{orgId}/projects/{projectId}/sprints/{sprintId}/burndown  {start, end|null, total_points, total_tasks, days:[{date, remaining_points, remaining_tasks}]} UTC days; planned sprint → 409 (VIEWER; FR-AN-003)
 POST   /orgs/{orgId}/tasks/bulk                      {task_ids[], op: move|assign|label, ...}

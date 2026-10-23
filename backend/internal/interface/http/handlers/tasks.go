@@ -47,6 +47,7 @@ type taskResp struct {
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	DueDate     *time.Time `json:"due_date,omitempty"`
 	EpicID      *string    `json:"epic_id,omitempty"`
+	ReleaseID   *string    `json:"release_id,omitempty"`
 	Estimate    *int       `json:"estimate,omitempty"`
 	Rank        string     `json:"rank"`
 	CreatedBy   string     `json:"created_by"`
@@ -63,7 +64,7 @@ func toTaskResp(t *project.Task) taskResp {
 	return taskResp{
 		ID: t.ID, ProjectID: t.ProjectID, ColumnID: t.ColumnID, Number: t.Number,
 		Title: t.Title, Description: t.Description, AssigneeID: t.AssigneeID,
-		Priority: string(t.Priority), StartDate: t.StartDate, DueDate: t.DueDate, EpicID: t.EpicID, Estimate: t.Estimate, Rank: t.Rank,
+		Priority: string(t.Priority), StartDate: t.StartDate, DueDate: t.DueDate, EpicID: t.EpicID, Estimate: t.Estimate, ReleaseID: t.ReleaseID, Rank: t.Rank,
 		CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 		Version: t.Version, ClaimedBy: claimedBy, LeaseExpiresAt: lease,
 	}
