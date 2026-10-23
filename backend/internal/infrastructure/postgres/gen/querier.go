@@ -146,6 +146,15 @@ type Querier interface {
 	CreateUser(ctx context.Context, arg CreateUserParams) error
 	// Project wiki ([T], tenant-scoped, FR-PROJ-013) ----------------------------
 	CreateWikiPage(ctx context.Context, arg CreateWikiPageParams) error
+	// Open tasks per project and assignee (assignee_id NULL = unassigned).
+	DashboardAssigneeCounts(ctx context.Context, arg DashboardAssigneeCountsParams) ([]DashboardAssigneeCountsRow, error)
+	// Org dashboard (FR-AN-005, ADR-038). [T]; every query is scoped to the caller's
+	// visible project ids, computed by ProjectRepository.List. "Done" is
+	// tasks.completed_at (trigger-stamped, 0038); tasks already done before that
+	// migration have no stamp and count as open.
+	DashboardProjectCounts(ctx context.Context, arg DashboardProjectCountsParams) ([]DashboardProjectCountsRow, error)
+	// Completed tasks per ISO week (Monday) from the nightly rollup.
+	DashboardWeeklyCompleted(ctx context.Context, arg DashboardWeeklyCompletedParams) ([]DashboardWeeklyCompletedRow, error)
 	DeclineIntakeRequest(ctx context.Context, arg DeclineIntakeRequestParams) (int64, error)
 	DeleteAgent(ctx context.Context, arg DeleteAgentParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
@@ -197,6 +206,7 @@ type Querier interface {
 	GetColumn(ctx context.Context, arg GetColumnParams) (BoardColumn, error)
 	GetComment(ctx context.Context, arg GetCommentParams) (Comment, error)
 	GetCustomField(ctx context.Context, arg GetCustomFieldParams) (CustomField, error)
+	GetDashboardLayout(ctx context.Context, arg GetDashboardLayoutParams) ([]byte, error)
 	GetEpic(ctx context.Context, arg GetEpicParams) (Epic, error)
 	GetIntakeRequest(ctx context.Context, arg GetIntakeRequestParams) (GetIntakeRequestRow, error)
 	GetInvitation(ctx context.Context, arg GetInvitationParams) (Invitation, error)
@@ -505,6 +515,7 @@ type Querier interface {
 	UpdateUserPasswordHash(ctx context.Context, arg UpdateUserPasswordHashParams) error
 	// Optimistic concurrency: a stale if_version matches no row.
 	UpdateWikiPage(ctx context.Context, arg UpdateWikiPageParams) (int64, error)
+	UpsertDashboardLayout(ctx context.Context, arg UpsertDashboardLayoutParams) error
 	UpsertFeatureFlag(ctx context.Context, arg UpsertFeatureFlagParams) error
 	UpsertInvoice(ctx context.Context, arg UpsertInvoiceParams) error
 	UpsertNotificationPref(ctx context.Context, arg UpsertNotificationPrefParams) error
