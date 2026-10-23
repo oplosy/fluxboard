@@ -23,7 +23,7 @@ export function ActivityTimeline({ taskId }: { taskId: string }) {
   const list = activity ?? [];
 
   function describe(a: Activity): string {
-    const field = a.field.replace(/_/g, ' ');
+    const field = a.field === 'estimate' ? 'story points' : a.field.replace(/_/g, ' ');
     if (a.old_value && a.new_value) return `changed ${field} from “${a.old_value}” to “${a.new_value}”`;
     if (a.new_value) return `set ${field} to “${a.new_value}”`;
     if (a.old_value) return `cleared ${field}`;
