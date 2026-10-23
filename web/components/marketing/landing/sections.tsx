@@ -23,6 +23,8 @@ const facts = [
   'audit: api_key.revoked',
   '2FA · TOTP verified',
   'usage: api_calls +1',
+  'mcp: tasks.next → claimed · lease 30m',
+  'agent → Review · awaiting approval',
 ];
 
 export function Ticker() {
@@ -194,7 +196,7 @@ export function BillingSection() {
     <section className="border-t border-border py-24 md:py-36">
       <div className="container">
         <SectionHead
-          n="04"
+          n="05"
           kicker="Billing"
           title="It meters itself."
           body="Seats, storage and API calls are counted as they happen and reported to Stripe. Hit a limit and you get an upgrade prompt, not a silent failure. Reads are never blocked."
@@ -258,7 +260,7 @@ export function SecuritySection() {
     <section className="border-t border-border py-24 md:py-36">
       <div className="container">
         <SectionHead
-          n="05"
+          n="06"
           kicker="Boundaries"
           title="Isolation is not a setting."
           body="Tenancy, roles and audit history are part of the foundation, not an enterprise add-on. Owner, Admin, Member and Guest each see exactly what they should."
@@ -288,7 +290,7 @@ export function ClosingCta() {
       <div className="pointer-events-none absolute inset-0 opacity-[0.07] [background-image:linear-gradient(hsl(var(--paper))_1px,transparent_1px),linear-gradient(90deg,hsl(var(--paper))_1px,transparent_1px)] [background-size:48px_48px]" />
       <div className="container relative grid gap-12 md:grid-cols-[1fr_auto] md:items-end">
         <div>
-          <p className="text-xs text-paper/50 font-medium">06 — Start</p>
+          <p className="text-xs text-paper/50 font-medium">08 — Start</p>
           <h2 className="mt-5 max-w-[14ch] text-[clamp(2.6rem,7vw,6.5rem)] font-semibold leading-[0.9] tracking-[-0.055em]">
             <SplitText text="Your next standup could be shorter." wordClassName={(w) => (w === 'shorter.' ? 'text-signal' : undefined)} />
           </h2>
