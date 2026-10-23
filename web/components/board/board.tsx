@@ -44,6 +44,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Column, type QuickTaskInput } from './column';
 import { PriorityBars } from './priority-bars';
 import { BoardToolbar, EMPTY_FILTER, type BoardFilter } from './board-toolbar';
+import { SavedViewsMenu } from './saved-views-menu';
 
 interface MoveVars {
   taskId: string;
@@ -145,6 +146,8 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
   const [chosenGroupBy, setChosenGroupBy] = useState<GroupBy | null>(null);
   const groupBy = chosenGroupBy ?? storedGroupBy;
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
+  // The saved view last applied or saved (FR-PROJ-011); null = none.
+  const [activeViewId, setActiveViewId] = useState<string | null>(null);
   function setGroupBy(g: GroupBy) {
     setChosenGroupBy(g);
     setCollapsed(new Set());
@@ -417,6 +420,19 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
         epics={epics ?? []}
         groupBy={groupBy}
         onGroupBy={setGroupBy}
+        viewsSlot={
+          <SavedViewsMenu
+            orgId={orgId}
+            projectId={projectId}
+            state={{ filter, groupBy }}
+            onApply={(v) => {
+              setFilter(v.filter);
+              setGroupBy(v.groupBy);
+            }}
+            activeId={activeViewId}
+            onActiveChange={setActiveViewId}
+          />
+        }
         bulkPending={bulkMutation.isPending}
         onBulkMove={(columnId) => bulkMutation.mutate({ action: 'move', task_ids: [...selectedIds], column_id: columnId })}
         onBulkAssignMe={() =>
