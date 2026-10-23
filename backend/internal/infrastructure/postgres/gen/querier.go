@@ -128,6 +128,8 @@ type Querier interface {
 	CreateRecoveryCode(ctx context.Context, arg CreateRecoveryCodeParams) error
 	// Releases ([T], tenant-scoped, FR-PROJ-010) --------------------------------
 	CreateRelease(ctx context.Context, arg CreateReleaseParams) error
+	// Saved board views ([T], tenant-scoped, FR-PROJ-011) -----------------------
+	CreateSavedView(ctx context.Context, arg CreateSavedViewParams) error
 	CreateSession(ctx context.Context, arg CreateSessionParams) error
 	// Sprints ([T], tenant-scoped, FR-SPRINT) ----------------------------------
 	CreateSprint(ctx context.Context, arg CreateSprintParams) error
@@ -153,6 +155,7 @@ type Querier interface {
 	DeleteOverride(ctx context.Context, arg DeleteOverrideParams) (int64, error)
 	DeleteProjectForm(ctx context.Context, arg DeleteProjectFormParams) (int64, error)
 	DeleteRelease(ctx context.Context, arg DeleteReleaseParams) (int64, error)
+	DeleteSavedView(ctx context.Context, arg DeleteSavedViewParams) (int64, error)
 	DeleteSprint(ctx context.Context, arg DeleteSprintParams) (int64, error)
 	DeleteSubtask(ctx context.Context, arg DeleteSubtaskParams) (int64, error)
 	DeleteTaskCustomValue(ctx context.Context, arg DeleteTaskCustomValueParams) (int64, error)
@@ -212,6 +215,7 @@ type Querier interface {
 	GetProjectForm(ctx context.Context, arg GetProjectFormParams) (ProjectForm, error)
 	GetProjectMember(ctx context.Context, arg GetProjectMemberParams) (GetProjectMemberRow, error)
 	GetRelease(ctx context.Context, arg GetReleaseParams) (Release, error)
+	GetSavedView(ctx context.Context, arg GetSavedViewParams) (SavedView, error)
 	GetSessionByID(ctx context.Context, id uuid.UUID) (GetSessionByIDRow, error)
 	GetSessionByTokenHashForUpdate(ctx context.Context, tokenHash []byte) (GetSessionByTokenHashForUpdateRow, error)
 	// Resolve a stale slug to its org within the 30-day 301 window (FR-TEN-007).
@@ -367,6 +371,8 @@ type Querier interface {
 	// Metered aggregates for a day not yet pushed to Stripe.
 	ListUsageForPush(ctx context.Context, arg ListUsageForPushParams) ([]UsageRecord, error)
 	ListUsersByIDs(ctx context.Context, ids []uuid.UUID) ([]ListUsersByIDsRow, error)
+	// The project's shared views plus the caller's own personal ones.
+	ListVisibleSavedViews(ctx context.Context, arg ListVisibleSavedViewsParams) ([]SavedView, error)
 	ListWaitingApprovals(ctx context.Context, arg ListWaitingApprovalsParams) ([]ListWaitingApprovalsRow, error)
 	// Request inbox ([T], tenant-scoped, research report §6.3/§7) -----------------
 	// Serializes concurrent identical submissions (same form + email + content) for
@@ -476,6 +482,7 @@ type Querier interface {
 	UpdateProjectForm(ctx context.Context, arg UpdateProjectFormParams) (int64, error)
 	UpdateProjectFormToken(ctx context.Context, arg UpdateProjectFormTokenParams) (int64, error)
 	UpdateRelease(ctx context.Context, arg UpdateReleaseParams) (int64, error)
+	UpdateSavedView(ctx context.Context, arg UpdateSavedViewParams) (int64, error)
 	UpdateSprint(ctx context.Context, arg UpdateSprintParams) (int64, error)
 	UpdateSubtask(ctx context.Context, arg UpdateSubtaskParams) (int64, error)
 	UpdateTask(ctx context.Context, arg UpdateTaskParams) (int64, error)

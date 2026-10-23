@@ -414,6 +414,17 @@ type Release struct {
 	CreatedAt   time.Time          `json:"created_at"`
 }
 
+type SavedView struct {
+	ID        uuid.UUID `json:"id"`
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+	OwnerID   uuid.UUID `json:"owner_id"`
+	Name      string    `json:"name"`
+	Shared    bool      `json:"shared"`
+	Filters   []byte    `json:"filters"`
+	CreatedAt time.Time `json:"created_at"`
+}
+
 type Session struct {
 	ID           uuid.UUID          `json:"id"`
 	FamilyID     uuid.UUID          `json:"family_id"`
