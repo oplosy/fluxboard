@@ -44,7 +44,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-03 | Sprint burndown and velocity | in progress | FR-AN-003 | `feat/sprint-burndown` | | R-02 |
+| R-03 | Sprint burndown and velocity | done | FR-AN-003 | `feat/sprint-burndown` | oplosy/fluxboard#84 | R-02 |
 | R-04 | Board swimlanes | todo | | | | R-01 |
 | R-05 | Releases / versions | todo | | | | |
 | R-06 | Workload / capacity view | todo | | | | R-02 |
@@ -118,3 +118,4 @@ Ideas not yet placed in a wave.
 | Canvas redesign (board, list, task detail, shell) | — | oplosy/fluxboard#79 |
 | Epics (R-01) | FR-PROJ-008 | oplosy/fluxboard#82 |
 | Story points (R-02) | FR-TASK-015 | oplosy/fluxboard#83 |
+| Sprint burndown and velocity (R-03) | FR-AN-003 | oplosy/fluxboard#84 |
