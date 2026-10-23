@@ -166,3 +166,25 @@ func (r *TimeEntryRepo) Delete(ctx context.Context, orgID, id string) error {
 		return nil
 	})
 }
+
+func (r *TimeEntryRepo) SumByUser(ctx context.Context, orgID, projectID string, from, to time.Time) (map[string]int64, error) {
+	pid, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("time sum: project: %w", err)
+	}
+	out := map[string]int64{}
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		rows, err := q.SumProjectTimeByUser(ctx, gen.SumProjectTimeByUserParams{
+			OrgID: oid, ProjectID: pid, FromAt: from, ToAt: to,
+		})
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			out[row.UserID.String()] = row.Seconds
+		}
+		return nil
+	})
+	return out, err
+}
