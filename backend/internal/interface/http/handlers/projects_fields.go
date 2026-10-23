@@ -200,6 +200,29 @@ func (h *ProjectHandlers) TaskFieldValues(w http.ResponseWriter, r *http.Request
 	response.JSON(w, http.StatusOK, map[string]any{"values": out})
 }
 
+// ProjectFieldValues returns every custom value of the project's tasks (VIEWER).
+func (h *ProjectHandlers) ProjectFieldValues(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	values, err := h.svc.ProjectFieldValues(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "projectId"), tc.Role)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	type taskValueResp struct {
+		TaskID string `json:"task_id"`
+		customValueResp
+	}
+	out := make([]taskValueResp, 0, len(values))
+	for i := range values {
+		out = append(out, taskValueResp{TaskID: values[i].TaskID, customValueResp: toCustomValueResp(&values[i])})
+	}
+	response.JSON(w, http.StatusOK, map[string]any{"values": out})
+}
+
 // ClearFieldValue removes one task value (CONTRIBUTOR).
 func (h *ProjectHandlers) ClearFieldValue(w http.ResponseWriter, r *http.Request) {
 	tc, ok := mw.TenantFrom(r.Context())

@@ -136,6 +136,18 @@ func (s *Service) TaskFieldValues(ctx context.Context, orgID, userID, taskID str
 	return s.fields.ValuesByTask(ctx, orgID, taskID)
 }
 
+// ProjectFieldValues returns every custom value of the project's live tasks
+// (VIEWER, FR-PROJ-012): one read for the editable table instead of one per row.
+func (s *Service) ProjectFieldValues(ctx context.Context, orgID, userID, projectID string, orgRole tenant.OrgRole) ([]project.CustomValue, error) {
+	if !s.fieldsEnabled() {
+		return nil, domain.ErrForbidden // fields disabled
+	}
+	if _, _, err := s.access(ctx, orgID, projectID, userID, orgRole, project.RoleViewer); err != nil {
+		return nil, err
+	}
+	return s.fields.ValuesByProject(ctx, orgID, projectID)
+}
+
 // ClearFieldValue removes one task value (CONTRIBUTOR).
 func (s *Service) ClearFieldValue(ctx context.Context, orgID, userID, taskID, fieldID string, orgRole tenant.OrgRole) error {
 	if !s.fieldsEnabled() {

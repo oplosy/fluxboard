@@ -297,6 +297,7 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Delete("/epics/{epicId}", d.Projects.DeleteEpic)
 					// Custom fields (docs/08, FR-FIELDS). Fine-grained gates in projectuc.
 					p.With(read(tenant.ObjOrg)).Get("/fields", d.Projects.ListFields)
+					p.With(read(tenant.ObjOrg)).Get("/field-values", d.Projects.ProjectFieldValues)
 					p.With(read(tenant.ObjOrg)).Post("/fields", d.Projects.CreateField)
 					p.With(read(tenant.ObjOrg)).Patch("/fields/{fieldId}", d.Projects.UpdateField)
 					p.With(read(tenant.ObjOrg)).Delete("/fields/{fieldId}", d.Projects.DeleteField)
