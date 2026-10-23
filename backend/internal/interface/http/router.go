@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/http/handlers"
@@ -57,6 +58,11 @@ type Deps struct {
 // NewRouter assembles the router. Infrastructure middleware wrap every route;
 // the security chain (auth → tenant → rbac → …) wraps only the routes that need
 // it, in the order fixed by docs/03-ARCHITECTURE.md §2.
+// compressJSON gzips JSON responses for clients that accept it: a large board
+// is ~9x smaller on the wire. Only application/json is touched, so the SSE
+// stream (text/event-stream) is never buffered.
+var compressJSON = middleware.Compress(5, "application/json")
+
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
 
@@ -81,6 +87,8 @@ func NewRouter(d Deps) http.Handler {
 	}
 
 	r.Route("/api/v1", func(api chi.Router) {
+		api.Use(compressJSON)
+
 		// Stripe webhook (FR-BILL-005). Mounted OUTSIDE session auth — Stripe
 		// carries no bearer token; the handler authenticates the request by
 		// verifying the payload signature through the gateway. docs/06 §4.
