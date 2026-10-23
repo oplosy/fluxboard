@@ -91,7 +91,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-12 | Goals / OKRs | todo | | | | R-01 |
+| R-12 | Goals / OKRs | in progress | FR-PROJ-014 | `claude/goals-0ce4ed` | | R-01 |
 | R-13 | Docs / wiki pages | done | FR-PROJ-013 | `feat/project-wiki` | oplosy/fluxboard#90 | |
 
 - **R-12 Goals / OKRs.** Goals with progress computed from linked tasks or
