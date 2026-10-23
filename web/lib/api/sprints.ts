@@ -10,7 +10,21 @@ export interface Sprint {
   ended_at?: string | null;
   completed_total: number;
   completed_done: number;
+  /** Story points snapshot at completion; 0 for sprints completed before points existed. */
+  completed_points_total: number;
+  completed_points_done: number;
   created_at: string;
+}
+
+/** Remaining work per UTC day (GET .../sprints/{id}/burndown, FR-AN-003). */
+export interface SprintBurndown {
+  /** YYYY-MM-DD. */
+  start: string;
+  /** Planned end (YYYY-MM-DD), null when the sprint has none. */
+  end: string | null;
+  total_points: number;
+  total_tasks: number;
+  days: { date: string; remaining_points: number; remaining_tasks: number }[];
 }
 
 /** Payload for POST .../projects/{id}/sprints. */
@@ -59,4 +73,9 @@ export function assignSprint(
     method: 'POST',
     body: input,
   });
+}
+
+/** Burndown of a started sprint (VIEWER). 409 for a planned sprint. */
+export function getSprintBurndown(orgId: string, projectId: string, sprintId: string): Promise<SprintBurndown> {
+  return apiFetch(`/orgs/${orgId}/projects/${projectId}/sprints/${sprintId}/burndown`);
 }

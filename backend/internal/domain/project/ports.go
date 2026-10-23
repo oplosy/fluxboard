@@ -235,6 +235,9 @@ type SprintRepository interface {
 	SetTaskSprint(ctx context.Context, orgID, taskID string, sprintID *string) error
 	// ClearSprint unassigns every task of one sprint in a project.
 	ClearSprint(ctx context.Context, orgID, projectID, sprintID string) error
+	// BurndownTasks returns the sprint's live tasks with points and
+	// completion stamp (FR-AN-003).
+	BurndownTasks(ctx context.Context, orgID, sprintID string) ([]BurndownTask, error)
 }
 
 // CustomFieldRepository persists project custom fields and task values

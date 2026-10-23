@@ -133,6 +133,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 |----|---|-------------|
 | FR-AN-001 | M | Project analytics page: tasks completed per week (12w bar), cumulative flow by column (stacked area), avg cycle time (In Progress→Done, 30d), per-assignee open/closed counts. Powered by nightly rollup table `project_stats_daily` — NOT live aggregate queries on the task table. |
 | FR-AN-002 | M | Org usage dashboard: seats vs limit, storage vs limit, API calls (30d sparkline), next-invoice estimate for metered plans (from local usage_records, labeled "estimate"). |
+| FR-AN-003 | S | Sprint burndown and velocity: every project VIEWER+ sees, for an active or completed sprint, the remaining work per day (UTC) from its start to today or its end, in story points and in tasks, against an ideal line to the planned end; work counts as done on the day it entered the done column. Completing a sprint also snapshots its total and done story points, and the sprints page charts committed vs done per completed sprint (velocity). |
 
 ## AI — Governed AI Layer (full spec: ADR-025)
 

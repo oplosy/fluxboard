@@ -424,18 +424,20 @@ type SlugHistory struct {
 }
 
 type Sprint struct {
-	ID             uuid.UUID          `json:"id"`
-	OrgID          uuid.UUID          `json:"org_id"`
-	ProjectID      uuid.UUID          `json:"project_id"`
-	Name           string             `json:"name"`
-	Goal           string             `json:"goal"`
-	Status         string             `json:"status"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	EndedAt        pgtype.Timestamptz `json:"ended_at"`
-	CompletedTotal int32              `json:"completed_total"`
-	CompletedDone  int32              `json:"completed_done"`
-	CreatedBy      uuid.UUID          `json:"created_by"`
-	CreatedAt      time.Time          `json:"created_at"`
+	ID                   uuid.UUID          `json:"id"`
+	OrgID                uuid.UUID          `json:"org_id"`
+	ProjectID            uuid.UUID          `json:"project_id"`
+	Name                 string             `json:"name"`
+	Goal                 string             `json:"goal"`
+	Status               string             `json:"status"`
+	StartedAt            pgtype.Timestamptz `json:"started_at"`
+	EndedAt              pgtype.Timestamptz `json:"ended_at"`
+	CompletedTotal       int32              `json:"completed_total"`
+	CompletedDone        int32              `json:"completed_done"`
+	CreatedBy            uuid.UUID          `json:"created_by"`
+	CreatedAt            time.Time          `json:"created_at"`
+	CompletedPointsTotal int32              `json:"completed_points_total"`
+	CompletedPointsDone  int32              `json:"completed_points_done"`
 }
 
 type Subscription struct {

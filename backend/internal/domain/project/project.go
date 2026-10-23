@@ -289,8 +289,11 @@ type Sprint struct {
 	EndedAt        *time.Time
 	CompletedTotal int
 	CompletedDone  int
-	CreatedBy      string
-	CreatedAt      time.Time
+	// CompletedPoints*: story points snapshot at completion (FR-AN-003).
+	CompletedPointsTotal int
+	CompletedPointsDone  int
+	CreatedBy            string
+	CreatedAt            time.Time
 }
 
 // ProjectForm is a shareable intake form for a project (ADR-023). Anyone with

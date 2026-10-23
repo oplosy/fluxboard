@@ -276,6 +276,7 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Post("/sprints", d.Projects.CreateSprint)
 					p.With(read(tenant.ObjOrg)).Post("/sprints/{sprintId}/start", d.Projects.StartSprint)
 					p.With(read(tenant.ObjOrg)).Post("/sprints/{sprintId}/complete", d.Projects.CompleteSprint)
+					p.With(read(tenant.ObjOrg)).Get("/sprints/{sprintId}/burndown", d.Projects.SprintBurndown)
 					p.With(read(tenant.ObjOrg)).Delete("/sprints/{sprintId}", d.Projects.DeleteSprint)
 					p.With(read(tenant.ObjOrg)).Post("/sprints/assign", d.Projects.AssignSprint)
 					// Epics (docs/08, FR-PROJ-008). Fine-grained gates in projectuc.
