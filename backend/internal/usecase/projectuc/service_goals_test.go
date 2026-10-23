@@ -93,7 +93,9 @@ func (f *fakeGoalProjects) List(_ context.Context, _, _ string, sc project.Scope
 	return out, nil
 }
 
-type fakeGoalMembers struct{ project.ProjectMemberRepository }
+type fakeGoalMembers struct {
+	project.ProjectMemberRepository
+}
 
 func (fakeGoalMembers) Get(_ context.Context, _, _, _ string) (*project.ProjectMember, error) {
 	return nil, domain.ErrNotFound
