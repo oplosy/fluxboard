@@ -63,7 +63,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-07 | Saved views and filters | done | FR-PROJ-011 | `feat/saved-views` | oplosy/fluxboard#88 | |
-| R-08 | Editable table view | todo | | | | |
+| R-08 | Editable table view | in progress | FR-PROJ-012 | `feat/editable-table` | | |
 | R-09 | Cross-project dashboards | todo | | | | |
 
 - **R-07 Saved views and filters.** Save board / list filters as personal or
