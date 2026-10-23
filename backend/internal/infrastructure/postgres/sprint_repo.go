@@ -27,6 +27,7 @@ func mapSprint(row gen.Sprint) *project.Sprint {
 		Name: row.Name, Goal: row.Goal, Status: project.SprintStatus(row.Status),
 		StartedAt: tsPtr(row.StartedAt), EndedAt: tsPtr(row.EndedAt),
 		CompletedTotal: int(row.CompletedTotal), CompletedDone: int(row.CompletedDone),
+		CompletedPointsTotal: int(row.CompletedPointsTotal), CompletedPointsDone: int(row.CompletedPointsDone),
 		CreatedBy: row.CreatedBy.String(), CreatedAt: row.CreatedAt,
 	}
 }
@@ -139,6 +140,7 @@ func (r *SprintRepo) Update(ctx context.Context, orgID string, s *project.Sprint
 			OrgID: oid, ID: sid, Name: s.Name, Goal: s.Goal, Status: string(s.Status),
 			StartedAt: nullTS(s.StartedAt), EndedAt: nullTS(s.EndedAt),
 			CompletedTotal: int32(s.CompletedTotal), CompletedDone: int32(s.CompletedDone),
+			CompletedPointsTotal: int32(s.CompletedPointsTotal), CompletedPointsDone: int32(s.CompletedPointsDone),
 		})
 		if err != nil {
 			return err
@@ -206,4 +208,30 @@ func (r *SprintRepo) ClearSprint(ctx context.Context, orgID, projectID, sprintID
 		})
 		return err
 	})
+}
+
+func (r *SprintRepo) BurndownTasks(ctx context.Context, orgID, sprintID string) ([]project.BurndownTask, error) {
+	sid, err := parseUUID(sprintID)
+	if err != nil {
+		return nil, fmt.Errorf("sprint burndown: %w", err)
+	}
+	out := make([]project.BurndownTask, 0)
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		rows, err := q.ListSprintBurndownTasks(ctx, gen.ListSprintBurndownTasksParams{
+			OrgID: oid, SprintID: pgtype.UUID{Bytes: sid, Valid: true},
+		})
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			t := project.BurndownTask{CompletedAt: tsPtr(row.CompletedAt)}
+			if row.Estimate != nil {
+				t.Points = int(*row.Estimate)
+			}
+			out = append(out, t)
+		}
+		return nil
+	})
+	return out, err
 }

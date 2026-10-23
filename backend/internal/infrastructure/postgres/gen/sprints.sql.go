@@ -86,7 +86,8 @@ func (q *Queries) DeleteSprint(ctx context.Context, arg DeleteSprintParams) (int
 
 const getActiveSprint = `-- name: GetActiveSprint :one
 SELECT id, org_id, project_id, name, goal, status, started_at, ended_at,
-       completed_total, completed_done, created_by, created_at
+       completed_total, completed_done, created_by, created_at,
+       completed_points_total, completed_points_done
 FROM sprints
 WHERE org_id = $1 AND project_id = $2 AND status = 'active'
 LIMIT 1
@@ -113,13 +114,16 @@ func (q *Queries) GetActiveSprint(ctx context.Context, arg GetActiveSprintParams
 		&i.CompletedDone,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.CompletedPointsTotal,
+		&i.CompletedPointsDone,
 	)
 	return i, err
 }
 
 const getSprint = `-- name: GetSprint :one
 SELECT id, org_id, project_id, name, goal, status, started_at, ended_at,
-       completed_total, completed_done, created_by, created_at
+       completed_total, completed_done, created_by, created_at,
+       completed_points_total, completed_points_done
 FROM sprints
 WHERE org_id = $1 AND id = $2
 `
@@ -145,13 +149,53 @@ func (q *Queries) GetSprint(ctx context.Context, arg GetSprintParams) (Sprint, e
 		&i.CompletedDone,
 		&i.CreatedBy,
 		&i.CreatedAt,
+		&i.CompletedPointsTotal,
+		&i.CompletedPointsDone,
 	)
 	return i, err
 }
 
+const listSprintBurndownTasks = `-- name: ListSprintBurndownTasks :many
+SELECT estimate, completed_at FROM tasks
+WHERE org_id = $1 AND sprint_id = $2 AND deleted_at IS NULL
+`
+
+type ListSprintBurndownTasksParams struct {
+	OrgID    uuid.UUID   `json:"org_id"`
+	SprintID pgtype.UUID `json:"sprint_id"`
+}
+
+type ListSprintBurndownTasksRow struct {
+	Estimate    *int32             `json:"estimate"`
+	CompletedAt pgtype.Timestamptz `json:"completed_at"`
+}
+
+// The sprint's live tasks with their points and completion stamp (FR-AN-003).
+// completed_at is set only while a task sits in the done column (0038).
+func (q *Queries) ListSprintBurndownTasks(ctx context.Context, arg ListSprintBurndownTasksParams) ([]ListSprintBurndownTasksRow, error) {
+	rows, err := q.db.Query(ctx, listSprintBurndownTasks, arg.OrgID, arg.SprintID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListSprintBurndownTasksRow
+	for rows.Next() {
+		var i ListSprintBurndownTasksRow
+		if err := rows.Scan(&i.Estimate, &i.CompletedAt); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listSprintsByProject = `-- name: ListSprintsByProject :many
 SELECT id, org_id, project_id, name, goal, status, started_at, ended_at,
-       completed_total, completed_done, created_by, created_at
+       completed_total, completed_done, created_by, created_at,
+       completed_points_total, completed_points_done
 FROM sprints
 WHERE org_id = $1 AND project_id = $2
 ORDER BY created_at
@@ -184,6 +228,8 @@ func (q *Queries) ListSprintsByProject(ctx context.Context, arg ListSprintsByPro
 			&i.CompletedDone,
 			&i.CreatedBy,
 			&i.CreatedAt,
+			&i.CompletedPointsTotal,
+			&i.CompletedPointsDone,
 		); err != nil {
 			return nil, err
 		}
@@ -218,20 +264,23 @@ const updateSprint = `-- name: UpdateSprint :execrows
 UPDATE sprints
 SET name = $1, goal = $2, status = $3,
     started_at = $4, ended_at = $5,
-    completed_total = $6, completed_done = $7
-WHERE org_id = $8 AND id = $9
+    completed_total = $6, completed_done = $7,
+    completed_points_total = $8, completed_points_done = $9
+WHERE org_id = $10 AND id = $11
 `
 
 type UpdateSprintParams struct {
-	Name           string             `json:"name"`
-	Goal           string             `json:"goal"`
-	Status         string             `json:"status"`
-	StartedAt      pgtype.Timestamptz `json:"started_at"`
-	EndedAt        pgtype.Timestamptz `json:"ended_at"`
-	CompletedTotal int32              `json:"completed_total"`
-	CompletedDone  int32              `json:"completed_done"`
-	OrgID          uuid.UUID          `json:"org_id"`
-	ID             uuid.UUID          `json:"id"`
+	Name                 string             `json:"name"`
+	Goal                 string             `json:"goal"`
+	Status               string             `json:"status"`
+	StartedAt            pgtype.Timestamptz `json:"started_at"`
+	EndedAt              pgtype.Timestamptz `json:"ended_at"`
+	CompletedTotal       int32              `json:"completed_total"`
+	CompletedDone        int32              `json:"completed_done"`
+	CompletedPointsTotal int32              `json:"completed_points_total"`
+	CompletedPointsDone  int32              `json:"completed_points_done"`
+	OrgID                uuid.UUID          `json:"org_id"`
+	ID                   uuid.UUID          `json:"id"`
 }
 
 func (q *Queries) UpdateSprint(ctx context.Context, arg UpdateSprintParams) (int64, error) {
@@ -243,6 +292,8 @@ func (q *Queries) UpdateSprint(ctx context.Context, arg UpdateSprintParams) (int
 		arg.EndedAt,
 		arg.CompletedTotal,
 		arg.CompletedDone,
+		arg.CompletedPointsTotal,
+		arg.CompletedPointsDone,
 		arg.OrgID,
 		arg.ID,
 	)

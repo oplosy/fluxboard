@@ -338,6 +338,9 @@ type Querier interface {
 	// Orgs the user solely owns (blocks account deletion, docs/08 §3). Cross-org read:
 	// run on the owner pool (memberships RLS is non-FORCE, table owner bypasses it).
 	ListSoleOwnerOrgs(ctx context.Context, userID uuid.UUID) ([]ListSoleOwnerOrgsRow, error)
+	// The sprint's live tasks with their points and completion stamp (FR-AN-003).
+	// completed_at is set only while a task sits in the done column (0038).
+	ListSprintBurndownTasks(ctx context.Context, arg ListSprintBurndownTasksParams) ([]ListSprintBurndownTasksRow, error)
 	ListSprintsByProject(ctx context.Context, arg ListSprintsByProjectParams) ([]Sprint, error)
 	ListSubtasksByTask(ctx context.Context, arg ListSubtasksByTaskParams) ([]Subtask, error)
 	ListTaskApprovals(ctx context.Context, arg ListTaskApprovalsParams) ([]TaskApproval, error)
