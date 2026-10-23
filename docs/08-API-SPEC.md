@@ -136,6 +136,12 @@ POST   /orgs/{orgId}/projects/{projectId}/wiki               {title, body?} -> p
 GET    /orgs/{orgId}/projects/{projectId}/wiki/{wikiId}      page with body and tasks: [{number, title}] = live tasks of this project named as KEY-N in the body (VIEWER)
 PATCH  /orgs/{orgId}/projects/{projectId}/wiki/{wikiId}      {title, body, version} 409 when version is not the stored one (CONTRIBUTOR)    DELETE same path (project LEAD or author)
 GET    /orgs/{orgId}/projects/{projectId}/wiki/mentions?task_number=N  pages naming task N, no bodies (VIEWER)
+GET    /orgs/{orgId}/goals                                     {goals:[{id, title, description, owner_id, target_date: YYYY-MM-DD|null, status: on_track|at_risk|done, total, done, points, done_points, created_at}]}; progress counts distinct tasks linked directly or through a linked epic, only from projects the caller can see (any org member; FR-PROJ-014)
+POST   /orgs/{orgId}/goals                                     {title, description?, target_date?: YYYY-MM-DD} caller becomes owner (MEMBER+); returns the detail below
+GET    /orgs/{orgId}/goals/{goalId}                            goal + items:[{kind: epic|task, id, project_id, project_key, number, title, total, done}] (linked work of projects the caller cannot see is omitted)
+PATCH  /orgs/{orgId}/goals/{goalId}                            {title, description, target_date|null} (owner or ADMIN+)    DELETE same path keeps the linked work (owner or ADMIN+)
+PUT    /orgs/{orgId}/goals/{goalId}/epics/{epicId}             link an epic, idempotent (owner or ADMIN+; epic's project must be visible, else 404)    DELETE same path unlinks (404 if not linked)
+PUT    /orgs/{orgId}/goals/{goalId}/tasks/{taskId}             link a task, same rules    DELETE same path unlinks
 GET    /orgs/{orgId}/projects/{projectId}/field-values         every custom value of the project's live tasks: {values:[{task_id, field_id, name, type, text?, number?, date?}]} (VIEWER; FR-PROJ-012)
 GET    /orgs/{orgId}/projects/{projectId}/views                shared views + the caller's personal ones: {id, name, shared, mine, filters:{text, priority, assignee, sprint, epic, group_by}} (VIEWER; FR-PROJ-011)
 POST   /orgs/{orgId}/projects/{projectId}/views                {name, shared, filters} personal: VIEWER, shared: LEAD
