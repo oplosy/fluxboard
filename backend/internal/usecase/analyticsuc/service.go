@@ -28,6 +28,7 @@ type Deps struct {
 	Usage    analytics.UsageReader
 	Subs     billing.SubscriptionRepository
 	Plans    billing.PlanRepository
+	Dash     analytics.DashboardRepository // org dashboard (FR-AN-005)
 	Now      func() time.Time
 }
 
@@ -39,6 +40,7 @@ type Service struct {
 	usage    analytics.UsageReader
 	subs     billing.SubscriptionRepository
 	plans    billing.PlanRepository
+	dash     analytics.DashboardRepository
 	now      func() time.Time
 }
 
@@ -47,7 +49,7 @@ func New(d Deps) *Service {
 	if d.Now == nil {
 		d.Now = time.Now
 	}
-	return &Service{stats: d.Stats, projects: d.Projects, members: d.Members, usage: d.Usage, subs: d.Subs, plans: d.Plans, now: d.Now}
+	return &Service{stats: d.Stats, projects: d.Projects, members: d.Members, usage: d.Usage, subs: d.Subs, plans: d.Plans, dash: d.Dash, now: d.Now}
 }
 
 // ProjectAnalytics returns the daily series + window totals for a project. A zero

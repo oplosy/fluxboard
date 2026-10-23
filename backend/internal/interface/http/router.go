@@ -469,6 +469,9 @@ func NewRouter(d Deps) http.Handler {
 				if d.Analytics != nil {
 					o.With(read(tenant.ObjOrg)).Get("/projects/{projectId}/analytics", d.Analytics.ProjectAnalytics)
 					o.With(read(tenant.ObjBilling)).Get("/usage", d.Analytics.Usage)
+					o.With(read(tenant.ObjOrg)).Get("/dashboard", d.Analytics.Dashboard)
+					o.With(read(tenant.ObjOrg)).Get("/dashboard/layout", d.Analytics.DashboardLayout)
+					o.With(read(tenant.ObjOrg)).Put("/dashboard/layout", d.Analytics.SaveDashboardLayout)
 				}
 			})
 		})
