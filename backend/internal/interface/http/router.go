@@ -261,6 +261,16 @@ func NewRouter(d Deps) http.Handler {
 				// Project templates (FR-PROJ-007, ADR-035): catalog + transactional create.
 				o.With(read(tenant.ObjOrg)).Get("/project-templates", d.Projects.ListProjectTemplates)
 				o.With(write(tenant.ObjProjects), d.Entitlement.RequireProjects()).Post("/projects/from-template", d.Projects.CreateProjectFromTemplate)
+				// Goals (docs/08, FR-PROJ-013): org-level; owner/ADMIN+ gates in projectuc.
+				o.With(read(tenant.ObjOrg)).Get("/goals", d.Projects.ListGoals)
+				o.With(read(tenant.ObjOrg)).Post("/goals", d.Projects.CreateGoal)
+				o.With(read(tenant.ObjOrg)).Get("/goals/{goalId}", d.Projects.GetGoal)
+				o.With(read(tenant.ObjOrg)).Patch("/goals/{goalId}", d.Projects.UpdateGoal)
+				o.With(read(tenant.ObjOrg)).Delete("/goals/{goalId}", d.Projects.DeleteGoal)
+				o.With(read(tenant.ObjOrg)).Put("/goals/{goalId}/epics/{epicId}", d.Projects.LinkGoalEpic)
+				o.With(read(tenant.ObjOrg)).Delete("/goals/{goalId}/epics/{epicId}", d.Projects.UnlinkGoalEpic)
+				o.With(read(tenant.ObjOrg)).Put("/goals/{goalId}/tasks/{taskId}", d.Projects.LinkGoalTask)
+				o.With(read(tenant.ObjOrg)).Delete("/goals/{goalId}/tasks/{taskId}", d.Projects.UnlinkGoalTask)
 				o.Route("/projects/{projectId}", func(p chi.Router) {
 					p.With(read(tenant.ObjOrg)).Get("/", d.Projects.GetProject)
 					p.With(read(tenant.ObjOrg)).Patch("/", d.Projects.UpdateProject)
