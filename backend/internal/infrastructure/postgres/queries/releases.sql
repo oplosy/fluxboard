@@ -28,3 +28,14 @@ WHERE org_id = @org_id AND id = @id;
 -- name: SetTaskRelease :execrows
 UPDATE tasks SET release_id = sqlc.narg('release_id')
 WHERE org_id = @org_id AND id = @id AND deleted_at IS NULL;
+
+-- name: ReleaseProgress :many
+-- Tasks and points per release, and of those in the done column (see EpicProgress).
+SELECT release_id::uuid AS id,
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE column_id = sqlc.narg('done_column'))::int AS done,
+       COALESCE(SUM(estimate), 0)::int AS points,
+       COALESCE(SUM(estimate) FILTER (WHERE column_id = sqlc.narg('done_column')), 0)::int AS done_points
+FROM tasks
+WHERE org_id = @org_id AND project_id = @project_id AND deleted_at IS NULL AND release_id IS NOT NULL
+GROUP BY release_id;

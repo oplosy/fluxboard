@@ -7,6 +7,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
+	"github.com/go-chi/chi/v5/middleware"
 
 	"github.com/mesutokul/fluxboard/backend/internal/domain/tenant"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/http/handlers"
@@ -17,6 +18,7 @@ import (
 type Deps struct {
 	Logger         *slog.Logger
 	WebOrigin      string
+	ExtraOrigins   []string // more CORS origins (WEB_EXTRA_ORIGINS)
 	Health         Health
 	MetricsHTTP    http.Handler
 	Auth           *handlers.AuthHandlers
@@ -57,6 +59,11 @@ type Deps struct {
 // NewRouter assembles the router. Infrastructure middleware wrap every route;
 // the security chain (auth → tenant → rbac → …) wraps only the routes that need
 // it, in the order fixed by docs/03-ARCHITECTURE.md §2.
+// compressJSON gzips JSON responses for clients that accept it: a large board
+// is ~9x smaller on the wire. Only application/json is touched, so the SSE
+// stream (text/event-stream) is never buffered.
+var compressJSON = middleware.Compress(5, "application/json")
+
 func NewRouter(d Deps) http.Handler {
 	r := chi.NewRouter()
 
@@ -64,7 +71,7 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(mw.RequestID)
 	r.Use(mw.Logger(d.Logger))
 	r.Use(mw.Recoverer)
-	r.Use(mw.CORS(d.WebOrigin))
+	r.Use(mw.CORS(append([]string{d.WebOrigin}, d.ExtraOrigins...)...))
 	r.Use(mw.ClientMeta(d.TrustedProxyHops)) // stash client IP/UA for audit + throttles (pkg/reqmeta)
 	if d.HTTPMetrics != nil {
 		r.Use(mw.Metrics(d.HTTPMetrics)) // request-duration histogram (10 §5)
@@ -81,6 +88,8 @@ func NewRouter(d Deps) http.Handler {
 	}
 
 	r.Route("/api/v1", func(api chi.Router) {
+		api.Use(compressJSON)
+
 		// Stripe webhook (FR-BILL-005). Mounted OUTSIDE session auth — Stripe
 		// carries no bearer token; the handler authenticates the request by
 		// verifying the payload signature through the gateway. docs/06 §4.

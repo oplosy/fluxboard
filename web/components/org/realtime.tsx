@@ -6,6 +6,9 @@ import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { useOrg } from '@/lib/org/context';
 import { useAuth } from '@/lib/auth/context';
 import { connectSse, type SseEvent } from '@/lib/sse';
+import { getTask } from '@/lib/api/tasks';
+import type { Board } from '@/lib/api/types';
+import { moveCard, patchCard } from '@/lib/board/board-cache';
 import { useLatest } from '@/lib/motion/hooks';
 
 // Realtime cache bridge (FR-NTF-001/002, docs/09 §1). Opens the org SSE stream
@@ -37,6 +40,22 @@ export function Realtime() {
   return null;
 }
 
+// Board refetches still needed (create / delete / restore) are coalesced per
+// project: a burst of events within the window costs one refetch, not one each.
+const BOARD_REFETCH_DEBOUNCE_MS = 300;
+const pendingBoardRefetch = new Map<string, ReturnType<typeof setTimeout>>();
+
+function refetchBoardSoon(qc: QueryClient, projectId: string): void {
+  if (pendingBoardRefetch.has(projectId)) return;
+  pendingBoardRefetch.set(
+    projectId,
+    setTimeout(() => {
+      pendingBoardRefetch.delete(projectId);
+      void qc.invalidateQueries({ queryKey: ['board', projectId] });
+    }, BOARD_REFETCH_DEBOUNCE_MS),
+  );
+}
+
 function applyEvent(
   qc: QueryClient,
   orgId: string,
@@ -52,21 +71,44 @@ function applyEvent(
   const inv = (key: readonly unknown[]) => void qc.invalidateQueries({ queryKey: key });
 
   switch (e.name) {
+    case 'task.moved': {
+      if (isSelf || !projectId) return;
+      // The event carries the destination: move the cached card, no refetch.
+      const board = qc.getQueryData<Board>(['board', projectId]);
+      const next =
+        board && taskId && typeof d.to_column === 'string' && typeof d.rank === 'string'
+          ? moveCard(board, taskId, d.to_column, d.rank)
+          : null;
+      if (next) qc.setQueryData(['board', projectId], next);
+      else if (board) refetchBoardSoon(qc, projectId);
+      return;
+    }
     case 'task.created':
-    case 'task.moved':
     case 'task.deleted':
     case 'task.restored': {
       if (isSelf) return;
-      if (projectId) inv(['board', projectId]);
+      if (projectId) refetchBoardSoon(qc, projectId);
       return;
     }
     case 'task.updated': {
-      if (isSelf) return;
-      if (projectId) inv(['board', projectId]);
-      if (taskId) {
-        inv(['task', orgId, taskId]);
-        inv(['activity', orgId, taskId]);
-      }
+      if (isSelf || !taskId) return;
+      inv(['activity', orgId, taskId]);
+      const board = projectId ? qc.getQueryData<Board>(['board', projectId]) : undefined;
+      if (!board && !qc.getQueryData(['task', orgId, taskId])) return; // nothing on screen shows it
+      // One small task read refreshes both the detail cache and its board card.
+      getTask(orgId, taskId)
+        .then((task) => {
+          qc.setQueryData(['task', orgId, taskId], task);
+          if (!projectId) return;
+          const current = qc.getQueryData<Board>(['board', projectId]);
+          const next = current ? patchCard(current, task) : null;
+          if (next) qc.setQueryData(['board', projectId], next);
+          else if (current) refetchBoardSoon(qc, projectId);
+        })
+        .catch(() => {
+          inv(['task', orgId, taskId]);
+          if (projectId) refetchBoardSoon(qc, projectId);
+        });
       return;
     }
     case 'comment.created': {

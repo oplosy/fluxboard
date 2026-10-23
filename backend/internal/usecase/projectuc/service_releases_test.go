@@ -12,8 +12,32 @@ import (
 
 type fakeReleases struct {
 	project.ReleaseRepository
-	rels map[string]*project.Release
-	set  map[string]*string
+	rels  map[string]*project.Release
+	set   map[string]*string
+	tasks []*project.Task
+}
+
+// Progress mirrors the SQL aggregation over the tasks the test service holds.
+func (f *fakeReleases) Progress(_ context.Context, _, projectID, doneColumnID string) (map[string]project.Progress, error) {
+	out := map[string]project.Progress{}
+	for _, t := range f.tasks {
+		if t.ProjectID != projectID || t.ReleaseID == nil {
+			continue
+		}
+		p := out[*t.ReleaseID]
+		p.Total++
+		if t.Estimate != nil {
+			p.Points += *t.Estimate
+		}
+		if doneColumnID != "" && t.ColumnID == doneColumnID {
+			p.Done++
+			if t.Estimate != nil {
+				p.DonePoints += *t.Estimate
+			}
+		}
+		out[*t.ReleaseID] = p
+	}
+	return out, nil
 }
 
 func newFakeReleases(rs ...*project.Release) *fakeReleases {
@@ -61,6 +85,7 @@ func (f *fakeReleases) SetTaskRelease(_ context.Context, _, taskID string, relea
 }
 
 func releaseTestService(role project.ProjectRole, rels *fakeReleases, tasks ...*project.Task) *Service {
+	rels.tasks = tasks
 	return New(Deps{
 		Projects: &fakeProjects{p: &project.Project{ID: "p1", Visibility: project.VisibilityOrg}},
 		Members:  &fakeMembers{role: &role},

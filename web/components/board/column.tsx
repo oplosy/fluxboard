@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useDroppable } from '@dnd-kit/core';
 import { SortableContext, verticalListSortingStrategy } from '@dnd-kit/sortable';
 import { Plus } from 'lucide-react';
@@ -21,6 +21,10 @@ export interface QuickTaskInput {
   start_date: string | null;
   due_date: string | null;
 }
+
+// Cards drawn per column before "Show more": a 3,000-task board drew ~118k DOM
+// nodes and took seconds to paint; counts and points still cover every task.
+export const CARD_PAGE = 50;
 
 export interface AssigneeOption {
   user_id: string;
@@ -114,6 +118,11 @@ export function Column({
 
   const fill = column.wip_limit ? Math.min(1, tasks.length / column.wip_limit) : 0;
   const points = tasks.reduce((sum, t) => sum + (t.estimate ?? 0), 0);
+  const [limit, setLimit] = useState(CARD_PAGE);
+  const shown = tasks.length > limit ? tasks.slice(0, limit) : tasks;
+  const hidden = tasks.length - shown.length;
+  const memberNames = useMemo(() => new Map(members.map((m) => [m.user_id, m.name])), [members]);
+  const epicsById = useMemo(() => new Map(epics.map((e) => [e.id, e])), [epics]);
 
   return (
     <div
@@ -161,8 +170,8 @@ export function Column({
         ref={setNodeRef}
         className="flex min-h-[3rem] flex-1 flex-col gap-1.5 pb-0.5"
       >
-        <SortableContext items={tasks.map((t) => t.id)} strategy={verticalListSortingStrategy}>
-          {tasks.map((t, i) => (
+        <SortableContext items={shown.map((t) => t.id)} strategy={verticalListSortingStrategy}>
+          {shown.map((t, i) => (
             <Card
               key={t.id}
               index={i}
@@ -172,15 +181,24 @@ export function Column({
               selectMode={selectMode}
               selected={selectedIds.has(t.id)}
               onToggle={onToggleSelect}
-              assigneeName={t.assignee_id ? members.find((m) => m.user_id === t.assignee_id)?.name : undefined}
+              assigneeName={t.assignee_id ? memberNames.get(t.assignee_id) : undefined}
               orgId={orgId}
               members={members}
               labels={labels}
-              epic={t.epic_id ? epics.find((e) => e.id === t.epic_id) : undefined}
+              epic={t.epic_id ? epicsById.get(t.epic_id) : undefined}
               onMutated={onMutated}
             />
           ))}
         </SortableContext>
+        {hidden > 0 ? (
+          <button
+            type="button"
+            onClick={() => setLimit((n) => n + CARD_PAGE)}
+            className="rounded-md px-2 py-1.5 text-left text-[13px] text-muted-foreground transition-colors hover:bg-foreground/[0.06] hover:text-foreground"
+          >
+            Show {Math.min(CARD_PAGE, hidden)} more <span className="tabular-nums">({hidden} hidden)</span>
+          </button>
+        ) : null}
 
         {inLane ? null : composing ? (
           <div className="origin-top animate-scale-in rounded-md border border-foreground/30 bg-card p-3 shadow-[0_12px_28px_-16px_hsl(var(--ink)/0.4)]">

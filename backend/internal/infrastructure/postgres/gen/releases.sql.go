@@ -130,6 +130,58 @@ func (q *Queries) ListReleasesByProject(ctx context.Context, arg ListReleasesByP
 	return items, nil
 }
 
+const releaseProgress = `-- name: ReleaseProgress :many
+SELECT release_id::uuid AS id,
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE column_id = $1)::int AS done,
+       COALESCE(SUM(estimate), 0)::int AS points,
+       COALESCE(SUM(estimate) FILTER (WHERE column_id = $1), 0)::int AS done_points
+FROM tasks
+WHERE org_id = $2 AND project_id = $3 AND deleted_at IS NULL AND release_id IS NOT NULL
+GROUP BY release_id
+`
+
+type ReleaseProgressParams struct {
+	DoneColumn pgtype.UUID `json:"done_column"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	ProjectID  uuid.UUID   `json:"project_id"`
+}
+
+type ReleaseProgressRow struct {
+	ID         uuid.UUID `json:"id"`
+	Total      int32     `json:"total"`
+	Done       int32     `json:"done"`
+	Points     int32     `json:"points"`
+	DonePoints int32     `json:"done_points"`
+}
+
+// Tasks and points per release, and of those in the done column (see EpicProgress).
+func (q *Queries) ReleaseProgress(ctx context.Context, arg ReleaseProgressParams) ([]ReleaseProgressRow, error) {
+	rows, err := q.db.Query(ctx, releaseProgress, arg.DoneColumn, arg.OrgID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ReleaseProgressRow
+	for rows.Next() {
+		var i ReleaseProgressRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Total,
+			&i.Done,
+			&i.Points,
+			&i.DonePoints,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const setTaskRelease = `-- name: SetTaskRelease :execrows
 UPDATE tasks SET release_id = $1
 WHERE org_id = $2 AND id = $3 AND deleted_at IS NULL

@@ -31,6 +31,7 @@ import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
 import { ActivityTimeline } from './activity-timeline';
 import { ReviewPanel } from './review-panel';
+import { LazySection } from './lazy-section';
 import { Select } from '@/components/ui/select';
 import { DescriptionEditor } from '@/components/editor/description-editor';
 
@@ -196,10 +197,18 @@ export function TaskDetail({
         <Subtasks taskId={taskId} canEdit={canEdit} />
         <TaskLinks taskId={taskId} canEdit={canEdit} />
         <TaskCustomValues projectId={projectId} taskId={taskId} canEdit={canEdit} />
-        <TimeTracker taskId={taskId} canEdit={canEdit} />
-        <Attachments taskId={taskId} canEdit={canEdit} />
-        <Comments taskId={taskId} canComment={canEdit} />
-        <ActivityTimeline taskId={taskId} />
+        <LazySection>
+          <TimeTracker taskId={taskId} canEdit={canEdit} />
+        </LazySection>
+        <LazySection>
+          <Attachments taskId={taskId} canEdit={canEdit} />
+        </LazySection>
+        <LazySection minHeight={160}>
+          <Comments taskId={taskId} canComment={canEdit} />
+        </LazySection>
+        <LazySection minHeight={160}>
+          <ActivityTimeline taskId={taskId} />
+        </LazySection>
       </div>
 
       {/* Meta sidebar */}

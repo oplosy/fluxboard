@@ -11,6 +11,9 @@ services:
     image: golang:1.26
     working_dir: /src
     command: ["sh", "-c", "go run github.com/air-verse/air@v1.61.7 -c .air.toml"]
+    environment:
+      # The production web build below (web-prod, :3002) calls the API too.
+      WEB_EXTRA_ORIGINS: "http://localhost:3002"
     volumes:
       - ../backend:/src
       - gocache:/go
@@ -35,6 +38,24 @@ services:
       NEXT_DIST_DIR: ".next-dev"
     ports:
       - "${WEB_HOST_PORT:-3000}:3000"
+    volumes:
+      - ../web:/web
+      - web_node_modules:/web/node_modules
+
+  # Production build of the same source on :3002 (`make web-prod`), to see the
+  # app at release speed: no on-demand compiling, minified JS. Opt-in profile
+  # because `next build` takes a minute or two on every start. The build is
+  # retried once: Next's security-advisory check sometimes fails on fetch.
+  web-prod:
+    image: node:22
+    profiles: ["prod"]
+    working_dir: /web
+    command: ["sh", "-c", "corepack enable && if [ ! -x node_modules/.bin/next ]; then pnpm install --frozen-lockfile; fi && (pnpm build || pnpm build) && pnpm start -p 3002"]
+    environment:
+      NEXT_PUBLIC_API_BASE: "http://localhost:8080/api/v1"
+      NEXT_DIST_DIR: ".next-prod"
+    ports:
+      - "${WEB_PROD_HOST_PORT:-3002}:3002"
     volumes:
       - ../web:/web
       - web_node_modules:/web/node_modules

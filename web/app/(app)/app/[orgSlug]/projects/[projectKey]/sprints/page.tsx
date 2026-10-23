@@ -25,7 +25,18 @@ import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
 import { Select } from '@/components/ui/select';
-import { BurndownChart, VelocityChart } from '@/components/sprint/sprint-charts';
+import dynamic from 'next/dynamic';
+
+// The chart library is ~100 KB gzipped: load it after the sprint list renders.
+const chartFallback = () => <div className="h-48 w-full animate-pulse rounded-md bg-secondary/50" aria-hidden />;
+const BurndownChart = dynamic(() => import('@/components/sprint/sprint-charts').then((m) => m.BurndownChart), {
+  ssr: false,
+  loading: chartFallback,
+});
+const VelocityChart = dynamic(() => import('@/components/sprint/sprint-charts').then((m) => m.VelocityChart), {
+  ssr: false,
+  loading: chartFallback,
+});
 
 function statusBadge(s: Sprint['status']): string {
   return s === 'active'

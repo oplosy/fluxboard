@@ -45,6 +45,7 @@ func TestValidateAPIProdRejectsDevFallbacks(t *testing.T) {
 		{"no minio", func(c *Config) { c.MinIOEndpoint = "" }, "MINIO_ENDPOINT is required"},
 		{"no minio secret", func(c *Config) { c.MinIOSecretKey = "" }, "MINIO_SECRET_KEY is required"},
 		{"http origin", func(c *Config) { c.WebOrigin = "http://localhost:3000" }, "WEB_ORIGIN must be an https URL"},
+		{"http extra origin", func(c *Config) { c.WebExtraOrigins = []string{"http://localhost:3002"} }, "WEB_EXTRA_ORIGINS must hold https URLs"},
 		{"stripe stub", func(c *Config) { c.StripeMode = "stub" }, "STRIPE_MODE must be live"},
 		{"dev mail sender", func(c *Config) { c.SMTPFrom = "no-reply@fluxboard.local" }, "SMTP_FROM must be an address on the operator's domain"},
 		{"no stripe key", func(c *Config) { c.StripeSecretKey = "" }, "STRIPE_SECRET_KEY is required"},

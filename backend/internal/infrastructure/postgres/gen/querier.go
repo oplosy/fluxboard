@@ -201,6 +201,9 @@ type Querier interface {
 	// Returns the org's label with this name, creating it (with color) if absent;
 	// an existing label keeps its color (project templates, FR-PROJ-007).
 	EnsureLabel(ctx context.Context, arg EnsureLabelParams) (uuid.UUID, error)
+	// Tasks and points per epic, and of those in the done column, counted in SQL
+	// so listing epics does not load every task of the project.
+	EpicProgress(ctx context.Context, arg EpicProgressParams) ([]EpicProgressRow, error)
 	FindRecentIntakeDuplicate(ctx context.Context, arg FindRecentIntakeDuplicateParams) (uuid.UUID, error)
 	FinishAutomationRun(ctx context.Context, arg FinishAutomationRunParams) error
 	// Auth-path lookup (owner pool). Revoked keys ARE returned so the caller maps them
@@ -463,6 +466,8 @@ type Querier interface {
 	ReleaseAgentClaims(ctx context.Context, arg ReleaseAgentClaimsParams) error
 	// Sweeper: clear lapsed claims and the assignment they made.
 	ReleaseExpiredClaims(ctx context.Context, orgID uuid.UUID) (int64, error)
+	// Tasks and points per release, and of those in the done column (see EpicProgress).
+	ReleaseProgress(ctx context.Context, arg ReleaseProgressParams) ([]ReleaseProgressRow, error)
 	// Give a claim back: the task is unassigned again if the agent still holds it.
 	ReleaseTask(ctx context.Context, arg ReleaseTaskParams) (int64, error)
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) (int64, error)
