@@ -2,7 +2,7 @@
 
 import { use, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { Play, CheckCircle2, Trash2, Plus } from 'lucide-react';
+import { Play, CheckCircle2, Trash2, Plus, TrendingDown } from 'lucide-react';
 
 import { useOrg } from '@/lib/org/context';
 import { useProjectByKey } from '@/lib/board/use-project';
@@ -12,6 +12,7 @@ import {
   completeSprint,
   createSprint,
   deleteSprint,
+  getSprintBurndown,
   listSprints,
   startSprint,
   type Sprint,
@@ -24,6 +25,7 @@ import { useToast } from '@/components/ui/toast';
 import { cn } from '@/lib/utils';
 import { ApiError } from '@/lib/api/client';
 import { Select } from '@/components/ui/select';
+import { BurndownChart, VelocityChart } from '@/components/sprint/sprint-charts';
 
 function statusBadge(s: Sprint['status']): string {
   return s === 'active'
@@ -31,6 +33,17 @@ function statusBadge(s: Sprint['status']): string {
     : s === 'completed'
       ? 'bg-secondary text-muted-foreground'
       : 'bg-sky-500/15 text-sky-700 dark:text-sky-400';
+}
+
+// Loads and draws one sprint's burndown when its panel is open (FR-AN-003).
+function SprintBurndownPanel({ orgId, projectId, sprintId }: { orgId: string; projectId: string; sprintId: string }) {
+  const q = useQuery({
+    queryKey: ['sprint-burndown', sprintId],
+    queryFn: () => getSprintBurndown(orgId, projectId, sprintId),
+  });
+  if (q.isLoading) return <p className="text-xs text-muted-foreground">Loading burndown…</p>;
+  if (q.isError || !q.data) return <p className="text-xs text-destructive">Couldn&apos;t load the burndown.</p>;
+  return <BurndownChart burndown={q.data} />;
 }
 
 export default function ProjectSprintsPage(props: { params: Promise<{ projectKey: string }> }) {
@@ -54,7 +67,10 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
   const invalidate = () => {
     queryClient.invalidateQueries({ queryKey: sprintsKey });
     queryClient.invalidateQueries({ queryKey: ['board', project?.id] });
+    queryClient.invalidateQueries({ queryKey: ['sprint-burndown'] });
   };
+  // Burndown panels the user toggled; the active sprint's starts open.
+  const [burndownToggled, setBurndownToggled] = useState<Record<string, boolean>>({});
   const onError = (err: unknown, fallback: string) =>
     toast({
       title: err instanceof ApiError && err.status === 409 ? 'Another sprint is already active' : fallback,
@@ -193,6 +209,14 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
         </Card>
       ) : null}
 
+      {sprints.some((s) => s.status === 'completed') ? (
+        <Card className="mb-4">
+          <CardContent className="py-4">
+            <VelocityChart sprints={sprints} />
+          </CardContent>
+        </Card>
+      ) : null}
+
       <div className="space-y-3">
         {sprints.length === 0 ? (
           <p className="text-sm text-muted-foreground">No sprints yet. Create the first one above.</p>
@@ -200,6 +224,8 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
           sprints.map((s) => {
             const mine = tasksOf(s.id);
             const points = mine.reduce((sum, t) => sum + (t.estimate ?? 0), 0);
+            const started = s.status !== 'planned';
+            const showBurndown = started && (burndownToggled[s.id] ?? s.status === 'active');
             return (
               <Card key={s.id}>
                 <CardContent className="flex flex-wrap items-center gap-3 py-4">
@@ -215,10 +241,21 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
                       {mine.length} tasks
                       {points > 0 ? ` · ${points} pts` : ''}
                       {s.status === 'completed'
-                        ? ` · velocity ${s.completed_done}/${s.completed_total}`
+                        ? ` · velocity ${s.completed_done}/${s.completed_total}` +
+                          (s.completed_points_total > 0 ? ` (${s.completed_points_done}/${s.completed_points_total} pts)` : '')
                         : ''}
                     </p>
                   </div>
+                  {started ? (
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      aria-expanded={showBurndown}
+                      onClick={() => setBurndownToggled((m) => ({ ...m, [s.id]: !showBurndown }))}
+                    >
+                      <TrendingDown className="h-3.5 w-3.5" /> Burndown
+                    </Button>
+                  ) : null}
                   {s.status === 'planned' ? (
                     <Button size="sm" variant="outline" onClick={() => startMutation.mutate(s.id)}>
                       <Play className="h-3.5 w-3.5" /> Start
@@ -240,6 +277,11 @@ export default function ProjectSprintsPage(props: { params: Promise<{ projectKey
                     </button>
                   ) : null}
                 </CardContent>
+                {showBurndown ? (
+                  <div className="border-t px-4 py-3">
+                    <SprintBurndownPanel orgId={orgId} projectId={project.id} sprintId={s.id} />
+                  </div>
+                ) : null}
                 {mine.length > 0 ? (
                   <div className="flex flex-wrap gap-1.5 border-t px-4 py-3">
                     {mine.map((t) => (
