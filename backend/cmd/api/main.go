@@ -485,7 +485,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	automationSvc.SetActions(taskSvc) // actions take the normal task write path (ADR-036)
 	projectSvc := projectuc.New(projectuc.Deps{
 		Projects: projectRepo, Members: projectMemberRepo, Boards: boardRepo,
-		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Epics: postgres.NewEpicRepo(tenantPool), Releases: postgres.NewReleaseRepo(tenantPool), Time: timeEntryRepo, Views: postgres.NewSavedViewRepo(tenantPool), Fields: fieldRepo, Labels: labelRepo,
+		Columns: columnRepo, Tasks: taskRepo, Sprints: sprintRepo, Epics: postgres.NewEpicRepo(tenantPool), Releases: postgres.NewReleaseRepo(tenantPool), Wiki: postgres.NewWikiRepo(tenantPool), Time: timeEntryRepo, Views: postgres.NewSavedViewRepo(tenantPool), Fields: fieldRepo, Labels: labelRepo,
 		Subtasks: subtaskRepo, Comments: commentRepo, Links: linkRepo, Forms: formRepo,
 		Intake: postgres.NewIntakeRepo(tenantPool), Audit: auditRepo,
 		Automation: automationSvc, Concurrency: taskRepo,

@@ -293,6 +293,13 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Post("/releases/assign", d.Projects.AssignRelease)
 					p.With(read(tenant.ObjOrg)).Patch("/releases/{releaseId}", d.Projects.UpdateRelease)
 					p.With(read(tenant.ObjOrg)).Delete("/releases/{releaseId}", d.Projects.DeleteRelease)
+					// Wiki pages (docs/08, FR-PROJ-013). Fine-grained gates in projectuc.
+					p.With(read(tenant.ObjOrg)).Get("/wiki", d.Projects.ListWikiPages)
+					p.With(read(tenant.ObjOrg)).Post("/wiki", d.Projects.CreateWikiPage)
+					p.With(read(tenant.ObjOrg)).Get("/wiki/mentions", d.Projects.WikiPagesMentioningTask)
+					p.With(read(tenant.ObjOrg)).Get("/wiki/{wikiId}", d.Projects.GetWikiPage)
+					p.With(read(tenant.ObjOrg)).Patch("/wiki/{wikiId}", d.Projects.UpdateWikiPage)
+					p.With(read(tenant.ObjOrg)).Delete("/wiki/{wikiId}", d.Projects.DeleteWikiPage)
 					p.With(read(tenant.ObjOrg)).Patch("/epics/{epicId}", d.Projects.UpdateEpic)
 					p.With(read(tenant.ObjOrg)).Delete("/epics/{epicId}", d.Projects.DeleteEpic)
 					// Custom fields (docs/08, FR-FIELDS). Fine-grained gates in projectuc.
