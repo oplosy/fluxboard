@@ -304,6 +304,18 @@ type ReleaseRepository interface {
 	SetTaskRelease(ctx context.Context, orgID, taskID string, releaseID *string) error
 }
 
+// SavedViewRepository persists saved board views (FR-PROJ-011).
+type SavedViewRepository interface {
+	Create(ctx context.Context, orgID string, v *SavedView) error
+	Get(ctx context.Context, orgID, id string) (*SavedView, error)
+	// ListVisible returns a project's shared views plus userID's personal ones,
+	// shared first, then oldest-first.
+	ListVisible(ctx context.Context, orgID, projectID, userID string) ([]SavedView, error)
+	// Update writes name, sharing and filters. ErrNotFound if absent.
+	Update(ctx context.Context, orgID string, v *SavedView) error
+	Delete(ctx context.Context, orgID, id string) error
+}
+
 // WatcherRepository persists task watchers (FR-TASK-014).
 type WatcherRepository interface {
 	// Add makes userID watch taskID (idempotent).

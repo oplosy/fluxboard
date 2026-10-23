@@ -139,6 +139,7 @@ export function BoardToolbar({
   epics,
   groupBy,
   onGroupBy,
+  viewsSlot,
   bulkPending,
   onBulkMove,
   onBulkAssignMe,
@@ -157,6 +158,8 @@ export function BoardToolbar({
   epics: Epic[];
   groupBy: GroupBy;
   onGroupBy: (g: GroupBy) => void;
+  /** Saved views control, drawn after the grouping (FR-PROJ-011). */
+  viewsSlot?: ReactNode;
   bulkPending: boolean;
   onBulkMove: (columnId: string) => void;
   onBulkAssignMe: () => void;
@@ -277,6 +280,7 @@ export function BoardToolbar({
             { value: 'priority', label: 'Priority', icon: <PriorityGlyph priority="high" /> },
           ]}
         />
+        {viewsSlot}
 
         {activeCount > 0 ? (
           <button

@@ -62,7 +62,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-07 | Saved views and filters | todo | | | | |
+| R-07 | Saved views and filters | done | FR-PROJ-011 | `feat/saved-views` | oplosy/fluxboard#88 | |
 | R-08 | Editable table view | todo | | | | |
 | R-09 | Cross-project dashboards | todo | | | | |
 
@@ -124,3 +124,4 @@ Ideas not yet placed in a wave.
 | Board swimlanes (R-04) | FR-PROJ-009 | oplosy/fluxboard#85 |
 | Releases (R-05) | FR-PROJ-010 | oplosy/fluxboard#86 |
 | Workload view (R-06; capacity targets not included) | FR-AN-004 | oplosy/fluxboard#87 |
+| Saved board views (R-07) | FR-PROJ-011 | oplosy/fluxboard#88 |
