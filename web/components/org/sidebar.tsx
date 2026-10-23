@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useCallback, useLayoutEffect, useRef, useState } from 'react';
 import {
   Home,
+  LayoutDashboard,
   FolderKanban,
   CheckSquare,
   Search,
@@ -41,6 +42,7 @@ function useNavItems(): NavItem[] {
   const items: NavItem[] = [
     { href: base, label: 'Home', icon: Home, exact: true, section: 'workspace' },
     { href: `${base}/projects`, label: 'Projects', icon: FolderKanban, section: 'workspace' },
+    { href: `${base}/dashboard`, label: 'Dashboard', icon: LayoutDashboard, section: 'workspace' },
     { href: `${base}/my-tasks`, label: 'My tasks', icon: CheckSquare, section: 'workspace' },
     { href: `${base}/search`, label: 'Search', icon: Search, section: 'workspace' },
     { href: `${base}/trash`, label: 'Trash', icon: Trash2, section: 'workspace' },
