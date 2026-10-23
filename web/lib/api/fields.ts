@@ -82,6 +82,17 @@ export async function listTaskFieldValues(orgId: string, taskId: string): Promis
   return res.values ?? [];
 }
 
+/** Every value of a project's live tasks, in one request (FR-PROJ-012). */
+export async function listProjectFieldValues(
+  orgId: string,
+  projectId: string,
+): Promise<(CustomValue & { task_id: string })[]> {
+  const res = await apiFetch<{ values: (CustomValue & { task_id: string })[] }>(
+    `/orgs/${orgId}/projects/${projectId}/field-values`,
+  );
+  return res.values ?? [];
+}
+
 /** Set a task value (204, CONTRIBUTOR). */
 export function setTaskFieldValue(
   orgId: string,

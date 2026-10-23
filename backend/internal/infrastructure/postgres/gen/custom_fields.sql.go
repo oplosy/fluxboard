@@ -152,6 +152,58 @@ func (q *Queries) ListCustomFieldsByProject(ctx context.Context, arg ListCustomF
 	return items, nil
 }
 
+const listProjectCustomValues = `-- name: ListProjectCustomValues :many
+SELECT v.task_id, v.field_id, v.value_text, v.value_number, v.value_date, f.name, f.type
+FROM task_custom_values v
+JOIN custom_fields f ON f.id = v.field_id
+JOIN tasks t ON t.id = v.task_id AND t.org_id = v.org_id
+WHERE v.org_id = $1 AND f.project_id = $2 AND t.deleted_at IS NULL
+`
+
+type ListProjectCustomValuesParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+}
+
+type ListProjectCustomValuesRow struct {
+	TaskID      uuid.UUID          `json:"task_id"`
+	FieldID     uuid.UUID          `json:"field_id"`
+	ValueText   *string            `json:"value_text"`
+	ValueNumber pgtype.Numeric     `json:"value_number"`
+	ValueDate   pgtype.Timestamptz `json:"value_date"`
+	Name        string             `json:"name"`
+	Type        string             `json:"type"`
+}
+
+// Every value of a project's live tasks, for the editable table (FR-PROJ-012).
+func (q *Queries) ListProjectCustomValues(ctx context.Context, arg ListProjectCustomValuesParams) ([]ListProjectCustomValuesRow, error) {
+	rows, err := q.db.Query(ctx, listProjectCustomValues, arg.OrgID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListProjectCustomValuesRow
+	for rows.Next() {
+		var i ListProjectCustomValuesRow
+		if err := rows.Scan(
+			&i.TaskID,
+			&i.FieldID,
+			&i.ValueText,
+			&i.ValueNumber,
+			&i.ValueDate,
+			&i.Name,
+			&i.Type,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const listTaskCustomValues = `-- name: ListTaskCustomValues :many
 SELECT v.task_id, v.field_id, v.org_id, v.value_text, v.value_number, v.value_date, v.updated_at,
        f.name, f.type

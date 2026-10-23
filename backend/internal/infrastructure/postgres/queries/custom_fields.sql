@@ -43,3 +43,11 @@ ORDER BY f.position, f.created_at;
 -- name: DeleteTaskCustomValue :execrows
 DELETE FROM task_custom_values
 WHERE org_id = @org_id AND task_id = @task_id AND field_id = @field_id;
+
+-- name: ListProjectCustomValues :many
+-- Every value of a project's live tasks, for the editable table (FR-PROJ-012).
+SELECT v.task_id, v.field_id, v.value_text, v.value_number, v.value_date, f.name, f.type
+FROM task_custom_values v
+JOIN custom_fields f ON f.id = v.field_id
+JOIN tasks t ON t.id = v.task_id AND t.org_id = v.org_id
+WHERE v.org_id = @org_id AND f.project_id = @project_id AND t.deleted_at IS NULL;

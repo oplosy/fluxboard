@@ -74,18 +74,24 @@ export function TaskCustomValues({
   );
 }
 
-function FieldRow({
+// One field's value editor; `bare` drops the label (table cells, FR-PROJ-012).
+export function FieldRow({
   field,
   value,
   canEdit,
   onSet,
   onClear,
+  bare = false,
+  ariaLabel,
 }: {
   field: CustomField;
-  value?: CustomValue;
+  value?: Pick<CustomValue, 'text' | 'number' | 'date'>;
   canEdit: boolean;
   onSet: (value: { text?: string | null; number?: number | null; date?: string | null }) => void;
   onClear: () => void;
+  bare?: boolean;
+  /** Overrides the field name as the control's label (e.g. per table row). */
+  ariaLabel?: string;
 }) {
   const control = (() => {
     switch (field.type) {
@@ -105,7 +111,7 @@ function FieldRow({
               onSet({ number: Number(e.target.value) });
             }}
             className={inputCls}
-            aria-label={field.name}
+            aria-label={ariaLabel ?? field.name}
           />
         );
       case 'date':
@@ -123,7 +129,7 @@ function FieldRow({
               onSet({ date: e.target.value });
             }}
             className={inputCls}
-            aria-label={field.name}
+            aria-label={ariaLabel ?? field.name}
           />
         );
       case 'select':
@@ -138,7 +144,7 @@ function FieldRow({
               }
               onSet({ text: v });
             }}
-            aria-label={field.name}
+            aria-label={ariaLabel ?? field.name}
             options={[{ value: '', label: '—' }, ...field.options.map((o) => ({ value: o, label: o }))]}
           />
         );
@@ -157,12 +163,13 @@ function FieldRow({
               onSet({ text: e.target.value });
             }}
             className={inputCls}
-            aria-label={field.name}
+            aria-label={ariaLabel ?? field.name}
           />
         );
     }
   })();
 
+  if (bare) return control;
   return (
     <label className="block">
       <span className="mb-1 block text-xs text-muted-foreground">{field.name}</span>

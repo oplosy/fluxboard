@@ -257,6 +257,9 @@ type CustomFieldRepository interface {
 	SetValue(ctx context.Context, orgID, taskID, fieldID string, v CustomValue) error
 	// ValuesByTask returns a task's values in field order.
 	ValuesByTask(ctx context.Context, orgID, taskID string) ([]CustomValue, error)
+	// ValuesByProject returns every value of the project's live tasks, with
+	// TaskID set (FR-PROJ-012).
+	ValuesByProject(ctx context.Context, orgID, projectID string) ([]CustomValue, error)
 	// ClearValue removes one task value. ErrNotFound if absent.
 	ClearValue(ctx context.Context, orgID, taskID, fieldID string) error
 }

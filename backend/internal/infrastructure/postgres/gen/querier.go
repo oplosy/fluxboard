@@ -324,6 +324,8 @@ type Querier interface {
 	ListOverrides(ctx context.Context, orgID uuid.UUID) ([]EntitlementOverride, error)
 	ListPendingInvitations(ctx context.Context, orgID uuid.UUID) ([]Invitation, error)
 	ListPlans(ctx context.Context) ([]Plan, error)
+	// Every value of a project's live tasks, for the editable table (FR-PROJ-012).
+	ListProjectCustomValues(ctx context.Context, arg ListProjectCustomValuesParams) ([]ListProjectCustomValuesRow, error)
 	ListProjectFormsByProject(ctx context.Context, arg ListProjectFormsByProjectParams) ([]ProjectForm, error)
 	// Directory lookups — Phase 5 notification fan-out (notifyuc.Directory). Resolves
 	// project members (for @mention matching) and specific users (targeted notifs).

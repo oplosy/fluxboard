@@ -124,6 +124,7 @@ GET    /orgs/{orgId}/projects/{projectId}/releases             releases with {re
 POST   /orgs/{orgId}/projects/{projectId}/releases             {name, description?, release_date?: YYYY-MM-DD} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/releases/{releaseId} {name, description, release_date|null, released: bool} released=true stamps released_at once, false reopens (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/releases/assign      {task_ids, release_id|null} (CONTRIBUTOR)
+GET    /orgs/{orgId}/projects/{projectId}/field-values         every custom value of the project's live tasks: {values:[{task_id, field_id, name, type, text?, number?, date?}]} (VIEWER; FR-PROJ-012)
 GET    /orgs/{orgId}/projects/{projectId}/views                shared views + the caller's personal ones: {id, name, shared, mine, filters:{text, priority, assignee, sprint, epic, group_by}} (VIEWER; FR-PROJ-011)
 POST   /orgs/{orgId}/projects/{projectId}/views                {name, shared, filters} personal: VIEWER, shared: LEAD
 PATCH  /orgs/{orgId}/projects/{projectId}/views/{viewId}       {name, shared, filters} own personal view or (LEAD) a shared one; someone else's personal view → 404    DELETE same path, same rules

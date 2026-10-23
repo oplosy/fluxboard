@@ -232,3 +232,26 @@ func (r *CustomFieldRepo) ClearValue(ctx context.Context, orgID, taskID, fieldID
 		return nil
 	})
 }
+
+func (r *CustomFieldRepo) ValuesByProject(ctx context.Context, orgID, projectID string) ([]project.CustomValue, error) {
+	pid, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("custom value project list: %w", err)
+	}
+	out := make([]project.CustomValue, 0)
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		rows, err := q.ListProjectCustomValues(ctx, gen.ListProjectCustomValuesParams{OrgID: oid, ProjectID: pid})
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			out = append(out, project.CustomValue{
+				TaskID: row.TaskID.String(), FieldID: row.FieldID.String(), Name: row.Name, Type: row.Type,
+				Text: row.ValueText, Number: numericToFloat(row.ValueNumber), Date: tsPtr(row.ValueDate),
+			})
+		}
+		return nil
+	})
+	return out, err
+}

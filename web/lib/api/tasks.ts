@@ -54,6 +54,25 @@ export function updateTask(orgId: string, taskId: string, input: UpdateTaskInput
   return apiFetch(`/orgs/${orgId}/tasks/${taskId}`, { method: 'PATCH', body: input });
 }
 
+/**
+ * Change some fields of a task: reads its current state, then PATCHes the full
+ * set with that version, so a concurrent edit is refused (409) rather than
+ * overwritten. Omitted estimate is kept by the server.
+ */
+export async function patchTask(orgId: string, taskId: string, patch: Partial<UpdateTaskInput>): Promise<Task> {
+  const t = await getTask(orgId, taskId);
+  return updateTask(orgId, taskId, {
+    title: t.title,
+    description: t.description,
+    assignee_id: t.assignee_id ?? null,
+    priority: t.priority as UpdateTaskInput['priority'],
+    start_date: t.start_date ?? null,
+    due_date: t.due_date ?? null,
+    version: t.version,
+    ...patch,
+  });
+}
+
 /** The current task carried by a 409 version_conflict (FR-AGT-005), if err is one. */
 export function conflictCurrent(err: unknown): Task | null {
   if (err instanceof ApiError && err.status === 409 && err.code === 'version_conflict') {
