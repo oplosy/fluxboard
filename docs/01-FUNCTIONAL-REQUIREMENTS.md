@@ -78,6 +78,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-TASK-013 | S | Project export: tasks as CSV (re-importable, formula-safe) and JSON with comments, labels and attachment metadata. VIEWER+ via the project-access policy. |
 | FR-TASK-014 | S | Task watchers: any project VIEWER+ can watch or unwatch a task for themselves and see who watches it. Watchers receive comment notifications (category `comment`) like the task creator and assignee; the commenter never notifies themselves. |
 | FR-TASK-015 | S | Story points: a CONTRIBUTOR+ sets or clears an optional whole-number estimate (0–1000 points) on a task; a change is logged in the task activity. Every VIEWER+ sees the estimate on board cards and task detail, the points summed per board column and per sprint, and per epic as total and done points. An update that does not send the estimate keeps it. |
+| FR-TASK-016 | S | GitHub pull-request linking: an org ADMIN+ connects a GitHub webhook (server-generated secret shown once, optional repository allow-list) and may enable, per project, moving a linked task to the done column when its pull request merges. A task key such as `WEB-12` in a PR title or head branch links the PR to that task; VIEWER+ see the linked PRs (number, title, state, link) in task detail. |
 
 ## BILL — Billing & Payments (full spec: 06-BILLING.md)
 

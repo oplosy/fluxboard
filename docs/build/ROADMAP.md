@@ -78,7 +78,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-10 | GitHub pull-request linking | todo | | | | |
+| R-10 | GitHub pull-request linking | in progress | FR-TASK-016 | `claude/github-pr-linking-8cdab0` | | |
 | R-11 | Slack / Teams notifications | todo | | | | |
 
 - **R-10 GitHub pull-request linking.** A task key such as `WEB-12` in a PR
