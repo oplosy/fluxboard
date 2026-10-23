@@ -1,6 +1,6 @@
 package jobs
 
-// chat:send delivers one Slack / Teams channel message (FR-NTF-005, ADR-038).
+// chat:send delivers one Slack / Teams channel message (FR-NTF-005, ADR-040).
 // The outbox payload carries only ids; the handler loads the delivery, decrypts
 // the channel's webhook URL and posts. Outcomes are written to the delivery row
 // (the UI's status source). Error strings stored or logged here are fixed

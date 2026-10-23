@@ -15,7 +15,7 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/domain/chat"
 )
 
-// Chat channels (0057/0058, ADR-038) on real Postgres: a delivery and its
+// Chat channels (0065/0066, ADR-040) on real Postgres: a delivery and its
 // chat:send outbox row are written together, the task deep-link join resolves,
 // attempts are recorded, and another tenant sees none of it.
 func TestChatChannels(t *testing.T) {

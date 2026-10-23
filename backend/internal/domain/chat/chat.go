@@ -1,5 +1,5 @@
 // Package chat is the domain of Slack / Teams notification channels
-// (FR-NTF-005, ADR-038): the provider webhook-URL allow-list, channel and
+// (FR-NTF-005, ADR-040): the provider webhook-URL allow-list, channel and
 // delivery models, the message payload formats and the repository port.
 // Stdlib-only apart from sibling domain packages.
 package chat

@@ -1,4 +1,4 @@
-// This file is the org settings chat-channel surface (FR-NTF-005, ADR-038):
+// This file is the org settings chat-channel surface (FR-NTF-005, ADR-040):
 // Slack / Teams incoming-webhook channels. All routes are ADMIN+ (write:chat in
 // the Casbin policy). The webhook URL is accepted on create only; responses
 // carry a display hint, never the URL or its ciphertext.

@@ -54,8 +54,8 @@ import (
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/authuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/automationuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/billinguc"
-	"github.com/mesutokul/fluxboard/backend/internal/usecase/githubuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/chatuc"
+	"github.com/mesutokul/fluxboard/backend/internal/usecase/githubuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/notifyuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/projectuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/taskuc"
@@ -289,7 +289,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	// (task/project/tenant/billing) take the bus + notifier below so their writes
 	// emit realtime events and fan-out notifications.
 	eventBus := redisx.NewEventBus(rdb, logger, redisx.WithSubscriberGauge(sseGauge))
-	// Slack / Teams channels (ADR-038) need the at-rest key; without TOTP_ENC_KEY
+	// Slack / Teams channels (ADR-040) need the at-rest key; without TOTP_ENC_KEY
 	// (dev only: prod requires it) the feature is off. Assign through a typed
 	// check so a nil service never becomes a non-nil ChatFanout interface.
 	var chatHandlers *handlers.ChatHandlers

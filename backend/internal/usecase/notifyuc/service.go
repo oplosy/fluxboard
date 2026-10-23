@@ -42,7 +42,7 @@ type OutboxWriter interface {
 }
 
 // ChatFanout queues a Slack / Teams channel message for a delivered
-// notification (chatuc.Service; ADR-038). Best-effort: it never returns an error.
+// notification (chatuc.Service; ADR-040). Best-effort: it never returns an error.
 type ChatFanout interface {
 	Notify(ctx context.Context, orgID string, cat notify.Category, title, body, entityType, entityID string)
 }

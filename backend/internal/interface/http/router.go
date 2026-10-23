@@ -488,7 +488,7 @@ func NewRouter(d Deps) http.Handler {
 					o.With(write(tenant.ObjAPIKeys)).Post("/api-keys", d.APIKeys.Create)
 					o.With(write(tenant.ObjAPIKeys)).Delete("/api-keys/{id}", d.APIKeys.Revoke)
 				}
-				// Slack / Teams notification channels (ADMIN, FR-NTF-005, ADR-038).
+				// Slack / Teams notification channels (ADMIN, FR-NTF-005, ADR-040).
 				if d.Chat != nil {
 					o.With(write(tenant.ObjChat)).Get("/chat-channels", d.Chat.List)
 					o.With(write(tenant.ObjChat)).Post("/chat-channels", d.Chat.Create)

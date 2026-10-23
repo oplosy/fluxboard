@@ -1,6 +1,6 @@
 import { apiFetch } from './client';
 
-// Slack / Teams notification channels (docs/08, FR-NTF-005, ADR-038). All
+// Slack / Teams notification channels (docs/08, FR-NTF-005, ADR-040). All
 // ADMIN-only. The webhook URL is sent on create only; the API never returns it,
 // just a display hint.
 

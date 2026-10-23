@@ -1,4 +1,4 @@
--- 0058_chat_channels_rls -- Row-Level Security for chat_channels and
+-- 0066_chat_channels_rls -- Row-Level Security for chat_channels and
 -- chat_deliveries. Same pattern as 0050: predicate on the per-transaction GUC
 -- app.current_tenant set via SET LOCAL by TenantPool. Unset GUC means zero rows
 -- (fail-closed). ENABLE (not FORCE).

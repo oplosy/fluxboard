@@ -234,7 +234,7 @@ func run(logger *slog.Logger) error {
 	webhookRetry.Register(mux)
 	auditRetention.Register(mux)
 
-	// Slack / Teams channel delivery (chat:send, ADR-038). Needs the at-rest key to
+	// Slack / Teams channel delivery (chat:send, ADR-040). Needs the at-rest key to
 	// decrypt webhook URLs; without it the api never queues chat rows either.
 	if cfg.TOTPEncKey != "" {
 		key, err := aesgcm.ParseKey(cfg.TOTPEncKey)

@@ -1,9 +1,9 @@
--- 0057_chat_channels -- Slack / Teams notification channels (FR-NTF-005,
--- roadmap R-11, ADR-038). A channel is one incoming-webhook URL, stored
+-- 0065_chat_channels -- Slack / Teams notification channels (FR-NTF-005,
+-- roadmap R-11, ADR-040). A channel is one incoming-webhook URL, stored
 -- AES-GCM encrypted (url_enc) with a display-only hint; categories picks the
 -- notification categories it receives. chat_deliveries is the per-message
 -- outbox-driven delivery log (status + last error shown in org settings).
--- DDL only; RLS lands in 0058 (the DDL/RLS split). Times = timestamptz UTC.
+-- DDL only; RLS lands in 0066 (the DDL/RLS split). Times = timestamptz UTC.
 
 CREATE TABLE chat_channels (                       -- [T]
   id         uuid PRIMARY KEY,

@@ -1,5 +1,5 @@
 // Package chatuc is the application service for Slack / Teams notification
-// channels (FR-NTF-005, ADR-038): channel management for org ADMIN+, test
+// channels (FR-NTF-005, ADR-040): channel management for org ADMIN+, test
 // sends and the fan-out that queues a delivery per matching channel. Delivery
 // itself runs in the worker (outbox chat:send). Domain-only deps; it never
 // imports another usecase package.

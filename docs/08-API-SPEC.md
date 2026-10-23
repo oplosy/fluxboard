@@ -187,7 +187,7 @@ GET    /orgs/{orgId}/billing/usage          ?from=&to=  usage_records series
 GET    /orgs/{orgId}/api-keys
 POST   /orgs/{orgId}/api-keys              {name, scopes[]} → plaintext ONCE
 DELETE /orgs/{orgId}/api-keys/{id}
-GET    /orgs/{orgId}/chat-channels          {channels:[{id, provider: slack|teams, name, url_hint, categories[], enabled, created_at}]} (ADMIN; FR-NTF-005, ADR-038) — the webhook URL is never returned
+GET    /orgs/{orgId}/chat-channels          {channels:[{id, provider: slack|teams, name, url_hint, categories[], enabled, created_at}]} (ADMIN; FR-NTF-005, ADR-040) — the webhook URL is never returned
 POST   /orgs/{orgId}/chat-channels          {provider, name, url, categories[]} url must be https on hooks.slack.com (Slack) or *.webhook.office.com / outlook.office.com / *.logic.azure.com (Teams) else 422; max 10 per org → 201 {channel}
 PATCH  /orgs/{orgId}/chat-channels/{channelId}  {name, categories[], enabled} (the URL is replaced by delete + create)    DELETE same path removes the channel and its delivery log
 POST   /orgs/{orgId}/chat-channels/{channelId}/test   queues a test message → 202 {delivery}
