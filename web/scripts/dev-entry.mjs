@@ -1,7 +1,17 @@
 import { spawn } from 'node:child_process';
 
 const child = spawn('pnpm', ['dev'], { stdio: 'inherit' });
-const routes = ['/', '/app', '/account/profile', '/account/notifications', '/account/sessions'];
+// Next dev compiles a route on its first request (1–2 s each in the container),
+// so warm the app's main screens up front. Dynamic routes compile once per
+// pattern; the demo seed's `acme`/`WEB` just gives them concrete URLs.
+const project = '/app/acme/projects/WEB';
+const routes = [
+  '/', '/login', '/app', '/account/profile', '/account/notifications', '/account/sessions',
+  '/app/acme', '/app/acme/projects', '/app/acme/my-tasks', '/app/acme/dashboard', '/app/acme/goals',
+  project, `${project}/list`, `${project}/sprints`, `${project}/epics`, `${project}/releases`,
+  `${project}/workload`, `${project}/analytics`, `${project}/docs`, `${project}/calendar`, `${project}/timeline`,
+  `${project}/settings`, `${project}/tasks/1`,
+];
 
 for (let attempt = 0; attempt < 60; attempt += 1) {
   try {
