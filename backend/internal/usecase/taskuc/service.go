@@ -8,6 +8,7 @@ package taskuc
 import (
 	"context"
 	"log/slog"
+	"strconv"
 	"strings"
 	"time"
 
@@ -278,6 +279,10 @@ type UpdateTaskInput struct {
 	Priority    project.Priority
 	StartDate   *time.Time
 	DueDate     *time.Time
+	// Estimate is written only when SetEstimate is true (nil clears it), so
+	// callers that never send one keep the stored points (FR-TASK-015).
+	Estimate    *int
+	SetEstimate bool
 	// IfVersion, when set, is the version the caller read: a task that changed
 	// since is refused with *project.VersionConflict (FR-AGT-005).
 	IfVersion *int64
@@ -298,6 +303,9 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 	if err := checkDateRange(in.StartDate, in.DueDate); err != nil {
 		return nil, err
 	}
+	if in.SetEstimate && in.Estimate != nil && (*in.Estimate < 0 || *in.Estimate > project.MaxEstimate) {
+		return nil, domain.ErrValidation
+	}
 	t, _, err := s.taskAccess(ctx, orgID, taskID, userID, orgRole, project.RoleContributor)
 	if err != nil {
 		return nil, err
@@ -312,6 +320,9 @@ func (s *Service) UpdateTask(ctx context.Context, orgID, userID, taskID string, 
 // change: the activity entries then name it.
 func (s *Service) applyUpdate(ctx context.Context, orgID, userID, ruleID string, t *project.Task, in UpdateTaskInput) (*project.Task, error) {
 	taskID := t.ID
+	if !in.SetEstimate {
+		in.Estimate = t.Estimate
+	}
 	changes := diffTask(t, in)
 	t.Title = in.Title
 	t.Description = in.Description
@@ -319,6 +330,7 @@ func (s *Service) applyUpdate(ctx context.Context, orgID, userID, ruleID string,
 	t.Priority = in.Priority
 	t.StartDate = in.StartDate
 	t.DueDate = in.DueDate
+	t.Estimate = in.Estimate
 	if err := s.writeTask(ctx, orgID, t, in.IfVersion); err != nil {
 		return nil, err
 	}
@@ -396,6 +408,9 @@ func diffTask(t *project.Task, in UpdateTaskInput) []fieldChange {
 	}
 	if !eqTimePtr(t.DueDate, in.DueDate) {
 		out = append(out, fieldChange{"due_date", timePtr(t.DueDate), timePtr(in.DueDate)})
+	}
+	if !eqIntPtr(t.Estimate, in.Estimate) {
+		out = append(out, fieldChange{"estimate", intStr(t.Estimate), intStr(in.Estimate)})
 	}
 	return out
 }
@@ -665,5 +680,20 @@ func timePtr(t *time.Time) *string {
 		return nil
 	}
 	s := t.UTC().Format(time.RFC3339)
+	return &s
+}
+
+func eqIntPtr(a, b *int) bool {
+	if a == nil || b == nil {
+		return a == b
+	}
+	return *a == *b
+}
+
+func intStr(n *int) *string {
+	if n == nil {
+		return nil
+	}
+	s := strconv.Itoa(*n)
 	return &s
 }
