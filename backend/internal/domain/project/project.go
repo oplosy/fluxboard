@@ -458,6 +458,7 @@ type CustomField struct {
 // CustomValue is one task's value for a field. Only the column matching the
 // field type is set.
 type CustomValue struct {
+	TaskID  string // set by ValuesByProject only
 	FieldID string
 	Name    string
 	Type    string
