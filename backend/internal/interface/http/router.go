@@ -26,6 +26,7 @@ type Deps struct {
 	Tasks          *handlers.TaskHandlers
 	PublicForms    *handlers.PublicFormHandlers // nil ⇒ public intake forms disabled
 	Automations    *handlers.AutomationHandlers // nil ⇒ automations disabled
+	Github         *handlers.GithubHandlers     // nil ⇒ GitHub integration disabled
 	AI             *handlers.AIHandlers         // nil ⇒ AI surface disabled
 	MCP            http.Handler                 // nil ⇒ /mcp disabled (ADR-034)
 	Billing        *handlers.BillingHandlers
@@ -106,6 +107,17 @@ func NewRouter(d Deps) http.Handler {
 			}
 			api.Get("/forms/{token}", d.PublicForms.GetPublicForm)
 			api.With(throttle("form_submit")).Post("/forms/{token}/submit", d.PublicForms.SubmitPublicForm)
+		}
+
+		// GitHub webhook (FR-TASK-016, ADR-039). No session: the HMAC signature
+		// of the body against the org's secret is the only credential, checked
+		// in the usecase before the payload is parsed. Per-IP throttled.
+		if d.Github != nil {
+			ghThrottle := func(next http.Handler) http.Handler { return next }
+			if d.AuthThrottle != nil {
+				ghThrottle = d.AuthThrottle.PerIP("github_webhook")
+			}
+			api.With(ghThrottle).Post("/integrations/github/{orgRef}/webhook", d.Github.Webhook)
 		}
 
 		// Auth surface (docs/04-AUTH.md §5) — no org context.
@@ -361,6 +373,10 @@ func NewRouter(d Deps) http.Handler {
 					t.With(read(tenant.ObjOrg)).Get("/links", d.Tasks.ListTaskLinks)
 					t.With(read(tenant.ObjOrg)).Post("/links", d.Tasks.AddTaskLink)
 					t.With(read(tenant.ObjOrg)).Delete("/links/{linkedId}", d.Tasks.RemoveTaskLink)
+					// Linked GitHub pull requests (FR-TASK-016). VIEWER gate in githubuc.
+					if d.Github != nil {
+						t.With(read(tenant.ObjOrg)).Get("/pull-requests", d.Github.ListTaskPullRequests)
+					}
 					// Watchers (docs/08, FR-TASK-014). Self-only; gates in taskuc.
 					t.With(read(tenant.ObjOrg)).Get("/watchers", d.Tasks.ListTaskWatchers)
 					t.With(read(tenant.ObjOrg)).Put("/watchers/me", d.Tasks.WatchTask)
@@ -398,6 +414,15 @@ func NewRouter(d Deps) http.Handler {
 					o.With(write(tenant.ObjAutomations)).Patch("/automations/{ruleId}", d.Automations.UpdateRule)
 					o.With(write(tenant.ObjAutomations)).Post("/automations/{ruleId}/enabled", d.Automations.SetRuleEnabled)
 					o.With(write(tenant.ObjAutomations)).Delete("/automations/{ruleId}", d.Automations.DeleteRule)
+				}
+
+				// GitHub integration settings (FR-TASK-016): ADMIN+ only, reads too
+				// (the page is the only consumer and the secret is never returned).
+				if d.Github != nil {
+					o.With(write(tenant.ObjIntegrations)).Get("/integrations/github", d.Github.GetSettings)
+					o.With(write(tenant.ObjIntegrations)).Put("/integrations/github", d.Github.UpdateSettings)
+					o.With(write(tenant.ObjIntegrations)).Post("/integrations/github/secret", d.Github.RotateSecret)
+					o.With(write(tenant.ObjIntegrations)).Delete("/integrations/github", d.Github.Disconnect)
 				}
 
 				// Governed AI (ADR-025, FR-AI-001..008). Member-level actions run

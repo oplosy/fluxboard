@@ -7,17 +7,18 @@ package tenant
 // action on object". Fine-grained resource checks (project membership, comment
 // authorship, OWNER-protection) stay in the usecase layer. See ADR-013.
 const (
-	ObjOrg         = "org"         // rename/logo (write), read
-	ObjOwnership   = "ownership"   // slug change, delete, transfer (OWNER)
-	ObjMembers     = "members"     // invite/remove/change role
-	ObjInvitations = "invitations" // manage invitations
-	ObjBilling     = "billing"     // view/manage billing
-	ObjAPIKeys     = "apikeys"     // manage API keys
-	ObjAgents      = "agents"      // list (read) / manage (write) agents, ADR-033
-	ObjAudit       = "audit"       // view org audit log
-	ObjProjects    = "projects"    // create projects
-	ObjLabels      = "labels"      // manage labels
-	ObjAutomations = "automations" // manage automation rules
+	ObjOrg          = "org"          // rename/logo (write), read
+	ObjOwnership    = "ownership"    // slug change, delete, transfer (OWNER)
+	ObjMembers      = "members"      // invite/remove/change role
+	ObjInvitations  = "invitations"  // manage invitations
+	ObjBilling      = "billing"      // view/manage billing
+	ObjAPIKeys      = "apikeys"      // manage API keys
+	ObjAgents       = "agents"       // list (read) / manage (write) agents, ADR-033
+	ObjAudit        = "audit"        // view org audit log
+	ObjProjects     = "projects"     // create projects
+	ObjLabels       = "labels"       // manage labels
+	ObjAutomations  = "automations"  // manage automation rules
+	ObjIntegrations = "integrations" // manage external integrations (GitHub, ADR-039)
 
 	ActRead  = "read"
 	ActWrite = "write"

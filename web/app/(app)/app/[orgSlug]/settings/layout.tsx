@@ -19,6 +19,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { href: `${base}/members`, label: 'Members' },
     { href: `${base}/labels`, label: 'Labels' },
     { href: `${base}/automations`, label: 'Automations' },
+    { href: `${base}/github`, label: 'GitHub' },
     { href: `${base}/agents`, label: 'Agents' },
     { href: `${base}/api-keys`, label: 'API keys' },
     { href: `${base}/audit-log`, label: 'Audit log' },

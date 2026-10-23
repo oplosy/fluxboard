@@ -15,6 +15,7 @@ type Querier interface {
 	// The status guard makes a double-click / concurrent accept create one task:
 	// the loser matches zero rows and the caller rolls its task back.
 	AcceptIntakeRequest(ctx context.Context, arg AcceptIntakeRequestParams) (int64, error)
+	AddGithubMergeProjects(ctx context.Context, arg AddGithubMergeProjectsParams) (int64, error)
 	// Project members ([T], tenant-scoped, FR-PROJ-003) ------------------------
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	// Task watchers ([T], tenant-scoped, FR-TASK-014) ------------------------------
@@ -39,6 +40,7 @@ type Querier interface {
 	ClaimTask(ctx context.Context, arg ClaimTaskParams) (int64, error)
 	// Free a role on a board before giving it to another column (one per board).
 	ClearColumnRole(ctx context.Context, arg ClearColumnRoleParams) error
+	ClearGithubMergeProjects(ctx context.Context, orgID uuid.UUID) error
 	// Removes the org logo (empty-string logo_key in UpdateProfile). A separate
 	// query because coalesce() above cannot express "set NULL".
 	ClearOrgLogo(ctx context.Context, id uuid.UUID) (int64, error)
@@ -162,6 +164,7 @@ type Querier interface {
 	DeleteColumn(ctx context.Context, arg DeleteColumnParams) (int64, error)
 	DeleteCustomField(ctx context.Context, arg DeleteCustomFieldParams) (int64, error)
 	DeleteEpic(ctx context.Context, arg DeleteEpicParams) (int64, error)
+	DeleteGithubIntegration(ctx context.Context, orgID uuid.UUID) error
 	// The FK cascade on task_labels detaches this label from every task.
 	DeleteLabel(ctx context.Context, arg DeleteLabelParams) (int64, error)
 	DeleteMembership(ctx context.Context, arg DeleteMembershipParams) (int64, error)
@@ -208,6 +211,8 @@ type Querier interface {
 	GetCustomField(ctx context.Context, arg GetCustomFieldParams) (CustomField, error)
 	GetDashboardLayout(ctx context.Context, arg GetDashboardLayoutParams) ([]byte, error)
 	GetEpic(ctx context.Context, arg GetEpicParams) (Epic, error)
+	// GitHub integration ([T], tenant-scoped, FR-TASK-016) -----------------------
+	GetGithubIntegration(ctx context.Context, orgID uuid.UUID) (GithubIntegration, error)
 	GetIntakeRequest(ctx context.Context, arg GetIntakeRequestParams) (GetIntakeRequestRow, error)
 	GetInvitation(ctx context.Context, arg GetInvitationParams) (Invitation, error)
 	GetInvitationByEmail(ctx context.Context, arg GetInvitationByEmailParams) (Invitation, error)
@@ -311,6 +316,7 @@ type Querier interface {
 	ListEpicsByProject(ctx context.Context, arg ListEpicsByProjectParams) ([]Epic, error)
 	// Feature flags — Phase 6 (FR-ADM-006). feature_flags is [T] (RLS via TenantPool).
 	ListFeatureFlags(ctx context.Context, orgID uuid.UUID) ([]FeatureFlag, error)
+	ListGithubMergeProjects(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error)
 	// Requests owing the submitter an acknowledgment, or an outcome mail once
 	// decided (declined / done). Never anything for an address-less submission.
 	ListIntakeMailDue(ctx context.Context, arg ListIntakeMailDueParams) ([]ListIntakeMailDueRow, error)
@@ -374,6 +380,7 @@ type Querier interface {
 	ListTaskBlocked(ctx context.Context, arg ListTaskBlockedParams) ([]ListTaskBlockedRow, error)
 	ListTaskBlockers(ctx context.Context, arg ListTaskBlockersParams) ([]ListTaskBlockersRow, error)
 	ListTaskCustomValues(ctx context.Context, arg ListTaskCustomValuesParams) ([]ListTaskCustomValuesRow, error)
+	ListTaskPullRequests(ctx context.Context, arg ListTaskPullRequestsParams) ([]ListTaskPullRequestsRow, error)
 	ListTaskWatchers(ctx context.Context, arg ListTaskWatchersParams) ([]ListTaskWatchersRow, error)
 	ListTasksByColumn(ctx context.Context, arg ListTasksByColumnParams) ([]ListTasksByColumnRow, error)
 	ListTasksByProject(ctx context.Context, arg ListTasksByProjectParams) ([]ListTasksByProjectRow, error)
@@ -425,8 +432,13 @@ type Querier interface {
 	// Atomically bump and return the per-project task counter (FR-TASK-001). The
 	// row lock serializes concurrent creates; gaps are acceptable.
 	NextTaskNumber(ctx context.Context, arg NextTaskNumberParams) (int32, error)
+	PruneGithubDeliveries(ctx context.Context, orgID uuid.UUID) error
 	// Hard-delete tasks trashed before the cutoff (nightly purge job, per-tenant).
 	PurgeExpiredTrash(ctx context.Context, arg PurgeExpiredTrashParams) (int64, error)
+	RecordGithubDelivery(ctx context.Context, arg RecordGithubDeliveryParams) (int64, error)
+	// A PR edited so that it no longer names a task keeps that task's link but
+	// still gets the fresh title/state.
+	RefreshPullRequestRows(ctx context.Context, arg RefreshPullRequestRowsParams) error
 	// A deleted agent gives back every claim it holds, and the assignments those
 	// claims made, so its tasks are free again at once (ADR-033).
 	ReleaseAgentClaims(ctx context.Context, arg ReleaseAgentClaimsParams) error
@@ -435,6 +447,7 @@ type Querier interface {
 	// Give a claim back: the task is unassigned again if the agent still holds it.
 	ReleaseTask(ctx context.Context, arg ReleaseTaskParams) (int64, error)
 	RemoveProjectMember(ctx context.Context, arg RemoveProjectMemberParams) (int64, error)
+	ResolveTasksByKeys(ctx context.Context, arg ResolveTasksByKeysParams) ([]ResolveTasksByKeysRow, error)
 	RestoreOrg(ctx context.Context, id uuid.UUID) error
 	// Restore only succeeds if the original (column_id, rank) slot is still free;
 	// the unique index otherwise raises a conflict the repo maps to 409.
@@ -464,6 +477,7 @@ type Querier interface {
 	SetApproverDecision(ctx context.Context, arg SetApproverDecisionParams) error
 	SetColumnRank(ctx context.Context, arg SetColumnRankParams) (int64, error)
 	SetColumnRole(ctx context.Context, arg SetColumnRoleParams) (int64, error)
+	SetGithubRepos(ctx context.Context, arg SetGithubReposParams) (int64, error)
 	SetProjectArchived(ctx context.Context, arg SetProjectArchivedParams) (int64, error)
 	SetTaskEpic(ctx context.Context, arg SetTaskEpicParams) (int64, error)
 	SetTaskRelease(ctx context.Context, arg SetTaskReleaseParams) (int64, error)
@@ -517,6 +531,7 @@ type Querier interface {
 	UpdateWikiPage(ctx context.Context, arg UpdateWikiPageParams) (int64, error)
 	UpsertDashboardLayout(ctx context.Context, arg UpsertDashboardLayoutParams) error
 	UpsertFeatureFlag(ctx context.Context, arg UpsertFeatureFlagParams) error
+	UpsertGithubSecret(ctx context.Context, arg UpsertGithubSecretParams) error
 	UpsertInvoice(ctx context.Context, arg UpsertInvoiceParams) error
 	UpsertNotificationPref(ctx context.Context, arg UpsertNotificationPrefParams) error
 	UpsertOverride(ctx context.Context, arg UpsertOverrideParams) error
@@ -526,6 +541,7 @@ type Querier interface {
 	// time (after its staleness guard), so EXCLUDED never regresses it.
 	UpsertSubscription(ctx context.Context, arg UpsertSubscriptionParams) error
 	UpsertTaskCustomValue(ctx context.Context, arg UpsertTaskCustomValueParams) error
+	UpsertTaskPullRequest(ctx context.Context, arg UpsertTaskPullRequestParams) error
 	// One rule per template task; an edit replaces the rule in place so its id, and
 	// with it the identity of every occurrence already generated, survives.
 	UpsertTaskRecurrence(ctx context.Context, arg UpsertTaskRecurrenceParams) error

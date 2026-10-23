@@ -25,6 +25,7 @@ import { TaskWatchers } from './watchers';
 import { TaskEpic } from './epic-field';
 import { TaskRelease } from './release-field';
 import { WikiMentions } from './wiki-mentions';
+import { TaskPullRequests } from './pull-requests';
 import { TimeTracker } from './time-tracker';
 import { TaskCustomValues } from './custom-values';
 import { Attachments } from './attachments';
@@ -323,6 +324,9 @@ export function TaskDetail({
             </Field>
             <Field label="Release">
               <TaskRelease taskId={taskId} projectId={projectId} releaseId={task.release_id} canEdit={canEdit} />
+            </Field>
+            <Field label="Pull requests">
+              <TaskPullRequests taskId={taskId} />
             </Field>
             <Field label="Labels">
               <div className="flex flex-wrap gap-1.5">

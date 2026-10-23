@@ -30,6 +30,8 @@ package main
 
 import (
 	"context"
+	crand "crypto/rand"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -51,10 +53,25 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"github.com/mesutokul/fluxboard/backend/internal/config"
+	"github.com/mesutokul/fluxboard/backend/internal/domain/github"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/postgres/demoseed"
 	"github.com/mesutokul/fluxboard/backend/internal/infrastructure/postgres/planseed"
+	"github.com/mesutokul/fluxboard/backend/internal/pkg/aesgcm"
 	"github.com/mesutokul/fluxboard/backend/internal/pkg/argon2x"
 )
+
+// isoTOTPKey is a fresh 32-byte AES key (base64) per run that enables the
+// GitHub integration's secret cipher; generated so no key literal is committed.
+var isoTOTPKey = func() string {
+	b := make([]byte, 32)
+	if _, err := crand.Read(b); err != nil {
+		panic(err)
+	}
+	return base64.StdEncoding.EncodeToString(b)
+}()
+
+// Org B's GitHub webhook secret (stored encrypted in its seeded integration).
+const orgBGithubSecret = "org-b-webhook-secret"
 
 // Marker carried by org B's seeded rows; it must never reach an org A caller.
 const orgBMarker = "betaco-marker"
@@ -72,6 +89,7 @@ type isoEnv struct {
 	bParams    map[string]string // route param → org-B resource ID
 	bIDs       map[string]string // named org-B resources for targeted checks
 	aWebTask   string
+	bGithubEnc string // orgBGithubSecret, encrypted
 	tokens     map[string]string
 	ip         string
 }
@@ -91,6 +109,7 @@ func TestTenantIsolation(t *testing.T) {
 	t.Run("search never crosses orgs or private projects", e.testSearch)
 	t.Run("guest sees only its own projects", e.testGuestVisibility)
 	t.Run("foreign attachment download 404s before presign", e.testAttachmentDownload)
+	t.Run("github webhook stays inside its org", e.testGithubWebhook)
 }
 
 // ---- setup -------------------------------------------------------------------
@@ -150,6 +169,17 @@ func setupIsolation(t *testing.T) *isoEnv {
 	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "release", "wiki", "view", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
+	key, err := aesgcm.ParseKey(isoTOTPKey)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cipher, err := aesgcm.New(key)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if e.bGithubEnc, err = cipher.Encrypt(orgBGithubSecret); err != nil {
+		t.Fatal(err)
+	}
 	e.bParams = map[string]string{
 		"projectId": e.bIDs["project"], "taskId": e.bIDs["task"], "linkedId": e.bIDs["task2"],
 		"columnId": e.bIDs["column"], "labelId": e.bIDs["label"], "userId": e.bIDs["member"],
@@ -177,7 +207,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		StripeMode: "stub", StripeWebhookSecret: "whsec_isolation",
 		MinIOEndpoint: s3, MinIOAccessKey: os.Getenv("TEST_S3_ACCESS_KEY"), MinIOSecretKey: os.Getenv("TEST_S3_SECRET_KEY"),
 		MinIOBucket: "fluxboard-isolation", SMTPPort: 1025, SMTPFrom: "no-reply@fluxboard.local",
-		AIProvider: "mock", AIMonthlyCap: 1000,
+		AIProvider: "mock", AIMonthlyCap: 1000, TOTPEncKey: isoTOTPKey,
 	}
 	a, err := newApp(ctx, cfg, slog.New(slog.NewTextHandler(io.Discard, nil)))
 	if err != nil {
@@ -233,6 +263,15 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{b["wiki"], e.orgB, b["project"], owner}},
 		{`INSERT INTO wiki_page_tasks (org_id, project_id, page_id, task_number) VALUES ($1, $2, $3, 1)`,
 			[]any{e.orgB, b["project"], b["wiki"]}},
+		{`INSERT INTO github_integrations (org_id, secret_enc, repos, created_by) VALUES ($1, $2, '{betaco/app}', $3)`,
+			[]any{e.orgB, e.bGithubEnc, owner}},
+		{`INSERT INTO github_merge_projects (org_id, project_id) VALUES ($1, $2)`,
+			[]any{e.orgB, b["project"]}},
+		{`INSERT INTO task_pull_requests (org_id, task_id, repo, number, title, state, url, pr_updated_at)
+		  VALUES ($1, $2, 'betaco/app', 1, $3, 'open', 'https://github.com/betaco/app/pull/1', now())`,
+			[]any{e.orgB, b["task"], orgBMarker + " pull request"}},
+		{`INSERT INTO github_deliveries (org_id, delivery_id) VALUES ($1, 'isolation-delivery')`,
+			[]any{e.orgB}},
 		{`INSERT INTO saved_views (id, org_id, project_id, owner_id, name, shared) VALUES ($1, $2, $3, $4, 'Beta view', true)`,
 			[]any{b["view"], e.orgB, b["project"], owner}},
 		{`INSERT INTO custom_fields (id, org_id, project_id, name, type, created_by) VALUES ($1, $2, $3, 'Beta field', 'text', $4)`,
@@ -769,4 +808,93 @@ func report(t *testing.T, what string, failures []string) {
 	}
 	sort.Strings(failures)
 	t.Errorf("%s — %d violation(s):\n  %s", what, len(failures), strings.Join(failures, "\n  "))
+}
+
+// githubHook posts a signed (or not) GitHub delivery to an org's public webhook.
+func (e *isoEnv) githubHook(orgRef, secret, delivery, body string) *httptest.ResponseRecorder {
+	req := httptest.NewRequest(http.MethodPost, "/api/v1/integrations/github/"+orgRef+"/webhook", strings.NewReader(body))
+	req.Header.Set("X-GitHub-Event", "pull_request")
+	req.Header.Set("X-GitHub-Delivery", delivery)
+	if secret != "" {
+		req.Header.Set("X-Hub-Signature-256", github.Sign(secret, []byte(body)))
+	}
+	req.Header.Set("X-Forwarded-For", e.ip)
+	req.RemoteAddr = e.ip + ":40000"
+	rec := httptest.NewRecorder()
+	e.h.ServeHTTP(rec, req)
+	return rec
+}
+
+// testGithubWebhook drives the real stack: settings are ADMIN-only, the
+// secret is returned once, a signed delivery links only same-org tasks even
+// when the PR names an org-B key, replays and bad signatures change nothing,
+// and one org's secret never authenticates another org's URL.
+func (e *isoEnv) testGithubWebhook(t *testing.T) {
+	ctx := context.Background()
+	base := "/api/v1/orgs/" + e.orgA + "/integrations/github"
+	if rec := e.as("member@demo.dev", http.MethodGet, base, ""); rec.Code != http.StatusForbidden {
+		t.Fatalf("member reading settings: %d, want 403", rec.Code)
+	}
+	rec := e.as("admin@demo.dev", http.MethodPost, base+"/secret", "")
+	var sec struct {
+		Secret string `json:"secret"`
+	}
+	if rec.Code != http.StatusOK || json.Unmarshal(rec.Body.Bytes(), &sec) != nil || len(sec.Secret) != 64 {
+		t.Fatalf("rotate secret: %d %s", rec.Code, rec.Body.String())
+	}
+	if rec := e.as("admin@demo.dev", http.MethodGet, base, ""); rec.Code != http.StatusOK || strings.Contains(rec.Body.String(), sec.Secret) {
+		t.Fatalf("settings read: %d (must succeed and never echo the secret) %s", rec.Code, rec.Body.String())
+	}
+	foreign := fmt.Sprintf(`{"repos":[],"move_on_merge_project_ids":[%q]}`, e.bIDs["project"])
+	if rec := e.as("admin@demo.dev", http.MethodPut, base, foreign); rec.Code != http.StatusUnprocessableEntity {
+		t.Fatalf("org-B project in move-on-merge: %d, want 422", rec.Code)
+	}
+
+	title := "WEB-1 and BETA-1 " + orgBMarker
+	payload := func(n int) string {
+		return fmt.Sprintf(`{"action":"opened","pull_request":{"number":%d,"title":%q,"html_url":"https://github.com/acme/app/pull/%d","state":"open","merged":false,"updated_at":"2026-05-01T10:00:00Z","head":{"ref":"x"}},"repository":{"full_name":"acme/app"}}`, n, title, n)
+	}
+	count := func(org, task string) int {
+		var n int
+		if err := e.owner.QueryRow(ctx, `SELECT count(*) FROM task_pull_requests WHERE org_id = $1 AND task_id = $2 AND repo = 'acme/app'`, org, task).Scan(&n); err != nil {
+			t.Fatal(err)
+		}
+		return n
+	}
+
+	if rec := e.githubHook(e.orgA, "", "iso-1", payload(5)); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unsigned delivery: %d, want 401", rec.Code)
+	}
+	if rec := e.githubHook(e.orgA, orgBGithubSecret, "iso-1", payload(5)); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("org B's secret on org A's URL: %d, want 401", rec.Code)
+	}
+	if rec := e.githubHook("no-such-org", sec.Secret, "iso-1", payload(5)); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("unknown org: %d, want 401", rec.Code)
+	}
+	if count(e.orgA, e.aWebTask) != 0 {
+		t.Fatal("a rejected delivery linked a PR")
+	}
+
+	if rec := e.githubHook(e.orgA, sec.Secret, "iso-1", payload(5)); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "processed") {
+		t.Fatalf("signed delivery: %d %s", rec.Code, rec.Body.String())
+	}
+	if count(e.orgA, e.aWebTask) != 1 {
+		t.Fatal("PR was not linked to the org A task named WEB-1")
+	}
+	if count(e.orgB, e.bIDs["task"]) != 0 {
+		t.Fatal("PR leaked onto org B's BETA-1 task")
+	}
+	if rec := e.githubHook(e.orgA, sec.Secret, "iso-1", payload(6)); rec.Code != http.StatusOK || !strings.Contains(rec.Body.String(), "duplicate") {
+		t.Fatalf("replay: %d %s", rec.Code, rec.Body.String())
+	}
+	var replayed int
+	if err := e.owner.QueryRow(ctx, `SELECT count(*) FROM task_pull_requests WHERE org_id = $1 AND number = 6`, e.orgA).Scan(&replayed); err != nil || replayed != 0 {
+		t.Fatalf("replayed delivery wrote %d rows (err %v)", replayed, err)
+	}
+
+	// The linked PR shows in task detail for org A.
+	list := e.as("member@demo.dev", http.MethodGet, "/api/v1/orgs/"+e.orgA+"/tasks/"+e.aWebTask+"/pull-requests", "")
+	if list.Code != http.StatusOK || !strings.Contains(list.Body.String(), "acme/app") {
+		t.Fatalf("task PR list: %d %s", list.Code, list.Body.String())
+	}
 }
