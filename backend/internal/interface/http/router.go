@@ -283,6 +283,7 @@ func NewRouter(d Deps) http.Handler {
 					p.With(read(tenant.ObjOrg)).Get("/epics", d.Projects.ListEpics)
 					p.With(read(tenant.ObjOrg)).Post("/epics", d.Projects.CreateEpic)
 					p.With(read(tenant.ObjOrg)).Post("/epics/assign", d.Projects.AssignEpic)
+					p.With(read(tenant.ObjOrg)).Get("/workload", d.Projects.Workload)
 					p.With(read(tenant.ObjOrg)).Get("/releases", d.Projects.ListReleases)
 					p.With(read(tenant.ObjOrg)).Post("/releases", d.Projects.CreateRelease)
 					p.With(read(tenant.ObjOrg)).Post("/releases/assign", d.Projects.AssignRelease)
