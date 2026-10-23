@@ -99,6 +99,9 @@ type Querier interface {
 	CreateAutomationRule(ctx context.Context, arg CreateAutomationRuleParams) error
 	// Boards + columns ([T], tenant-scoped, FR-PROJ-004) -----------------------
 	CreateBoard(ctx context.Context, arg CreateBoardParams) error
+	// Chat channels + deliveries ([T], tenant-scoped, FR-NTF-005) ---------------
+	CreateChatChannel(ctx context.Context, arg CreateChatChannelParams) error
+	CreateChatDelivery(ctx context.Context, arg CreateChatDeliveryParams) error
 	CreateColumn(ctx context.Context, arg CreateColumnParams) error
 	// Comments ([T], tenant-scoped, FR-TASK-005) --------------------------------
 	CreateComment(ctx context.Context, arg CreateCommentParams) error
@@ -164,6 +167,7 @@ type Querier interface {
 	DeleteAgent(ctx context.Context, arg DeleteAgentParams) (int64, error)
 	DeleteAttachment(ctx context.Context, arg DeleteAttachmentParams) (int64, error)
 	DeleteAutomationRule(ctx context.Context, arg DeleteAutomationRuleParams) (int64, error)
+	DeleteChatChannel(ctx context.Context, arg DeleteChatChannelParams) (int64, error)
 	DeleteColumn(ctx context.Context, arg DeleteColumnParams) (int64, error)
 	DeleteCustomField(ctx context.Context, arg DeleteCustomFieldParams) (int64, error)
 	DeleteEpic(ctx context.Context, arg DeleteEpicParams) (int64, error)
@@ -211,6 +215,8 @@ type Querier interface {
 	GetAttachment(ctx context.Context, arg GetAttachmentParams) (Attachment, error)
 	GetAutomationRule(ctx context.Context, arg GetAutomationRuleParams) (AutomationRule, error)
 	GetBoardByProject(ctx context.Context, arg GetBoardByProjectParams) (Board, error)
+	GetChatChannel(ctx context.Context, arg GetChatChannelParams) (ChatChannel, error)
+	GetChatDelivery(ctx context.Context, arg GetChatDeliveryParams) (ChatDelivery, error)
 	GetColumn(ctx context.Context, arg GetColumnParams) (BoardColumn, error)
 	GetComment(ctx context.Context, arg GetCommentParams) (Comment, error)
 	GetCustomField(ctx context.Context, arg GetCustomFieldParams) (CustomField, error)
@@ -255,6 +261,8 @@ type Querier interface {
 	// Live tasks only; trashed tasks are addressable through the Trash queries.
 	GetTask(ctx context.Context, arg GetTaskParams) (GetTaskRow, error)
 	GetTaskApproval(ctx context.Context, arg GetTaskApprovalParams) (TaskApproval, error)
+	// Org slug, project key and task number for a live task (chat deep link).
+	GetTaskPath(ctx context.Context, arg GetTaskPathParams) (GetTaskPathRow, error)
 	// Task recurrence rules ([T], tenant-scoped, research report P1) ---------------
 	GetTaskRecurrence(ctx context.Context, arg GetTaskRecurrenceParams) (GetTaskRecurrenceRow, error)
 	GetTenantSummary(ctx context.Context, orgID uuid.UUID) (GetTenantSummaryRow, error)
@@ -315,6 +323,8 @@ type Querier interface {
 	ListAttachmentsByTask(ctx context.Context, arg ListAttachmentsByTaskParams) ([]Attachment, error)
 	ListAutomationRules(ctx context.Context, orgID uuid.UUID) ([]AutomationRule, error)
 	ListAutomationRuns(ctx context.Context, arg ListAutomationRunsParams) ([]ListAutomationRunsRow, error)
+	ListChatChannels(ctx context.Context, orgID uuid.UUID) ([]ChatChannel, error)
+	ListChatDeliveries(ctx context.Context, arg ListChatDeliveriesParams) ([]ListChatDeliveriesRow, error)
 	ListColumnsByBoard(ctx context.Context, arg ListColumnsByBoardParams) ([]BoardColumn, error)
 	ListCommentsByTask(ctx context.Context, arg ListCommentsByTaskParams) ([]Comment, error)
 	ListCustomFieldsByProject(ctx context.Context, arg ListCustomFieldsByProjectParams) ([]CustomField, error)
@@ -443,6 +453,7 @@ type Querier interface {
 	PruneGithubDeliveries(ctx context.Context, orgID uuid.UUID) error
 	// Hard-delete tasks trashed before the cutoff (nightly purge job, per-tenant).
 	PurgeExpiredTrash(ctx context.Context, arg PurgeExpiredTrashParams) (int64, error)
+	RecordChatAttempt(ctx context.Context, arg RecordChatAttemptParams) (int64, error)
 	RecordGithubDelivery(ctx context.Context, arg RecordGithubDeliveryParams) (int64, error)
 	// A PR edited so that it no longer names a task keeps that task's link but
 	// still gets the fresh title/state.
@@ -513,6 +524,7 @@ type Querier interface {
 	TriageIntakeRequest(ctx context.Context, arg TriageIntakeRequestParams) (int64, error)
 	UpdateAgent(ctx context.Context, arg UpdateAgentParams) (int64, error)
 	UpdateAutomationRule(ctx context.Context, arg UpdateAutomationRuleParams) (int64, error)
+	UpdateChatChannel(ctx context.Context, arg UpdateChatChannelParams) (int64, error)
 	UpdateColumn(ctx context.Context, arg UpdateColumnParams) (int64, error)
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (int64, error)
 	UpdateCustomField(ctx context.Context, arg UpdateCustomFieldParams) (int64, error)
