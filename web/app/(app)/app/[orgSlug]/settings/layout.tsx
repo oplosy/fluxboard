@@ -22,6 +22,7 @@ export default function SettingsLayout({ children }: { children: ReactNode }) {
     { href: `${base}/github`, label: 'GitHub' },
     { href: `${base}/agents`, label: 'Agents' },
     { href: `${base}/api-keys`, label: 'API keys' },
+    { href: `${base}/chat`, label: 'Chat' },
     { href: `${base}/audit-log`, label: 'Audit log' },
     { href: `${base}/danger`, label: 'Danger zone' },
   ];
