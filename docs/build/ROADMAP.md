@@ -45,7 +45,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-03 | Sprint burndown and velocity | done | FR-AN-003 | `feat/sprint-burndown` | oplosy/fluxboard#84 | R-02 |
-| R-04 | Board swimlanes | todo | | | | R-01 |
+| R-04 | Board swimlanes | in progress | FR-PROJ-009 | `feat/board-swimlanes` | | R-01 |
 | R-05 | Releases / versions | todo | | | | |
 | R-06 | Workload / capacity view | todo | | | | R-02 |
 
