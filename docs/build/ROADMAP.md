@@ -78,7 +78,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-10 | GitHub pull-request linking | in progress | FR-TASK-016 | `claude/github-pr-linking-8cdab0` | | |
+| R-10 | GitHub pull-request linking | done | FR-TASK-016 | `claude/github-pr-linking-8cdab0` | oplosy/fluxboard#92 | |
 | R-11 | Slack / Teams notifications | todo | | | | |
 
 - **R-10 GitHub pull-request linking.** A task key such as `WEB-12` in a PR
@@ -128,3 +128,4 @@ Ideas not yet placed in a wave.
 | Editable table view (R-08) | FR-PROJ-012 | oplosy/fluxboard#89 |
 | Docs / wiki pages (R-13; flat, no history) | FR-PROJ-013 | oplosy/fluxboard#90 |
 | Cross-project dashboards (R-09) | FR-AN-005 | oplosy/fluxboard#91 |
+| GitHub pull-request linking (R-10; commits not scanned) | FR-TASK-016 | oplosy/fluxboard#92 |
