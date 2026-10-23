@@ -44,7 +44,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-03 | Sprint burndown and velocity | todo | | | | R-02 |
+| R-03 | Sprint burndown and velocity | in progress | FR-AN-003 | `feat/sprint-burndown` | | R-02 |
 | R-04 | Board swimlanes | todo | | | | R-01 |
 | R-05 | Releases / versions | todo | | | | |
 | R-06 | Workload / capacity view | todo | | | | R-02 |
