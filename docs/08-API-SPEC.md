@@ -123,6 +123,10 @@ POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #r
 PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
 GET    /orgs/{orgId}/projects/{projectId}/workload?from=YYYY-MM-DD&to=YYYY-MM-DD  {from, to, rows:[{user_id|null, open_tasks, open_points, scheduled_tasks, scheduled_points, scheduled_unestimated, overdue_tasks, logged_minutes}]} UTC days, to inclusive, ≤ 92 days (VIEWER; FR-AN-004)
+GET    /orgs/{orgId}/integrations/github                      {configured, webhook_path, repos: ["owner/name"], move_on_merge_project_ids} (ADMIN; the secret is never returned; FR-TASK-016)
+POST   /orgs/{orgId}/integrations/github/secret               creates or rotates the webhook secret, returns {secret} ONCE (64 hex); 403 when TOTP_ENC_KEY is unset (ADMIN)
+PUT    /orgs/{orgId}/integrations/github                      {repos: ["owner/name"] (max 50, empty = any), move_on_merge_project_ids}; 404 before a secret exists, 422 for a project outside the org (ADMIN)    DELETE same path removes the integration (ADMIN)
+GET    /orgs/{orgId}/tasks/{taskId}/pull-requests             {pull_requests:[{repo, number, title, state: open|closed|merged, url, updated_at}]} (VIEWER; FR-TASK-016)
 GET    /orgs/{orgId}/projects/{projectId}/releases             releases with {release_date: YYYY-MM-DD|null, released_at|null, total, done, points, done_points} (VIEWER; FR-PROJ-010)
 POST   /orgs/{orgId}/projects/{projectId}/releases             {name, description?, release_date?: YYYY-MM-DD} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/releases/{releaseId} {name, description, release_date|null, released: bool} released=true stamps released_at once, false reopens (LEAD)    DELETE same path keeps its tasks (LEAD)
@@ -301,6 +305,11 @@ GET  /admin/jobs/stats                     (Asynq queue introspection)
 
 ```
 POST /api/v1/webhooks/stripe    signature-gated (06 §4); NOT under /admin or session auth
+POST /api/v1/integrations/github/{orgSlugOrId}/webhook    GitHub `pull_request` webhook (FR-TASK-016, ADR-038); NOT under session auth, per-IP throttled
+  Auth: `X-Hub-Signature-256` = `sha256=` + HMAC-SHA256(secret, raw body), verified in constant time BEFORE the body is parsed. Unknown org, no integration and bad signature are all 401.
+  Headers: `X-GitHub-Event` (`ping` → 200 pong; `pull_request`; anything else 422), `X-GitHub-Delivery` (required, deduped per org: replays answer 200 `duplicate`, nothing written). Body max 1 MiB (413).
+  `pull_request` actions opened/edited/closed/reopened; others and repos outside the allow-list answer 200 `ignored`. Task keys `WEB-12` (case-insensitive, max 20) in the title and head branch link the PR to matching live tasks of that org only. A merged PR (`closed` + `merged`) moves linked tasks of projects with move-on-merge to the done column through the automation move path (dependency guard applies; a refused move is logged, the delivery still succeeds).
+  200 → {status: processed|duplicate|ignored|pong}
 GET  /healthz                   200 static
 GET  /readyz                    checks: PG ping, Redis ping, migrations current → 200/503
 GET  /metrics                   Prometheus (bound to internal interface)
