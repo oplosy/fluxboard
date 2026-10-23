@@ -53,6 +53,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-PROJ-006 | M | Project archive (read-only, excluded from default lists) and unarchive. |
 | FR-PROJ-007 | S | Project templates: create a project from a predefined column/label set. |
 | FR-PROJ-008 | S | Epics: a project LEAD creates, renames and deletes epics (name + optional color) in a project; deleting an epic keeps its tasks. A CONTRIBUTOR+ assigns tasks of the same project to one epic or clears it. Every VIEWER+ sees each epic with its progress (tasks in the done column / all its tasks), the epic on board cards and task detail, and can filter the board by epic. |
+| FR-PROJ-009 | S | Board swimlanes: any VIEWER+ groups the board into horizontal lanes by assignee, epic or priority (or none), each lane showing its cards per column with a count and story points and collapsible; only lanes holding visible cards appear, the no-value lane last. Board filters still apply. A CONTRIBUTOR+ dragging a card into another lane sets that field (assignee, epic or priority) along with any column move. The choice is remembered per project in the browser. |
 
 ## TASK — Tasks, Subtasks, Comments, Attachments
 

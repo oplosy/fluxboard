@@ -1,12 +1,13 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { Check, CheckSquare, ChevronDown, Layers, Search, User, Users, X, Zap } from 'lucide-react';
+import { Check, CheckSquare, ChevronDown, Layers, Rows3, Search, User, Users, X, Zap } from 'lucide-react';
 
 import type { BoardColumn, Label, Priority } from '@/lib/api/types';
 import type { Sprint } from '@/lib/api/sprints';
 import type { Epic } from '@/lib/api/epics';
 import { PRIORITIES, priorityLabel, priorityLevel } from '@/lib/board/priority';
+import type { GroupBy } from '@/lib/board/swimlanes';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Menu, MenuItem } from '@/components/ui/menu';
@@ -124,7 +125,8 @@ function FilterPill({
 
 // Board toolbar: client-side filters (text / priority / assignee / sprint / epic — the
 // board projection carries no labels, so label is not a filter, ADR-017) plus
-// the multi-select mode toggle and, when a selection exists, the bulk action bar.
+// the swimlane grouping, the multi-select mode toggle and, when a selection
+// exists, the bulk action bar.
 export function BoardToolbar({
   filter,
   onFilter,
@@ -135,6 +137,8 @@ export function BoardToolbar({
   labels,
   sprints,
   epics,
+  groupBy,
+  onGroupBy,
   bulkPending,
   onBulkMove,
   onBulkAssignMe,
@@ -151,6 +155,8 @@ export function BoardToolbar({
   labels: Label[];
   sprints: Sprint[];
   epics: Epic[];
+  groupBy: GroupBy;
+  onGroupBy: (g: GroupBy) => void;
   bulkPending: boolean;
   onBulkMove: (columnId: string) => void;
   onBulkAssignMe: () => void;
@@ -253,6 +259,22 @@ export function BoardToolbar({
             { value: '', label: 'All epics' },
             { value: 'none', label: 'No epic' },
             ...epics.map((e) => ({ value: e.id, label: e.name })),
+          ]}
+        />
+
+        <span className="mx-0.5 hidden h-5 w-px bg-border sm:block" aria-hidden />
+
+        <FilterPill
+          label="Group"
+          icon={<Rows3 />}
+          value={groupBy}
+          defaultValue="none"
+          onChange={(v) => onGroupBy(v as GroupBy)}
+          options={[
+            { value: 'none', label: 'No swimlanes' },
+            { value: 'assignee', label: 'Assignee', icon: <Users /> },
+            { value: 'epic', label: 'Epic', icon: <Layers /> },
+            { value: 'priority', label: 'Priority', icon: <PriorityGlyph priority="high" /> },
           ]}
         />
 
