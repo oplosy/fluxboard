@@ -188,3 +188,52 @@ func (q *Queries) StopTimeEntry(ctx context.Context, arg StopTimeEntryParams) (i
 	}
 	return result.RowsAffected(), nil
 }
+
+const sumProjectTimeByUser = `-- name: SumProjectTimeByUser :many
+SELECT te.user_id,
+       COALESCE(sum(EXTRACT(EPOCH FROM (COALESCE(te.ended_at, now()) - te.started_at))), 0)::bigint AS seconds
+FROM time_entries te
+JOIN tasks t ON t.org_id = te.org_id AND t.id = te.task_id
+WHERE te.org_id = $1 AND t.project_id = $2
+  AND te.started_at >= $3 AND te.started_at < $4
+GROUP BY te.user_id
+`
+
+type SumProjectTimeByUserParams struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+	FromAt    time.Time `json:"from_at"`
+	ToAt      time.Time `json:"to_at"`
+}
+
+type SumProjectTimeByUserRow struct {
+	UserID  uuid.UUID `json:"user_id"`
+	Seconds int64     `json:"seconds"`
+}
+
+// Seconds logged per user on one project's tasks by entries started in
+// [from, to) (FR-AN-004). A running entry counts up to now.
+func (q *Queries) SumProjectTimeByUser(ctx context.Context, arg SumProjectTimeByUserParams) ([]SumProjectTimeByUserRow, error) {
+	rows, err := q.db.Query(ctx, sumProjectTimeByUser,
+		arg.OrgID,
+		arg.ProjectID,
+		arg.FromAt,
+		arg.ToAt,
+	)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []SumProjectTimeByUserRow
+	for rows.Next() {
+		var i SumProjectTimeByUserRow
+		if err := rows.Scan(&i.UserID, &i.Seconds); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

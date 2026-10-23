@@ -47,7 +47,7 @@ Most later items build on these two.
 | R-03 | Sprint burndown and velocity | done | FR-AN-003 | `feat/sprint-burndown` | oplosy/fluxboard#84 | R-02 |
 | R-04 | Board swimlanes | done | FR-PROJ-009 | `feat/board-swimlanes` | oplosy/fluxboard#85 | R-01 |
 | R-05 | Releases / versions | done | FR-PROJ-010 | `feat/releases` | oplosy/fluxboard#86 | |
-| R-06 | Workload / capacity view | todo | | | | R-02 |
+| R-06 | Workload / capacity view | done | FR-AN-004 | `feat/workload` | oplosy/fluxboard#87 | R-02 |
 
 - **R-03 Sprint burndown and velocity.** Burndown per sprint and velocity over
   past sprints. Check what `analytics` already shows before starting.
@@ -105,6 +105,8 @@ Most later items build on these two.
 Ideas not yet placed in a wave.
 
 - iCal feed of due dates and sprints (token-protected, read-only).
+- Capacity targets per person (points or hours per week) shown against the R-06
+  workload, so overload is visible.
 - Intake SLA: response-time target on intake requests, with an automation
   trigger when it is breached.
 - Upgrade Next.js: the dev overlay and `pnpm build` flag a known vulnerability
@@ -121,3 +123,4 @@ Ideas not yet placed in a wave.
 | Sprint burndown and velocity (R-03) | FR-AN-003 | oplosy/fluxboard#84 |
 | Board swimlanes (R-04) | FR-PROJ-009 | oplosy/fluxboard#85 |
 | Releases (R-05) | FR-PROJ-010 | oplosy/fluxboard#86 |
+| Workload view (R-06; capacity targets not included) | FR-AN-004 | oplosy/fluxboard#87 |

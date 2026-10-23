@@ -216,6 +216,9 @@ type TimeEntryRepository interface {
 	Stop(ctx context.Context, orgID, id string, endedAt time.Time) error
 	// Delete removes an entry. ErrNotFound if absent.
 	Delete(ctx context.Context, orgID, id string) error
+	// SumByUser returns seconds logged per user on one project's tasks by
+	// entries started in [from, to); running entries count up to now (FR-AN-004).
+	SumByUser(ctx context.Context, orgID, projectID string, from, to time.Time) (map[string]int64, error)
 }
 
 // SprintRepository persists project sprints and task assignment (FR-SPRINT).

@@ -450,6 +450,9 @@ type Querier interface {
 	StopTimeEntry(ctx context.Context, arg StopTimeEntryParams) (int64, error)
 	// Total committed bytes for the org (storage-quota check, FR-TASK-006).
 	SumOrgAttachmentBytes(ctx context.Context, orgID uuid.UUID) (int64, error)
+	// Seconds logged per user on one project's tasks by entries started in
+	// [from, to) (FR-AN-004). A running entry counts up to now.
+	SumProjectTimeByUser(ctx context.Context, arg SumProjectTimeByUserParams) ([]SumProjectTimeByUserRow, error)
 	// Total of a metric over [from, to] (cumulative dimensions: api_calls).
 	SumUsageRange(ctx context.Context, arg SumUsageRangeParams) (int64, error)
 	TouchAPIKeyLastUsed(ctx context.Context, keyHash string) error
