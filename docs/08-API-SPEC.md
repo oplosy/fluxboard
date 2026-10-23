@@ -110,12 +110,12 @@ GET    /orgs/{orgId}/projects/{key}/analytics        rollup data (FR-AN-001)
 GET    /orgs/{orgId}/projects/{key}/tasks            ?column=&assignee=&label=&priority=&q=&cursor=
 POST   /orgs/{orgId}/projects/{key}/tasks            create (FR-TASK-001)
 GET    /orgs/{orgId}/tasks/{taskId}                  full detail (subtasks, labels, activity head)
-PATCH  /orgs/{orgId}/tasks/{taskId}                  field edits (+version) → 409 version_conflict
+PATCH  /orgs/{orgId}/tasks/{taskId}                  field edits (+version) → 409 version_conflict; estimate: 0–1000 points, null clears, absent keeps (FR-TASK-015)
 PATCH  /orgs/{orgId}/tasks/{taskId}/position         {column_id, rank, version?}  → 409 rank_conflict | version_conflict
                                                      → 403 human_approval_required (agent → done column)
 POST   /orgs/{orgId}/tasks/{taskId}/review           {decision: approve|changes, comment?} (people only; comment required for changes)
 PUT    /orgs/{orgId}/projects/{projectId}/columns/{columnId}/role  {role: backlog|todo|in_progress|review|done|""} (LEAD)
-GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progress {total, done} (VIEWER; FR-PROJ-008)
+GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progress {total, done, points, done_points} (VIEWER; FR-PROJ-008, FR-TASK-015)
 POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #rrggbb} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
