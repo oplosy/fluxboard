@@ -73,18 +73,23 @@ func epicTestService(role project.ProjectRole, epics *fakeEpics, tasks ...*proje
 
 func TestListEpics_Progress(t *testing.T) {
 	eid := "e1"
+	five, three := 5, 3
 	epics := newFakeEpics(&project.Epic{ID: eid, ProjectID: "p1", Name: "Checkout"})
 	s := epicTestService(project.RoleViewer, epics,
-		&project.Task{ID: "t-done", ProjectID: "p1", ColumnID: "c2", EpicID: &eid},
-		&project.Task{ID: "t-open", ProjectID: "p1", ColumnID: "c1", EpicID: &eid},
-		&project.Task{ID: "t-none", ProjectID: "p1", ColumnID: "c2"},
+		&project.Task{ID: "t-done", ProjectID: "p1", ColumnID: "c2", EpicID: &eid, Estimate: &five},
+		&project.Task{ID: "t-open", ProjectID: "p1", ColumnID: "c1", EpicID: &eid, Estimate: &three},
+		&project.Task{ID: "t-unest", ProjectID: "p1", ColumnID: "c1", EpicID: &eid},
+		&project.Task{ID: "t-none", ProjectID: "p1", ColumnID: "c2", Estimate: &five},
 	)
 	got, err := s.ListEpics(context.Background(), "o", "u", "p1", tenant.RoleMember)
 	if err != nil || len(got) != 1 {
 		t.Fatalf("ListEpics = %+v, %v", got, err)
 	}
-	if got[0].Total != 2 || got[0].Done != 1 {
-		t.Fatalf("progress = %d/%d, want 1/2", got[0].Done, got[0].Total)
+	if got[0].Total != 3 || got[0].Done != 1 {
+		t.Fatalf("progress = %d/%d, want 1/3", got[0].Done, got[0].Total)
+	}
+	if got[0].Points != 8 || got[0].DonePoints != 5 {
+		t.Fatalf("points = %d/%d, want 5/8", got[0].DonePoints, got[0].Points)
 	}
 }
 
