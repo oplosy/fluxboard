@@ -198,6 +198,26 @@ type FeatureFlag struct {
 	Enabled bool      `json:"enabled"`
 }
 
+type GithubDelivery struct {
+	OrgID      uuid.UUID `json:"org_id"`
+	DeliveryID string    `json:"delivery_id"`
+	ReceivedAt time.Time `json:"received_at"`
+}
+
+type GithubIntegration struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	SecretEnc string    `json:"secret_enc"`
+	Repos     []string  `json:"repos"`
+	CreatedBy uuid.UUID `json:"created_by"`
+	CreatedAt time.Time `json:"created_at"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+type GithubMergeProject struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	ProjectID uuid.UUID `json:"project_id"`
+}
+
 type IntakeRequest struct {
 	ID                uuid.UUID          `json:"id"`
 	OrgID             uuid.UUID          `json:"org_id"`
@@ -581,6 +601,17 @@ type TaskLink struct {
 	LinkedTaskID uuid.UUID `json:"linked_task_id"`
 	OrgID        uuid.UUID `json:"org_id"`
 	CreatedAt    time.Time `json:"created_at"`
+}
+
+type TaskPullRequest struct {
+	OrgID       uuid.UUID `json:"org_id"`
+	TaskID      uuid.UUID `json:"task_id"`
+	Repo        string    `json:"repo"`
+	Number      int32     `json:"number"`
+	Title       string    `json:"title"`
+	State       string    `json:"state"`
+	Url         string    `json:"url"`
+	PrUpdatedAt time.Time `json:"pr_updated_at"`
 }
 
 type TaskRecurrence struct {
