@@ -564,6 +564,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 	a.handler = httpx.NewRouter(httpx.Deps{
 		Logger:           logger,
 		WebOrigin:        cfg.WebOrigin,
+		ExtraOrigins:     cfg.WebExtraOrigins,
 		Health:           httpx.Health{DB: pool, Redis: redisPinger{rdb}, Migrations: postgres.SchemaVersion{Pool: pool, Want: schemaWant}},
 		MetricsHTTP:      promhttp.HandlerFor(reg, promhttp.HandlerOpts{}),
 		Auth:             authHandlers,

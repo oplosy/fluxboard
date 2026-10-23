@@ -67,6 +67,9 @@ type Config struct {
 	SMTPFrom     string `envconfig:"SMTP_FROM" default:"no-reply@fluxboard.local"`
 
 	WebOrigin string `envconfig:"WEB_ORIGIN" default:"http://localhost:3000"`
+	// WebExtraOrigins are further browser origins CORS accepts (comma-separated),
+	// e.g. the local production build on :3001. Links and emails use WebOrigin.
+	WebExtraOrigins []string `envconfig:"WEB_EXTRA_ORIGINS"`
 
 	// Governed AI layer (ADR-025, FR-AI-001..008). Provider selects the
 	// ai.Provider implementation: "mock" (default — deterministic, keyless,
@@ -143,6 +146,11 @@ func (c *Config) prodCommon() []error {
 	}
 	if !strings.HasPrefix(c.WebOrigin, "https://") {
 		errs = append(errs, fmt.Errorf("WEB_ORIGIN must be an https URL, got %q", c.WebOrigin))
+	}
+	for _, o := range c.WebExtraOrigins {
+		if !strings.HasPrefix(o, "https://") {
+			errs = append(errs, fmt.Errorf("WEB_EXTRA_ORIGINS must hold https URLs, got %q", o))
+		}
 	}
 	// Mail goes out from the operator's real domain (report B09), never the dev default.
 	if strings.HasSuffix(strings.ToLower(strings.TrimSpace(c.SMTPFrom)), ".local") || strings.TrimSpace(c.SMTPFrom) == "" {

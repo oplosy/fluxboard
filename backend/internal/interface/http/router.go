@@ -18,6 +18,7 @@ import (
 type Deps struct {
 	Logger         *slog.Logger
 	WebOrigin      string
+	ExtraOrigins   []string // more CORS origins (WEB_EXTRA_ORIGINS)
 	Health         Health
 	MetricsHTTP    http.Handler
 	Auth           *handlers.AuthHandlers
@@ -70,7 +71,7 @@ func NewRouter(d Deps) http.Handler {
 	r.Use(mw.RequestID)
 	r.Use(mw.Logger(d.Logger))
 	r.Use(mw.Recoverer)
-	r.Use(mw.CORS(d.WebOrigin))
+	r.Use(mw.CORS(append([]string{d.WebOrigin}, d.ExtraOrigins...)...))
 	r.Use(mw.ClientMeta(d.TrustedProxyHops)) // stash client IP/UA for audit + throttles (pkg/reqmeta)
 	if d.HTTPMetrics != nil {
 		r.Use(mw.Metrics(d.HTTPMetrics)) // request-duration histogram (10 §5)
