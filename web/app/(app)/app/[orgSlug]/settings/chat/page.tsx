@@ -124,7 +124,7 @@ export default function ChatSettingsPage() {
 
   return (
     <div className="max-w-2xl space-y-6">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h2 className="text-sm font-semibold text-muted-foreground">Chat notifications</h2>
           <p className="mt-1 text-sm text-muted-foreground">
@@ -132,7 +132,7 @@ export default function ChatSettingsPage() {
           </p>
         </div>
         {!creating ? (
-          <Button size="sm" onClick={() => setCreating(true)}>
+          <Button size="sm" className="shrink-0 whitespace-nowrap" onClick={() => setCreating(true)}>
             Connect channel
           </Button>
         ) : null}
@@ -256,7 +256,7 @@ function ChannelRow({
   return (
     <div className={'space-y-3 p-3' + (channel.enabled ? '' : ' opacity-70')}>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
+        <div className="min-w-[10rem] flex-1">
           <p className="truncate text-sm font-medium">
             {channel.name}
             <span className="ml-2 text-xs font-normal text-muted-foreground">{PROVIDERS[channel.provider].label}</span>
@@ -264,7 +264,7 @@ function ChannelRow({
           </p>
           <p className="truncate font-mono text-xs text-muted-foreground">{channel.url_hint}</p>
         </div>
-        <div className="flex items-center gap-3 text-sm">
+        <div className="flex flex-wrap items-center gap-3 text-sm">
           <button onClick={onTest} disabled={busy} className="hover:underline disabled:opacity-50">
             Send test
           </button>
@@ -314,7 +314,7 @@ function DeliveryList({ items, loading }: { items: ChatDelivery[]; loading: bool
       {items.map((d) => (
         <li key={d.id} className="flex flex-wrap items-baseline gap-x-3 gap-y-0.5 p-3 text-sm">
           <span className={'w-16 shrink-0 text-xs font-medium capitalize ' + STATUS_STYLE[d.status]}>{d.status}</span>
-          <span className="min-w-0 flex-1 truncate">
+          <span className="min-w-[10rem] flex-1 truncate">
             {d.title}
             <span className="ml-2 text-xs text-muted-foreground">
               {d.channel_name} · {d.category}
