@@ -47,6 +47,8 @@ export function Column({
   composeSignal,
   flash = false,
   tone,
+  dropId,
+  inLane = false,
 }: {
   column: BoardColumn;
   tasks: TaskCard[];
@@ -67,8 +69,12 @@ export function Column({
   flash?: boolean;
   /** Status colour of this lane (lib/board/status). */
   tone: StatusTone;
+  /** Droppable id; defaults to the column id (swimlanes pass a lane-scoped one). */
+  dropId?: string;
+  /** Inside a swimlane: no header or composer, the board draws one header row. */
+  inLane?: boolean;
 }) {
-  const { setNodeRef, isOver } = useDroppable({ id: column.id });
+  const { setNodeRef, isOver } = useDroppable({ id: dropId ?? column.id });
   const [composingManual, setComposing] = useState(false);
   // External trigger (board "c" shortcut): each new signal value opens the
   // composer until it is closed.
@@ -117,37 +123,39 @@ export function Column({
         flash && 'animate-[column-flash_0.9s_var(--ease-out-expo)]',
       )}
     >
-      <div className="px-2 pb-2 pt-1.5">
-        <div className="flex h-6 items-center gap-2">
-          <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
-          <h3 className="truncate font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
-            {column.name}
-          </h3>
-          <span
-            key={tasks.length}
-            className={cn(
-              'animate-scale-in rounded-full px-1.5 text-[11px] font-medium tabular-nums',
-              overLimit ? 'bg-warning/25 text-foreground' : 'text-muted-foreground',
-            )}
-          >
-            {tasks.length}
-            {column.wip_limit != null ? ` / ${column.wip_limit}` : ''}
-          </span>
-          {points > 0 ? (
-            <span className="ml-auto text-[11px] tabular-nums text-muted-foreground" title="Story points in this column">
-              {points} pts
+      {inLane ? null : (
+        <div className="px-2 pb-2 pt-1.5">
+          <div className="flex h-6 items-center gap-2">
+            <span className={cn('h-2 w-2 shrink-0 rounded-full', tone.dot)} aria-hidden />
+            <h3 className="truncate font-sans text-[11px] font-semibold uppercase tracking-[0.06em] text-muted-foreground">
+              {column.name}
+            </h3>
+            <span
+              key={tasks.length}
+              className={cn(
+                'animate-scale-in rounded-full px-1.5 text-[11px] font-medium tabular-nums',
+                overLimit ? 'bg-warning/25 text-foreground' : 'text-muted-foreground',
+              )}
+            >
+              {tasks.length}
+              {column.wip_limit != null ? ` / ${column.wip_limit}` : ''}
             </span>
+            {points > 0 ? (
+              <span className="ml-auto text-[11px] tabular-nums text-muted-foreground" title="Story points in this column">
+                {points} pts
+              </span>
+            ) : null}
+          </div>
+          {column.wip_limit != null ? (
+            <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>
+              <div
+                className={cn('h-full origin-left rounded-full transition-[transform,background-color] duration-700 ease-out-expo', overLimit ? 'bg-warning' : 'bg-foreground/40')}
+                style={{ transform: `scaleX(${fill})` }}
+              />
+            </div>
           ) : null}
         </div>
-        {column.wip_limit != null ? (
-          <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>
-            <div
-              className={cn('h-full origin-left rounded-full transition-[transform,background-color] duration-700 ease-out-expo', overLimit ? 'bg-warning' : 'bg-foreground/40')}
-              style={{ transform: `scaleX(${fill})` }}
-            />
-          </div>
-        ) : null}
-      </div>
+      )}
 
       <div
         ref={setNodeRef}
@@ -174,7 +182,7 @@ export function Column({
           ))}
         </SortableContext>
 
-        {composing ? (
+        {inLane ? null : composing ? (
           <div className="origin-top animate-scale-in rounded-md border border-foreground/30 bg-card p-3 shadow-[0_12px_28px_-16px_hsl(var(--ink)/0.4)]">
             <Textarea
               autoFocus
