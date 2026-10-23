@@ -289,6 +289,9 @@ type EpicRepository interface {
 	// SetTaskEpic assigns (nil clears) a live task's epic. ErrNotFound if the
 	// task is absent.
 	SetTaskEpic(ctx context.Context, orgID, taskID string, epicID *string) error
+	// Progress counts a project's live tasks per epic; doneColumnID "" counts
+	// nothing as done. Epics without tasks are absent from the map.
+	Progress(ctx context.Context, orgID, projectID, doneColumnID string) (map[string]Progress, error)
 }
 
 // ReleaseRepository persists releases (FR-PROJ-010).
@@ -305,6 +308,8 @@ type ReleaseRepository interface {
 	// SetTaskRelease assigns (nil clears) a live task's release. ErrNotFound if
 	// the task is absent.
 	SetTaskRelease(ctx context.Context, orgID, taskID string, releaseID *string) error
+	// Progress counts a project's live tasks per release (see EpicRepository).
+	Progress(ctx context.Context, orgID, projectID, doneColumnID string) (map[string]Progress, error)
 }
 
 // SavedViewRepository persists saved board views (FR-PROJ-011).

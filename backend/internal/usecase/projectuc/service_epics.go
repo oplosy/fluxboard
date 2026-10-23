@@ -49,37 +49,19 @@ func (s *Service) ListEpics(ctx context.Context, orgID, userID, projectID string
 	return epics, nil
 }
 
-// withProgress fills Total/Done on epics of one project from its tasks.
+// withProgress fills the progress counters of one project's epics, counted in
+// SQL rather than by loading every task of the project.
 func (s *Service) withProgress(ctx context.Context, orgID, projectID string, epics []project.Epic) error {
 	if len(epics) == 0 {
 		return nil
 	}
-	tasks, err := s.tasks.ListByProject(ctx, orgID, projectID)
+	progress, err := s.epics.Progress(ctx, orgID, projectID, s.finalColumnID(ctx, orgID, projectID))
 	if err != nil {
 		return err
 	}
-	idx := make(map[string]int, len(epics))
 	for i := range epics {
-		idx[epics[i].ID] = i
-	}
-	doneColumn := s.finalColumnID(ctx, orgID, projectID)
-	for i := range tasks {
-		t := &tasks[i]
-		if t.EpicID == nil {
-			continue
-		}
-		if j, ok := idx[*t.EpicID]; ok {
-			epics[j].Total++
-			pts := 0
-			if t.Estimate != nil {
-				pts = *t.Estimate
-			}
-			epics[j].Points += pts
-			if t.ColumnID == doneColumn {
-				epics[j].Done++
-				epics[j].DonePoints += pts
-			}
-		}
+		p := progress[epics[i].ID]
+		epics[i].Total, epics[i].Done, epics[i].Points, epics[i].DonePoints = p.Total, p.Done, p.Points, p.DonePoints
 	}
 	return nil
 }

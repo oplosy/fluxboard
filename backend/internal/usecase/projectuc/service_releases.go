@@ -70,39 +70,19 @@ func (s *Service) ListReleases(ctx context.Context, orgID, userID, projectID str
 	return releases, nil
 }
 
-// withReleaseProgress fills the progress counters of one project's releases.
+// withReleaseProgress fills the progress counters of one project's releases,
+// counted in SQL rather than by loading every task of the project.
 func (s *Service) withReleaseProgress(ctx context.Context, orgID, projectID string, releases []project.Release) error {
 	if len(releases) == 0 {
 		return nil
 	}
-	tasks, err := s.tasks.ListByProject(ctx, orgID, projectID)
+	progress, err := s.releases.Progress(ctx, orgID, projectID, s.finalColumnID(ctx, orgID, projectID))
 	if err != nil {
 		return err
 	}
-	idx := make(map[string]int, len(releases))
 	for i := range releases {
-		idx[releases[i].ID] = i
-	}
-	doneColumn := s.finalColumnID(ctx, orgID, projectID)
-	for i := range tasks {
-		t := &tasks[i]
-		if t.ReleaseID == nil {
-			continue
-		}
-		j, ok := idx[*t.ReleaseID]
-		if !ok {
-			continue
-		}
-		pts := 0
-		if t.Estimate != nil {
-			pts = *t.Estimate
-		}
-		releases[j].Total++
-		releases[j].Points += pts
-		if t.ColumnID == doneColumn {
-			releases[j].Done++
-			releases[j].DonePoints += pts
-		}
+		p := progress[releases[i].ID]
+		releases[i].Total, releases[i].Done, releases[i].Points, releases[i].DonePoints = p.Total, p.Done, p.Points, p.DonePoints
 	}
 	return nil
 }

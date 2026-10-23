@@ -175,3 +175,29 @@ func (r *ReleaseRepo) SetTaskRelease(ctx context.Context, orgID, taskID string, 
 		return nil
 	})
 }
+
+func (r *ReleaseRepo) Progress(ctx context.Context, orgID, projectID, doneColumnID string) (map[string]project.Progress, error) {
+	pid, err := parseUUID(projectID)
+	if err != nil {
+		return nil, fmt.Errorf("release progress: project: %w", err)
+	}
+	var done pgtype.UUID
+	if doneColumnID != "" {
+		if done, err = nullableUUID(&doneColumnID); err != nil {
+			return nil, fmt.Errorf("release progress: column: %w", err)
+		}
+	}
+	out := map[string]project.Progress{}
+	err = r.tp.WithTenant(ctx, orgID, func(q *gen.Queries) error {
+		oid, _ := parseUUID(orgID)
+		rows, err := q.ReleaseProgress(ctx, gen.ReleaseProgressParams{OrgID: oid, ProjectID: pid, DoneColumn: done})
+		if err != nil {
+			return err
+		}
+		for _, row := range rows {
+			out[row.ID.String()] = project.Progress{Total: int(row.Total), Done: int(row.Done), Points: int(row.Points), DonePoints: int(row.DonePoints)}
+		}
+		return nil
+	})
+	return out, err
+}

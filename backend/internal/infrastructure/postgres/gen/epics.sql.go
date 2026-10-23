@@ -58,6 +58,59 @@ func (q *Queries) DeleteEpic(ctx context.Context, arg DeleteEpicParams) (int64, 
 	return result.RowsAffected(), nil
 }
 
+const epicProgress = `-- name: EpicProgress :many
+SELECT epic_id::uuid AS id,
+       COUNT(*)::int AS total,
+       COUNT(*) FILTER (WHERE column_id = $1)::int AS done,
+       COALESCE(SUM(estimate), 0)::int AS points,
+       COALESCE(SUM(estimate) FILTER (WHERE column_id = $1), 0)::int AS done_points
+FROM tasks
+WHERE org_id = $2 AND project_id = $3 AND deleted_at IS NULL AND epic_id IS NOT NULL
+GROUP BY epic_id
+`
+
+type EpicProgressParams struct {
+	DoneColumn pgtype.UUID `json:"done_column"`
+	OrgID      uuid.UUID   `json:"org_id"`
+	ProjectID  uuid.UUID   `json:"project_id"`
+}
+
+type EpicProgressRow struct {
+	ID         uuid.UUID `json:"id"`
+	Total      int32     `json:"total"`
+	Done       int32     `json:"done"`
+	Points     int32     `json:"points"`
+	DonePoints int32     `json:"done_points"`
+}
+
+// Tasks and points per epic, and of those in the done column, counted in SQL
+// so listing epics does not load every task of the project.
+func (q *Queries) EpicProgress(ctx context.Context, arg EpicProgressParams) ([]EpicProgressRow, error) {
+	rows, err := q.db.Query(ctx, epicProgress, arg.DoneColumn, arg.OrgID, arg.ProjectID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []EpicProgressRow
+	for rows.Next() {
+		var i EpicProgressRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.Total,
+			&i.Done,
+			&i.Points,
+			&i.DonePoints,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const getEpic = `-- name: GetEpic :one
 SELECT id, org_id, project_id, name, color, created_by, created_at
 FROM epics

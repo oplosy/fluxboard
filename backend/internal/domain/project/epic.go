@@ -25,6 +25,15 @@ type Epic struct {
 	DonePoints int // of those, points in the done column
 }
 
+// Progress counts the tasks of an epic or release: all of them and those in
+// the done column, by number and by story points.
+type Progress struct {
+	Total      int
+	Done       int
+	Points     int
+	DonePoints int
+}
+
 // MaxEpicNameLen caps an epic name (runes).
 const MaxEpicNameLen = 100
 
