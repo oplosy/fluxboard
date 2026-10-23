@@ -37,6 +37,7 @@ type Deps struct {
 	Epics      project.EpicRepository        // epics; nil ⇒ epic endpoints disabled
 	Releases   project.ReleaseRepository     // releases; nil ⇒ release endpoints disabled
 	Wiki       project.WikiRepository        // wiki pages; nil ⇒ wiki endpoints disabled
+	Goals      project.GoalRepository        // goals; nil ⇒ goal endpoints disabled
 	Time       project.TimeEntryRepository   // logged time for workload; nil ⇒ workload shows none
 	Views      project.SavedViewRepository   // saved board views; nil ⇒ view endpoints disabled
 	Fields     project.CustomFieldRepository // custom fields; nil ⇒ field endpoints disabled
@@ -79,6 +80,7 @@ type Service struct {
 	epics      project.EpicRepository
 	releases   project.ReleaseRepository
 	wiki       project.WikiRepository
+	goals      project.GoalRepository
 	timeLog    project.TimeEntryRepository
 	views      project.SavedViewRepository
 	fields     project.CustomFieldRepository
@@ -113,7 +115,7 @@ func New(d Deps) *Service {
 	}
 	return &Service{
 		projects: d.Projects, members: d.Members, boards: d.Boards,
-		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, epics: d.Epics, releases: d.Releases, wiki: d.Wiki, timeLog: d.Time, views: d.Views, fields: d.Fields, forms: d.Forms, intake: d.Intake, audit: d.Audit, intakeMail: d.IntakeMail, labels: d.Labels, subtasks: d.Subtasks,
+		columns: d.Columns, tasks: d.Tasks, sprints: d.Sprints, epics: d.Epics, releases: d.Releases, wiki: d.Wiki, goals: d.Goals, timeLog: d.Time, views: d.Views, fields: d.Fields, forms: d.Forms, intake: d.Intake, audit: d.Audit, intakeMail: d.IntakeMail, labels: d.Labels, subtasks: d.Subtasks,
 		comments: d.Comments, automation: d.Automation, links: d.Links, events: d.Events, conc: d.Concurrency, agents: d.Agents, commenter: d.Commenter, seeder: d.Seeder, idem: d.Idem, logger: logger, now: now,
 	}
 }

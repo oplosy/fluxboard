@@ -16,6 +16,7 @@ type Querier interface {
 	// the loser matches zero rows and the caller rolls its task back.
 	AcceptIntakeRequest(ctx context.Context, arg AcceptIntakeRequestParams) (int64, error)
 	AddGithubMergeProjects(ctx context.Context, arg AddGithubMergeProjectsParams) (int64, error)
+	AddGoalLink(ctx context.Context, arg AddGoalLinkParams) error
 	// Project members ([T], tenant-scoped, FR-PROJ-003) ------------------------
 	AddProjectMember(ctx context.Context, arg AddProjectMemberParams) error
 	// Task watchers ([T], tenant-scoped, FR-TASK-014) ------------------------------
@@ -105,6 +106,8 @@ type Querier interface {
 	CreateCustomField(ctx context.Context, arg CreateCustomFieldParams) error
 	// Epics ([T], tenant-scoped, FR-PROJ-008) ----------------------------------
 	CreateEpic(ctx context.Context, arg CreateEpicParams) error
+	// Goals ([T], tenant-scoped, FR-PROJ-014) -----------------------------------
+	CreateGoal(ctx context.Context, arg CreateGoalParams) error
 	// Invitations ([T], tenant-scoped) ------------------------------------------
 	CreateInvitation(ctx context.Context, arg CreateInvitationParams) error
 	// Labels + task attachments ([T], tenant-scoped, FR-TASK-004) ---------------
@@ -165,6 +168,8 @@ type Querier interface {
 	DeleteCustomField(ctx context.Context, arg DeleteCustomFieldParams) (int64, error)
 	DeleteEpic(ctx context.Context, arg DeleteEpicParams) (int64, error)
 	DeleteGithubIntegration(ctx context.Context, orgID uuid.UUID) error
+	DeleteGoal(ctx context.Context, arg DeleteGoalParams) (int64, error)
+	DeleteGoalLink(ctx context.Context, arg DeleteGoalLinkParams) (int64, error)
 	// The FK cascade on task_labels detaches this label from every task.
 	DeleteLabel(ctx context.Context, arg DeleteLabelParams) (int64, error)
 	DeleteMembership(ctx context.Context, arg DeleteMembershipParams) (int64, error)
@@ -213,6 +218,7 @@ type Querier interface {
 	GetEpic(ctx context.Context, arg GetEpicParams) (Epic, error)
 	// GitHub integration ([T], tenant-scoped, FR-TASK-016) -----------------------
 	GetGithubIntegration(ctx context.Context, orgID uuid.UUID) (GithubIntegration, error)
+	GetGoal(ctx context.Context, arg GetGoalParams) (Goal, error)
 	GetIntakeRequest(ctx context.Context, arg GetIntakeRequestParams) (GetIntakeRequestRow, error)
 	GetInvitation(ctx context.Context, arg GetInvitationParams) (Invitation, error)
 	GetInvitationByEmail(ctx context.Context, arg GetInvitationByEmailParams) (Invitation, error)
@@ -317,6 +323,8 @@ type Querier interface {
 	// Feature flags — Phase 6 (FR-ADM-006). feature_flags is [T] (RLS via TenantPool).
 	ListFeatureFlags(ctx context.Context, orgID uuid.UUID) ([]FeatureFlag, error)
 	ListGithubMergeProjects(ctx context.Context, orgID uuid.UUID) ([]uuid.UUID, error)
+	ListGoalLinks(ctx context.Context, arg ListGoalLinksParams) ([]ListGoalLinksRow, error)
+	ListGoals(ctx context.Context, orgID uuid.UUID) ([]Goal, error)
 	// Requests owing the submitter an acknowledgment, or an outcome mail once
 	// decided (declined / done). Never anything for an address-less submission.
 	ListIntakeMailDue(ctx context.Context, arg ListIntakeMailDueParams) ([]ListIntakeMailDueRow, error)
@@ -509,6 +517,7 @@ type Querier interface {
 	UpdateComment(ctx context.Context, arg UpdateCommentParams) (int64, error)
 	UpdateCustomField(ctx context.Context, arg UpdateCustomFieldParams) (int64, error)
 	UpdateEpic(ctx context.Context, arg UpdateEpicParams) (int64, error)
+	UpdateGoal(ctx context.Context, arg UpdateGoalParams) (int64, error)
 	UpdateInvitationToken(ctx context.Context, arg UpdateInvitationTokenParams) (int64, error)
 	UpdateLabel(ctx context.Context, arg UpdateLabelParams) (int64, error)
 	UpdateMemberRole(ctx context.Context, arg UpdateMemberRoleParams) (int64, error)

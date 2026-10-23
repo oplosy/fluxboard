@@ -166,7 +166,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"member":  demoseed.ID("user", "beta.member"),
 		"owner":   demoseed.ID("user", "beta.owner"),
 	}
-	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "release", "wiki", "view", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
+	for _, k := range []string{"comment", "subtask", "attachment", "sprint", "epic", "release", "wiki", "goal", "view", "field", "form", "request", "rule", "entry", "invitation", "notification", "apikey", "agent", "agentkey", "approval"} {
 		e.bIDs[k] = demoseed.ID("isolation", k)
 	}
 	key, err := aesgcm.ParseKey(isoTOTPKey)
@@ -184,7 +184,7 @@ func setupIsolation(t *testing.T) *isoEnv {
 		"projectId": e.bIDs["project"], "taskId": e.bIDs["task"], "linkedId": e.bIDs["task2"],
 		"columnId": e.bIDs["column"], "labelId": e.bIDs["label"], "userId": e.bIDs["member"],
 		"commentId": e.bIDs["comment"], "subtaskId": e.bIDs["subtask"], "attachmentId": e.bIDs["attachment"],
-		"sprintId": e.bIDs["sprint"], "epicId": e.bIDs["epic"], "releaseId": e.bIDs["release"], "wikiId": e.bIDs["wiki"], "viewId": e.bIDs["view"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
+		"sprintId": e.bIDs["sprint"], "epicId": e.bIDs["epic"], "releaseId": e.bIDs["release"], "wikiId": e.bIDs["wiki"], "goalId": e.bIDs["goal"], "viewId": e.bIDs["view"], "fieldId": e.bIDs["field"], "formId": e.bIDs["form"], "requestId": e.bIDs["request"],
 		"ruleId": e.bIDs["rule"], "entryId": e.bIDs["entry"],
 		"agentId": e.bIDs["agent"], "keyId": e.bIDs["agentkey"], "approvalId": e.bIDs["approval"],
 	}
@@ -272,6 +272,10 @@ func insertOrgBResources(ctx context.Context, tx pgx.Tx, e *isoEnv) error {
 			[]any{e.orgB, b["task"], orgBMarker + " pull request"}},
 		{`INSERT INTO github_deliveries (org_id, delivery_id) VALUES ($1, 'isolation-delivery')`,
 			[]any{e.orgB}},
+		{`INSERT INTO goals (id, org_id, title, owner_id) VALUES ($1, $2, $4, $3)`,
+			[]any{b["goal"], e.orgB, owner, orgBMarker + " goal"}},
+		{`INSERT INTO goal_links (id, org_id, goal_id, epic_id) VALUES ($1, $2, $3, $4)`,
+			[]any{demoseed.ID("isolation", "goal-link"), e.orgB, b["goal"], b["epic"]}},
 		{`INSERT INTO saved_views (id, org_id, project_id, owner_id, name, shared) VALUES ($1, $2, $3, $4, 'Beta view', true)`,
 			[]any{b["view"], e.orgB, b["project"], owner}},
 		{`INSERT INTO custom_fields (id, org_id, project_id, name, type, created_by) VALUES ($1, $2, $3, 'Beta field', 'text', $4)`,

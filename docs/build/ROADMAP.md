@@ -91,7 +91,7 @@ Most later items build on these two.
 
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
-| R-12 | Goals / OKRs | todo | | | | R-01 |
+| R-12 | Goals / OKRs | done | FR-PROJ-014 | `claude/goals-0ce4ed` | oplosy/fluxboard#93 | R-01 |
 | R-13 | Docs / wiki pages | done | FR-PROJ-013 | `feat/project-wiki` | oplosy/fluxboard#90 | |
 
 - **R-12 Goals / OKRs.** Goals with progress computed from linked tasks or
@@ -129,3 +129,4 @@ Ideas not yet placed in a wave.
 | Docs / wiki pages (R-13; flat, no history) | FR-PROJ-013 | oplosy/fluxboard#90 |
 | Cross-project dashboards (R-09) | FR-AN-005 | oplosy/fluxboard#91 |
 | GitHub pull-request linking (R-10; commits not scanned) | FR-TASK-016 | oplosy/fluxboard#92 |
+| Goals (R-12; flat goals, no key results) | FR-PROJ-014 | oplosy/fluxboard#93 |

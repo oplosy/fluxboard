@@ -218,6 +218,25 @@ type GithubMergeProject struct {
 	ProjectID uuid.UUID `json:"project_id"`
 }
 
+type Goal struct {
+	ID          uuid.UUID   `json:"id"`
+	OrgID       uuid.UUID   `json:"org_id"`
+	Title       string      `json:"title"`
+	Description string      `json:"description"`
+	OwnerID     uuid.UUID   `json:"owner_id"`
+	TargetDate  pgtype.Date `json:"target_date"`
+	CreatedAt   time.Time   `json:"created_at"`
+}
+
+type GoalLink struct {
+	ID        uuid.UUID   `json:"id"`
+	OrgID     uuid.UUID   `json:"org_id"`
+	GoalID    uuid.UUID   `json:"goal_id"`
+	EpicID    pgtype.UUID `json:"epic_id"`
+	TaskID    pgtype.UUID `json:"task_id"`
+	CreatedAt time.Time   `json:"created_at"`
+}
+
 type IntakeRequest struct {
 	ID                uuid.UUID          `json:"id"`
 	OrgID             uuid.UUID          `json:"org_id"`
