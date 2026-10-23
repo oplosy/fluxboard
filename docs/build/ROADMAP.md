@@ -105,6 +105,8 @@ Most later items build on these two.
 Ideas not yet placed in a wave.
 
 - iCal feed of due dates and sprints (token-protected, read-only).
+- Capacity targets per person (points or hours per week) shown against the R-06
+  workload, so overload is visible.
 - Intake SLA: response-time target on intake requests, with an automation
   trigger when it is breached.
 - Upgrade Next.js: the dev overlay and `pnpm build` flag a known vulnerability
