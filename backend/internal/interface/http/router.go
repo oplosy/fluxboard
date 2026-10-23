@@ -109,7 +109,7 @@ func NewRouter(d Deps) http.Handler {
 			api.With(throttle("form_submit")).Post("/forms/{token}/submit", d.PublicForms.SubmitPublicForm)
 		}
 
-		// GitHub webhook (FR-TASK-016, ADR-038). No session: the HMAC signature
+		// GitHub webhook (FR-TASK-016, ADR-039). No session: the HMAC signature
 		// of the body against the org's secret is the only credential, checked
 		// in the usecase before the payload is parsed. Per-IP throttled.
 		if d.Github != nil {

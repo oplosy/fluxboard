@@ -18,7 +18,7 @@ const (
 	ObjProjects     = "projects"     // create projects
 	ObjLabels       = "labels"       // manage labels
 	ObjAutomations  = "automations"  // manage automation rules
-	ObjIntegrations = "integrations" // manage external integrations (GitHub, ADR-038)
+	ObjIntegrations = "integrations" // manage external integrations (GitHub, ADR-039)
 
 	ActRead  = "read"
 	ActWrite = "write"

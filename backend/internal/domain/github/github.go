@@ -1,5 +1,5 @@
 // Package github is the domain model for GitHub pull-request linking
-// (FR-TASK-016, ADR-038): webhook signature check, payload parsing and task-key
+// (FR-TASK-016, ADR-039): webhook signature check, payload parsing and task-key
 // extraction. Stdlib only.
 package github
 

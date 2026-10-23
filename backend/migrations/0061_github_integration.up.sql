@@ -1,8 +1,8 @@
--- 0057_github_integration -- GitHub pull-request linking (FR-TASK-016, roadmap
--- R-10, ADR-038). One integration per org; the webhook secret is stored
+-- 0061_github_integration -- GitHub pull-request linking (FR-TASK-016, roadmap
+-- R-10, ADR-039). One integration per org; the webhook secret is stored
 -- AES-256-GCM encrypted (HMAC verification needs the plaintext). Linked PRs are
 -- one row per (task, repo, number). Delivery ids dedupe redelivered webhooks.
--- DDL only; RLS lands in 0058 (the DDL/RLS split).
+-- DDL only; RLS lands in 0062 (the DDL/RLS split).
 -- Times = timestamptz UTC.
 
 CREATE TABLE github_integrations (                 -- [T]

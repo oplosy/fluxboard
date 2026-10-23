@@ -1,4 +1,4 @@
--- 0058_github_integration_rls rollback.
+-- 0062_github_integration_rls rollback.
 DROP POLICY IF EXISTS tenant_isolation ON github_integrations;
 ALTER TABLE github_integrations DISABLE ROW LEVEL SECURITY;
 DROP POLICY IF EXISTS tenant_isolation ON github_merge_projects;

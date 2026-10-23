@@ -305,7 +305,7 @@ GET  /admin/jobs/stats                     (Asynq queue introspection)
 
 ```
 POST /api/v1/webhooks/stripe    signature-gated (06 §4); NOT under /admin or session auth
-POST /api/v1/integrations/github/{orgSlugOrId}/webhook    GitHub `pull_request` webhook (FR-TASK-016, ADR-038); NOT under session auth, per-IP throttled
+POST /api/v1/integrations/github/{orgSlugOrId}/webhook    GitHub `pull_request` webhook (FR-TASK-016, ADR-039); NOT under session auth, per-IP throttled
   Auth: `X-Hub-Signature-256` = `sha256=` + HMAC-SHA256(secret, raw body), verified in constant time BEFORE the body is parsed. Unknown org, no integration and bad signature are all 401.
   Headers: `X-GitHub-Event` (`ping` → 200 pong; `pull_request`; anything else 422), `X-GitHub-Delivery` (required, deduped per org: replays answer 200 `duplicate`, nothing written). Body max 1 MiB (413).
   `pull_request` actions opened/edited/closed/reopened; others and repos outside the allow-list answer 200 `ignored`. Task keys `WEB-12` (case-insensitive, max 20) in the title and head branch link the PR to matching live tasks of that org only. A merged PR (`closed` + `merged`) moves linked tasks of projects with move-on-merge to the done column through the automation move path (dependency guard applies; a refused move is logged, the delivery still succeeds).

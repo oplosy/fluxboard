@@ -1,5 +1,5 @@
 // Package githubuc implements GitHub pull-request linking (FR-TASK-016,
-// ADR-038): per-org webhook settings for ADMINs and the signed webhook that
+// ADR-039): per-org webhook settings for ADMINs and the signed webhook that
 // links pull requests to tasks by key and optionally moves them on merge.
 package githubuc
 

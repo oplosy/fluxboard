@@ -1,4 +1,4 @@
--- 0058_github_integration_rls -- Row-Level Security for the GitHub integration
+-- 0062_github_integration_rls -- Row-Level Security for the GitHub integration
 -- tables. Same pattern as 0050: predicate on the per-transaction GUC
 -- app.current_tenant set via SET LOCAL by TenantPool. Unset GUC means zero rows
 -- (fail-closed). ENABLE (not FORCE).

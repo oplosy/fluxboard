@@ -1,4 +1,4 @@
-// GitHub pull-request linking (FR-TASK-016, ADR-038). The webhook is the one
+// GitHub pull-request linking (FR-TASK-016, ADR-039). The webhook is the one
 // route here mounted OUTSIDE session auth: GitHub carries no bearer token, so
 // the usecase authenticates the request by verifying the HMAC signature of the
 // raw body. The settings routes are org ADMIN+ (write:integrations).
