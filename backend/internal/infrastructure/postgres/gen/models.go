@@ -402,6 +402,18 @@ type RecoveryCode struct {
 	UsedAt   pgtype.Timestamptz `json:"used_at"`
 }
 
+type Release struct {
+	ID          uuid.UUID          `json:"id"`
+	OrgID       uuid.UUID          `json:"org_id"`
+	ProjectID   uuid.UUID          `json:"project_id"`
+	Name        string             `json:"name"`
+	Description string             `json:"description"`
+	ReleaseDate pgtype.Date        `json:"release_date"`
+	ReleasedAt  pgtype.Timestamptz `json:"released_at"`
+	CreatedBy   uuid.UUID          `json:"created_by"`
+	CreatedAt   time.Time          `json:"created_at"`
+}
+
 type Session struct {
 	ID           uuid.UUID          `json:"id"`
 	FamilyID     uuid.UUID          `json:"family_id"`
@@ -492,6 +504,7 @@ type Task struct {
 	OccurrenceOn   pgtype.Date        `json:"occurrence_on"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
 	Estimate       *int32             `json:"estimate"`
+	ReleaseID      pgtype.UUID        `json:"release_id"`
 }
 
 type TaskActivity struct {
