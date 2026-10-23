@@ -33,6 +33,9 @@ import { cn } from '@/lib/utils';
 type SortKey = 'number' | 'title' | 'priority';
 
 const PRIORITY_ORDER = new Map(PRIORITIES.map((p, i) => [p, i]));
+// Rows drawn per status group before "Show more": every row carries several
+// editors, so thousands of them make the page slow to paint.
+const ROW_PAGE = 100;
 
 const cellInput =
   'w-full rounded-md border border-transparent bg-transparent px-1.5 py-1 text-xs outline-none transition-[border-color,box-shadow] hover:border-input focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))]';
@@ -105,6 +108,7 @@ export default function ProjectListPage(props: { params: Promise<{ projectKey: s
 
   const [sort, setSort] = useState<SortKey>('number');
   const [asc, setAsc] = useState(true);
+  const [rowLimit, setRowLimit] = useState<Record<string, number>>({});
 
   const groups = useMemo<Group[]>(() => {
     const data = board.data;
@@ -215,7 +219,7 @@ export default function ProjectListPage(props: { params: Promise<{ projectKey: s
                         </td>
                       </tr>
                     ) : null}
-                    {g.tasks.map((t) => (
+                    {g.tasks.slice(0, rowLimit[g.id] ?? ROW_PAGE).map((t) => (
                       <tr key={t.id} className="border-b border-border/60 transition-colors last:border-0 hover:bg-secondary/40">
                         <td className="py-2 pl-4 pr-3">
                           <Link
@@ -347,6 +351,16 @@ export default function ProjectListPage(props: { params: Promise<{ projectKey: s
                     ))}
                   </tbody>
                 </table>
+                {g.tasks.length > (rowLimit[g.id] ?? ROW_PAGE) ? (
+                  <button
+                    type="button"
+                    onClick={() => setRowLimit((m) => ({ ...m, [g.id]: (m[g.id] ?? ROW_PAGE) + ROW_PAGE }))}
+                    className="w-full border-t border-border/60 px-4 py-2 text-left text-xs text-muted-foreground hover:bg-secondary/40 hover:text-foreground"
+                  >
+                    Show {Math.min(ROW_PAGE, g.tasks.length - (rowLimit[g.id] ?? ROW_PAGE))} more{' '}
+                    <span className="tabular-nums">({g.tasks.length - (rowLimit[g.id] ?? ROW_PAGE)} hidden)</span>
+                  </button>
+                ) : null}
               </div>
             </section>
           ))}
