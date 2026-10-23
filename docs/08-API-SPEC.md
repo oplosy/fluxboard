@@ -119,6 +119,8 @@ GET    /orgs/{orgId}/projects/{projectId}/epics                epics with progre
 POST   /orgs/{orgId}/projects/{projectId}/epics                {name, color?: #rrggbb} (LEAD)
 PATCH  /orgs/{orgId}/projects/{projectId}/epics/{epicId}       {name, color?} (LEAD)    DELETE same path keeps its tasks (LEAD)
 POST   /orgs/{orgId}/projects/{projectId}/epics/assign         {task_ids, epic_id|null} (CONTRIBUTOR)
+GET    /orgs/{orgId}/projects/{projectId}/sprints              sprints oldest-first; completed ones carry {completed_total, completed_done, completed_points_total, completed_points_done} (VIEWER; FR-AN-003)
+GET    /orgs/{orgId}/projects/{projectId}/sprints/{sprintId}/burndown  {start, end|null, total_points, total_tasks, days:[{date, remaining_points, remaining_tasks}]} UTC days; planned sprint → 409 (VIEWER; FR-AN-003)
 POST   /orgs/{orgId}/tasks/bulk                      {task_ids[], op: move|assign|label, ...}
 DELETE /orgs/{orgId}/tasks/{taskId}                  → trash
 POST   /orgs/{orgId}/tasks/{taskId}/restore
