@@ -30,6 +30,7 @@ import (
 	redisx "github.com/mesutokul/fluxboard/backend/internal/infrastructure/redis"
 	stripex "github.com/mesutokul/fluxboard/backend/internal/infrastructure/stripe"
 	"github.com/mesutokul/fluxboard/backend/internal/interface/jobs"
+	"github.com/mesutokul/fluxboard/backend/internal/pkg/aesgcm"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/aiuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/automationuc"
 	"github.com/mesutokul/fluxboard/backend/internal/usecase/billinguc"
@@ -232,6 +233,22 @@ func run(logger *slog.Logger) error {
 	notifyJobs.Register(mux)
 	webhookRetry.Register(mux)
 	auditRetention.Register(mux)
+
+	// Slack / Teams channel delivery (chat:send, ADR-038). Needs the at-rest key to
+	// decrypt webhook URLs; without it the api never queues chat rows either.
+	if cfg.TOTPEncKey != "" {
+		key, err := aesgcm.ParseKey(cfg.TOTPEncKey)
+		if err != nil {
+			return fmt.Errorf("totp enc key: %w", err)
+		}
+		chatCipher, err := aesgcm.New(key)
+		if err != nil {
+			return err
+		}
+		jobs.NewChat(jobs.ChatDeps{Repo: postgres.NewChatRepo(tenantPool), Cipher: chatCipher, Logger: logger}).Register(mux)
+	} else {
+		logger.Warn("TOTP_ENC_KEY not set; chat:send disabled")
+	}
 
 	// AI retention (ADR-025, FR-AI-008). The sweep only needs the ledger, so
 	// the service is built with Runs alone; gates/metering are API-path only.
