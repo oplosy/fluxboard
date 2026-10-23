@@ -285,6 +285,22 @@ type EpicRepository interface {
 	SetTaskEpic(ctx context.Context, orgID, taskID string, epicID *string) error
 }
 
+// ReleaseRepository persists releases (FR-PROJ-010).
+type ReleaseRepository interface {
+	Create(ctx context.Context, orgID string, r *Release) error
+	Get(ctx context.Context, orgID, id string) (*Release, error)
+	// ListByProject returns a project's releases oldest-first (progress unset).
+	ListByProject(ctx context.Context, orgID, projectID string) ([]Release, error)
+	// Update writes name, description, release date and released time.
+	// ErrNotFound if absent.
+	Update(ctx context.Context, orgID string, r *Release) error
+	// Delete removes a release; its tasks keep living with release_id NULL.
+	Delete(ctx context.Context, orgID, id string) error
+	// SetTaskRelease assigns (nil clears) a live task's release. ErrNotFound if
+	// the task is absent.
+	SetTaskRelease(ctx context.Context, orgID, taskID string, releaseID *string) error
+}
+
 // WatcherRepository persists task watchers (FR-TASK-014).
 type WatcherRepository interface {
 	// Add makes userID watch taskID (idempotent).
