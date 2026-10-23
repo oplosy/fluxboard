@@ -12,7 +12,7 @@ DATABASE_URL_MIGRATE ?= postgres://fluxboard_owner:owner_pw@postgres:5432/fluxbo
 
 .DEFAULT_GOAL := help
 
-.PHONY: help up down logs migrate migrate-down sqlc openapi gen-client seed stripe-seed stripe-sandbox-test \
+.PHONY: help up down web-prod logs migrate migrate-down sqlc openapi gen-client seed stripe-seed stripe-sandbox-test \
         api worker web test test-integration lint audit
 
 help: ## List targets
@@ -68,6 +68,9 @@ api: ## Run the API with hot reload (in-stack)
 
 worker: ## Run the worker (in-stack)
 	$(COMPOSE) up worker
+
+web-prod: ## Build and serve the production web app on http://localhost:3002
+	$(COMPOSE) --profile prod up -d web-prod
 
 web: ## Run the Next.js dev server (http://localhost:3000)
 	cd web && pnpm install && pnpm dev

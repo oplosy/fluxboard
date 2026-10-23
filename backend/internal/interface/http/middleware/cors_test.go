@@ -7,7 +7,7 @@ import (
 )
 
 func TestCORS(t *testing.T) {
-	h := CORS("http://localhost:3000", "http://localhost:3001")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+	h := CORS("http://localhost:3000", "http://localhost:3002")(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		w.WriteHeader(http.StatusOK)
 	}))
 	call := func(method, origin string) *httptest.ResponseRecorder {
@@ -19,8 +19,8 @@ func TestCORS(t *testing.T) {
 	}
 
 	// A preflight from an extra origin is allowed and cacheable.
-	rec := call(http.MethodOptions, "http://localhost:3001")
-	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3001" {
+	rec := call(http.MethodOptions, "http://localhost:3002")
+	if rec.Code != http.StatusNoContent || rec.Header().Get("Access-Control-Allow-Origin") != "http://localhost:3002" {
 		t.Fatalf("preflight: %d %q", rec.Code, rec.Header().Get("Access-Control-Allow-Origin"))
 	}
 	if rec.Header().Get("Access-Control-Max-Age") != "7200" {

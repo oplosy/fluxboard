@@ -68,7 +68,7 @@ type Config struct {
 
 	WebOrigin string `envconfig:"WEB_ORIGIN" default:"http://localhost:3000"`
 	// WebExtraOrigins are further browser origins CORS accepts (comma-separated),
-	// e.g. the local production build on :3001. Links and emails use WebOrigin.
+	// e.g. the local production build on :3002. Links and emails use WebOrigin.
 	WebExtraOrigins []string `envconfig:"WEB_EXTRA_ORIGINS"`
 
 	// Governed AI layer (ADR-025, FR-AI-001..008). Provider selects the

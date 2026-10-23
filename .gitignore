@@ -28,6 +28,7 @@ coverage.*
 node_modules/
 web/.next/
 web/.next-dev/
+web/.next-prod/
 web/.pnpm-store/
 web/out/
 
