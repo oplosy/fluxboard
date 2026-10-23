@@ -29,6 +29,7 @@ import { useOrgAgents } from '@/lib/org/use-agents';
 import { ApiError } from '@/lib/api/client';
 import { useToast } from '@/components/ui/toast';
 import { between } from '@/lib/board/rank';
+import { moveCard } from '@/lib/board/board-cache';
 import { doneColumnId, statusTone } from '@/lib/board/status';
 import {
   NO_VALUE,
@@ -51,28 +52,6 @@ interface MoveVars {
   columnId: string;
   rank: string;
   snapshot: BoardData;
-}
-
-// Move `taskId` to (destColId, newRank) in the cached board projection, keeping
-// each column sorted by rank. Pure — returns a new board.
-function applyMove(board: BoardData, taskId: string, destColId: string, newRank: string): BoardData {
-  let moving: TaskCard | undefined;
-  const stripped = board.columns.map((col) => {
-    const idx = col.tasks.findIndex((t) => t.id === taskId);
-    if (idx < 0) return col;
-    moving = { ...(col.tasks[idx] as TaskCard) };
-    return { ...col, tasks: col.tasks.filter((t) => t.id !== taskId) };
-  });
-  if (!moving) return board;
-  const placed = { ...moving, rank: newRank };
-  return {
-    ...board,
-    columns: stripped.map((col) => {
-      if (col.id !== destColId) return col;
-      const tasks = [...col.tasks, placed].sort((a, b) => (a.rank < b.rank ? -1 : a.rank > b.rank ? 1 : 0));
-      return { ...col, tasks };
-    }),
-  };
 }
 
 interface LaneMoveVars extends MoveVars {
@@ -356,7 +335,7 @@ export function Board({ projectId, projectKey }: { projectId: string; projectKey
       return;
     }
 
-    const moved = applyMove(current, activeTaskId, destCol.id, newRank);
+    const moved = moveCard(current, activeTaskId, destCol.id, newRank) ?? current;
     if (groupBy !== 'none' && destLane !== laneKeyOf(activeTask, groupBy)) {
       queryClient.setQueryData(boardKey, withLaneField(moved, activeTaskId, groupBy, destLane));
       laneMoveMutation.mutate({
