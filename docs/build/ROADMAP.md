@@ -79,7 +79,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR | Depends on |
 |---|---|---|---|---|---|---|
 | R-10 | GitHub pull-request linking | done | FR-TASK-016 | `claude/github-pr-linking-8cdab0` | oplosy/fluxboard#92 | |
-| R-11 | Slack / Teams notifications | in progress | FR-NTF-005 | `feat/chat-notifications` | | |
+| R-11 | Slack / Teams notifications | done | FR-NTF-005 | `feat/chat-notifications` | oplosy/fluxboard#94 | |
 
 - **R-10 GitHub pull-request linking.** A task key such as `WEB-12` in a PR
   title, branch or commit links the PR to the task; merging can move the task.
@@ -130,3 +130,4 @@ Ideas not yet placed in a wave.
 | Cross-project dashboards (R-09) | FR-AN-005 | oplosy/fluxboard#91 |
 | GitHub pull-request linking (R-10; commits not scanned) | FR-TASK-016 | oplosy/fluxboard#92 |
 | Goals (R-12; flat goals, no key results) | FR-PROJ-014 | oplosy/fluxboard#93 |
+| Slack / Teams notifications (R-11; incoming webhooks, no per-project filter) | FR-NTF-005 | oplosy/fluxboard#94 |
