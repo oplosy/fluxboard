@@ -178,3 +178,34 @@ func TestFanOutComment_MentionRowAndEmailForOptedInOnly(t *testing.T) {
 		t.Fatalf("email payload = %+v; want alice/org1", outbox.emails[0])
 	}
 }
+
+type chatCall struct {
+	cat                  notify.Category
+	title, body, entType string
+}
+
+type fakeChat struct{ calls []chatCall }
+
+func (f *fakeChat) Notify(_ context.Context, _ string, cat notify.Category, title, body, entType, _ string) {
+	f.calls = append(f.calls, chatCall{cat, title, body, entType})
+}
+
+func TestNotifyAssigned_FansOutToChat(t *testing.T) {
+	bob := UserRef{ID: "u-bob", Email: "bob@example.com", Name: "Bob"}
+	chat := &fakeChat{}
+	// Bob turned both personal channels off: the org channel still gets the message.
+	prefs := &fakePrefs{stored: map[string]notify.Pref{
+		(&fakePrefs{}).key(bob.ID, notify.CategoryTaskAssigned): {Category: notify.CategoryTaskAssigned},
+	}}
+	s := New(Deps{Notifs: &fakeNotifs{}, Prefs: prefs, Dir: &fakeDir{members: []UserRef{bob}}, Chat: chat})
+
+	s.NotifyAssigned(context.Background(), "org1", "u-actor", "task1", bob.ID, "Ship it")
+
+	if len(chat.calls) != 1 {
+		t.Fatalf("chat calls = %d; want 1", len(chat.calls))
+	}
+	c := chat.calls[0]
+	if c.cat != notify.CategoryTaskAssigned || c.entType != "task" || c.body != "For Bob: You have been assigned to “Ship it”." {
+		t.Fatalf("unexpected chat call %+v", c)
+	}
+}

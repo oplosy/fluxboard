@@ -263,6 +263,7 @@ type OutboxKind string
 
 const (
 	OutboxEmailSend OutboxKind = "email:send"
+	OutboxChatSend  OutboxKind = "chat:send"
 )
 
 // OutboxItem is a transactional-outbox row (09 §2). Producers insert it in the

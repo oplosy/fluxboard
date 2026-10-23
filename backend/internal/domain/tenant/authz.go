@@ -19,6 +19,7 @@ const (
 	ObjLabels       = "labels"       // manage labels
 	ObjAutomations  = "automations"  // manage automation rules
 	ObjIntegrations = "integrations" // manage external integrations (GitHub, ADR-039)
+	ObjChat         = "chat"         // manage Slack / Teams notification channels
 
 	ActRead  = "read"
 	ActWrite = "write"

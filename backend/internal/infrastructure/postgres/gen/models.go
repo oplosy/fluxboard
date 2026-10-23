@@ -142,6 +142,34 @@ type BoardColumn struct {
 	Role      *string   `json:"role"`
 }
 
+type ChatChannel struct {
+	ID         uuid.UUID `json:"id"`
+	OrgID      uuid.UUID `json:"org_id"`
+	Provider   string    `json:"provider"`
+	Name       string    `json:"name"`
+	UrlEnc     string    `json:"url_enc"`
+	UrlHint    string    `json:"url_hint"`
+	Categories []string  `json:"categories"`
+	Enabled    bool      `json:"enabled"`
+	CreatedBy  uuid.UUID `json:"created_by"`
+	CreatedAt  time.Time `json:"created_at"`
+}
+
+type ChatDelivery struct {
+	ID        uuid.UUID          `json:"id"`
+	OrgID     uuid.UUID          `json:"org_id"`
+	ChannelID uuid.UUID          `json:"channel_id"`
+	Category  string             `json:"category"`
+	Title     string             `json:"title"`
+	Body      string             `json:"body"`
+	Link      string             `json:"link"`
+	Status    string             `json:"status"`
+	Attempts  int32              `json:"attempts"`
+	LastError string             `json:"last_error"`
+	CreatedAt time.Time          `json:"created_at"`
+	SentAt    pgtype.Timestamptz `json:"sent_at"`
+}
+
 type Comment struct {
 	ID        uuid.UUID          `json:"id"`
 	OrgID     uuid.UUID          `json:"org_id"`

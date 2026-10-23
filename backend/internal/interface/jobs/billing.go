@@ -158,6 +158,8 @@ func (b *Billing) enqueueOutboxItem(ctx context.Context, item billing.OutboxItem
 	switch item.Kind {
 	case billing.OutboxEmailSend:
 		taskType = TypeEmailSend
+	case billing.OutboxChatSend:
+		taskType = TypeChatSend
 	default:
 		return fmt.Errorf("%w %q", errUnknownOutboxKind, item.Kind)
 	}

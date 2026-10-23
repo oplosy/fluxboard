@@ -27,6 +27,7 @@ type Deps struct {
 	PublicForms    *handlers.PublicFormHandlers // nil ⇒ public intake forms disabled
 	Automations    *handlers.AutomationHandlers // nil ⇒ automations disabled
 	Github         *handlers.GithubHandlers     // nil ⇒ GitHub integration disabled
+	Chat           *handlers.ChatHandlers       // nil ⇒ chat channels disabled (no TOTP_ENC_KEY)
 	AI             *handlers.AIHandlers         // nil ⇒ AI surface disabled
 	MCP            http.Handler                 // nil ⇒ /mcp disabled (ADR-034)
 	Billing        *handlers.BillingHandlers
@@ -486,6 +487,15 @@ func NewRouter(d Deps) http.Handler {
 					o.With(write(tenant.ObjAPIKeys)).Get("/api-keys", d.APIKeys.List)
 					o.With(write(tenant.ObjAPIKeys)).Post("/api-keys", d.APIKeys.Create)
 					o.With(write(tenant.ObjAPIKeys)).Delete("/api-keys/{id}", d.APIKeys.Revoke)
+				}
+				// Slack / Teams notification channels (ADMIN, FR-NTF-005, ADR-040).
+				if d.Chat != nil {
+					o.With(write(tenant.ObjChat)).Get("/chat-channels", d.Chat.List)
+					o.With(write(tenant.ObjChat)).Post("/chat-channels", d.Chat.Create)
+					o.With(write(tenant.ObjChat)).Patch("/chat-channels/{channelId}", d.Chat.Update)
+					o.With(write(tenant.ObjChat)).Delete("/chat-channels/{channelId}", d.Chat.Delete)
+					o.With(write(tenant.ObjChat)).Post("/chat-channels/{channelId}/test", d.Chat.Test)
+					o.With(write(tenant.ObjChat)).Get("/chat-deliveries", d.Chat.Deliveries)
 				}
 				// Agents (ADR-033, FR-AGT-002/003): members see them, ADMIN+ manage
 				// them; creation is capped by the plan's max_agents.

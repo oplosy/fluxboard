@@ -105,6 +105,7 @@ Acceptance criteria for each phase = all **M** requirements of that module pass.
 | FR-NTF-002 | M | In-app notifications for: task assigned to you, @mention, comment on a task you're assigned to/created, invitation accepted, billing events (OWNER/ADMIN). Unread badge; mark read/all-read; 90-day retention. |
 | FR-NTF-003 | M | Email notifications (Asynq → SMTP; Mailpit locally): invitation, verification, password reset, payment failed, weekly digest (S). Per-user per-category opt-out (transactional auth emails cannot be disabled). |
 | FR-NTF-004 | S | Notification preferences page (matrix: category × channel). |
+| FR-NTF-005 | S | Chat notifications: an org ADMIN+ connects a Slack or Microsoft Teams incoming-webhook URL (https and the provider's own hosts only), picks which notification categories it receives, and can send a test message. Deliveries run through the outbox and worker with retries; the webhook URL is encrypted at rest and never returned after saving; recent delivery status is shown in org settings. |
 
 ## ADM — Platform Admin
 
