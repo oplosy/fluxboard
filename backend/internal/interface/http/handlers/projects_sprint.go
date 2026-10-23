@@ -24,7 +24,10 @@ type sprintResp struct {
 	EndedAt        *time.Time `json:"ended_at,omitempty"`
 	CompletedTotal int        `json:"completed_total"`
 	CompletedDone  int        `json:"completed_done"`
-	CreatedAt      time.Time  `json:"created_at"`
+	// Story points snapshot at completion (FR-AN-003).
+	CompletedPointsTotal int       `json:"completed_points_total"`
+	CompletedPointsDone  int       `json:"completed_points_done"`
+	CreatedAt            time.Time `json:"created_at"`
 }
 
 func toSprintResp(s *project.Sprint) sprintResp {
@@ -32,6 +35,7 @@ func toSprintResp(s *project.Sprint) sprintResp {
 		ID: s.ID, Name: s.Name, Goal: s.Goal, Status: string(s.Status),
 		StartedAt: s.StartedAt, EndedAt: s.EndedAt,
 		CompletedTotal: s.CompletedTotal, CompletedDone: s.CompletedDone,
+		CompletedPointsTotal: s.CompletedPointsTotal, CompletedPointsDone: s.CompletedPointsDone,
 		CreatedAt: s.CreatedAt,
 	}
 }
@@ -111,6 +115,39 @@ func (h *ProjectHandlers) CompleteSprint(w http.ResponseWriter, r *http.Request)
 		return
 	}
 	response.JSON(w, http.StatusOK, toSprintResp(sp))
+}
+
+type burndownDayResp struct {
+	Date            string `json:"date"` // YYYY-MM-DD, UTC
+	RemainingPoints int    `json:"remaining_points"`
+	RemainingTasks  int    `json:"remaining_tasks"`
+}
+
+// SprintBurndown returns remaining work per day of a started sprint (VIEWER).
+func (h *ProjectHandlers) SprintBurndown(w http.ResponseWriter, r *http.Request) {
+	tc, ok := mw.TenantFrom(r.Context())
+	if !ok {
+		response.Error(w, domain.ErrForbidden)
+		return
+	}
+	b, err := h.svc.SprintBurndown(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "projectId"), chi.URLParam(r, "sprintId"), tc.Role)
+	if err != nil {
+		response.Error(w, err)
+		return
+	}
+	days := make([]burndownDayResp, 0, len(b.Days))
+	for _, d := range b.Days {
+		days = append(days, burndownDayResp{Date: d.Date.Format(time.DateOnly), RemainingPoints: d.RemainingPoints, RemainingTasks: d.RemainingTasks})
+	}
+	var end *string
+	if b.End != nil {
+		e := b.End.UTC().Format(time.DateOnly)
+		end = &e
+	}
+	response.JSON(w, http.StatusOK, map[string]any{
+		"start": b.Start.Format(time.DateOnly), "end": end,
+		"total_points": b.TotalPoints, "total_tasks": b.TotalTasks, "days": days,
+	})
 }
 
 // DeleteSprint removes a planned sprint (LEAD).
