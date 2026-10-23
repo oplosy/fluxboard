@@ -70,8 +70,14 @@ func (s *Service) withProgress(ctx context.Context, orgID, projectID string, epi
 		}
 		if j, ok := idx[*t.EpicID]; ok {
 			epics[j].Total++
+			pts := 0
+			if t.Estimate != nil {
+				pts = *t.Estimate
+			}
+			epics[j].Points += pts
 			if t.ColumnID == doneColumn {
 				epics[j].Done++
+				epics[j].DonePoints += pts
 			}
 		}
 	}

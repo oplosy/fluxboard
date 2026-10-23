@@ -12,15 +12,17 @@ import (
 // Epic groups related tasks of one project (FR-PROJ-008). Tasks join via
 // Task.EpicID. Total/Done are derived from the tasks when listing, never stored.
 type Epic struct {
-	ID        string
-	OrgID     string
-	ProjectID string
-	Name      string
-	Color     string // "" or #RRGGBB
-	CreatedBy string
-	CreatedAt time.Time
-	Total     int // tasks in the epic
-	Done      int // of those, tasks in the done column
+	ID         string
+	OrgID      string
+	ProjectID  string
+	Name       string
+	Color      string // "" or #RRGGBB
+	CreatedBy  string
+	CreatedAt  time.Time
+	Total      int // tasks in the epic
+	Done       int // of those, tasks in the done column
+	Points     int // summed estimates of the epic's tasks (FR-TASK-015)
+	DonePoints int // of those, points in the done column
 }
 
 // MaxEpicNameLen caps an epic name (runes).

@@ -249,6 +249,8 @@ export interface TaskCard {
   subtask_done: number;
   sprint_id?: string | null;
   epic_id?: string | null;
+  /** Story points; null = not estimated (FR-TASK-015). */
+  estimate?: number | null;
   created_at: string;
   rank: string;
   /** Increases on every content change; send it back to refuse stale writes. */
@@ -293,6 +295,8 @@ export interface UpdateTaskInput {
   priority: Priority;
   start_date?: string | null;
   due_date?: string | null;
+  /** Story points 0–1000; null clears, omitted keeps the stored value. */
+  estimate?: number | null;
   /** The version the edit is based on; a newer task → 409 version_conflict. */
   version?: number;
 }
@@ -486,6 +490,8 @@ export interface Task {
   start_date?: string;
   due_date?: string;
   epic_id?: string | null;
+  /** Story points; null = not estimated (FR-TASK-015). */
+  estimate?: number | null;
   rank: string;
   created_by: string;
   created_at: string;

@@ -107,6 +107,7 @@ export function Column({
   }
 
   const fill = column.wip_limit ? Math.min(1, tasks.length / column.wip_limit) : 0;
+  const points = tasks.reduce((sum, t) => sum + (t.estimate ?? 0), 0);
 
   return (
     <div
@@ -132,6 +133,11 @@ export function Column({
             {tasks.length}
             {column.wip_limit != null ? ` / ${column.wip_limit}` : ''}
           </span>
+          {points > 0 ? (
+            <span className="ml-auto text-[11px] tabular-nums text-muted-foreground" title="Story points in this column">
+              {points} pts
+            </span>
+          ) : null}
         </div>
         {column.wip_limit != null ? (
           <div className="mt-1.5 h-[3px] overflow-hidden rounded-full bg-foreground/10" aria-hidden>

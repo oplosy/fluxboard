@@ -79,6 +79,8 @@ func (p Priority) Valid() bool {
 const (
 	// MaxTitleLen bounds a task title (FR-TASK-001).
 	MaxTitleLen = 200
+	// MaxEstimate bounds a task's story points (FR-TASK-015; DB CHECK matches).
+	MaxEstimate = 1000
 	// MaxLabelLen bounds a label name (FR-TASK-004).
 	MaxLabelLen = 30
 	// CommentEditWindow is how long after posting a comment may still be edited
@@ -205,6 +207,7 @@ type Task struct {
 	DueDate     *time.Time
 	SprintID    *string
 	EpicID      *string // nil = no epic (FR-PROJ-008)
+	Estimate    *int    // story points; nil = not estimated (FR-TASK-015)
 	Rank        string
 	CreatedBy   string
 	CreatedAt   time.Time

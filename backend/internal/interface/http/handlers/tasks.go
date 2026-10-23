@@ -5,6 +5,7 @@
 package handlers
 
 import (
+	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -46,6 +47,7 @@ type taskResp struct {
 	StartDate   *time.Time `json:"start_date,omitempty"`
 	DueDate     *time.Time `json:"due_date,omitempty"`
 	EpicID      *string    `json:"epic_id,omitempty"`
+	Estimate    *int       `json:"estimate,omitempty"`
 	Rank        string     `json:"rank"`
 	CreatedBy   string     `json:"created_by"`
 	CreatedAt   time.Time  `json:"created_at"`
@@ -61,7 +63,7 @@ func toTaskResp(t *project.Task) taskResp {
 	return taskResp{
 		ID: t.ID, ProjectID: t.ProjectID, ColumnID: t.ColumnID, Number: t.Number,
 		Title: t.Title, Description: t.Description, AssigneeID: t.AssigneeID,
-		Priority: string(t.Priority), StartDate: t.StartDate, DueDate: t.DueDate, EpicID: t.EpicID, Rank: t.Rank,
+		Priority: string(t.Priority), StartDate: t.StartDate, DueDate: t.DueDate, EpicID: t.EpicID, Estimate: t.Estimate, Rank: t.Rank,
 		CreatedBy: t.CreatedBy, CreatedAt: t.CreatedAt, UpdatedAt: t.UpdatedAt,
 		Version: t.Version, ClaimedBy: claimedBy, LeaseExpiresAt: lease,
 	}
@@ -198,9 +200,22 @@ type updateTaskReq struct {
 	Priority    string     `json:"priority"`
 	StartDate   *time.Time `json:"start_date"`
 	DueDate     *time.Time `json:"due_date"`
+	// Estimate: absent keeps the stored points, null clears them (FR-TASK-015).
+	Estimate optionalInt `json:"estimate"`
 	// Version, when sent, is the version the client read; a task that changed
 	// since → 409 version_conflict with the current task (FR-AGT-005).
 	Version *int64 `json:"version"`
+}
+
+// optionalInt tells an absent JSON field (Set false) from an explicit null.
+type optionalInt struct {
+	Set   bool
+	Value *int
+}
+
+func (o *optionalInt) UnmarshalJSON(b []byte) error {
+	o.Set = true
+	return json.Unmarshal(b, &o.Value)
 }
 
 // UpdateTask edits a task's fields (CONTRIBUTOR+).
@@ -217,6 +232,7 @@ func (h *TaskHandlers) UpdateTask(w http.ResponseWriter, r *http.Request) {
 	t, err := h.svc.UpdateTask(r.Context(), tc.OrgID, tc.UserID, chi.URLParam(r, "taskId"), taskuc.UpdateTaskInput{
 		Title: req.Title, Description: req.Description, AssigneeID: req.AssigneeID,
 		Priority: project.Priority(req.Priority), StartDate: req.StartDate, DueDate: req.DueDate,
+		Estimate: req.Estimate.Value, SetEstimate: req.Estimate.Set,
 		IfVersion: req.Version,
 	}, tc.Role)
 	if err != nil {

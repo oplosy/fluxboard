@@ -489,6 +489,7 @@ type Task struct {
 	RecurrenceID   pgtype.UUID        `json:"recurrence_id"`
 	OccurrenceOn   pgtype.Date        `json:"occurrence_on"`
 	EpicID         pgtype.UUID        `json:"epic_id"`
+	Estimate       *int32             `json:"estimate"`
 }
 
 type TaskActivity struct {

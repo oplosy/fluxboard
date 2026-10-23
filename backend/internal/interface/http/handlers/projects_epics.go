@@ -15,16 +15,18 @@ import (
 )
 
 type epicResp struct {
-	ID        string    `json:"id"`
-	Name      string    `json:"name"`
-	Color     string    `json:"color"`
-	Total     int       `json:"total"`
-	Done      int       `json:"done"`
-	CreatedAt time.Time `json:"created_at"`
+	ID         string    `json:"id"`
+	Name       string    `json:"name"`
+	Color      string    `json:"color"`
+	Total      int       `json:"total"`
+	Done       int       `json:"done"`
+	Points     int       `json:"points"`
+	DonePoints int       `json:"done_points"`
+	CreatedAt  time.Time `json:"created_at"`
 }
 
 func toEpicResp(e *project.Epic) epicResp {
-	return epicResp{ID: e.ID, Name: e.Name, Color: e.Color, Total: e.Total, Done: e.Done, CreatedAt: e.CreatedAt}
+	return epicResp{ID: e.ID, Name: e.Name, Color: e.Color, Total: e.Total, Done: e.Done, Points: e.Points, DonePoints: e.DonePoints, CreatedAt: e.CreatedAt}
 }
 
 type epicReq struct {

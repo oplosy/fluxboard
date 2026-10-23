@@ -247,6 +247,39 @@ export function TaskDetail({
               )}
             </Field>
 
+            <Field label="Story points">
+              {canEdit ? (
+                <input
+                  // Remount on a new saved value so the field follows refetches.
+                  key={`${task.id}:${task.estimate ?? ''}`}
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  max={1000}
+                  step={1}
+                  aria-label="Story points"
+                  placeholder="—"
+                  defaultValue={task.estimate ?? ''}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') e.currentTarget.blur();
+                  }}
+                  onBlur={(e) => {
+                    const raw = e.target.value.trim();
+                    const next = raw === '' ? null : Number(raw);
+                    if (next !== null && (!Number.isInteger(next) || next < 0 || next > 1000)) {
+                      e.target.value = task.estimate == null ? '' : String(task.estimate);
+                      toast({ title: 'Story points must be a whole number from 0 to 1000', variant: 'error' });
+                      return;
+                    }
+                    if (next !== (task.estimate ?? null)) patch.mutate({ estimate: next });
+                  }}
+                  className="w-full rounded-md border border-input bg-card px-2.5 py-1.5 text-sm outline-none focus-visible:border-foreground focus-visible:shadow-[inset_0_-2px_0_hsl(var(--signal))] focus-visible:outline-none transition-[border-color,box-shadow] duration-300 hover:border-foreground/40"
+                />
+              ) : (
+                <span className="text-sm">{task.estimate ?? '—'}</span>
+              )}
+            </Field>
+
             <Field label="Start date">
               {canEdit ? (
                 <input
