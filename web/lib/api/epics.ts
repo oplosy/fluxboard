@@ -10,6 +10,10 @@ export interface Epic {
   total: number;
   /** Of those, tasks in the done column. */
   done: number;
+  /** Summed estimates of the epic's tasks (FR-TASK-015). */
+  points: number;
+  /** Of those, points in the done column. */
+  done_points: number;
   created_at: string;
 }
 
