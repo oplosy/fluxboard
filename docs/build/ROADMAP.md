@@ -31,7 +31,7 @@ Most later items build on these two.
 | ID | Feature | Status | FR | Branch | PR |
 |---|---|---|---|---|---|
 | R-01 | Epics / task hierarchy | done | FR-PROJ-008 | `feat/epics` | oplosy/fluxboard#82 |
-| R-02 | Story points / estimates | in progress | FR-TASK-015 | `feat/story-points` | |
+| R-02 | Story points / estimates | done | FR-TASK-015 | `feat/story-points` | oplosy/fluxboard#83 |
 
 - **R-01 Epics / task hierarchy.** A task can have a parent (epic). Today
   subtasks are checklist items only, and there is no `parent_id` on tasks. Epic
@@ -117,3 +117,4 @@ Ideas not yet placed in a wave.
 | Task watchers | FR-TASK-014 | oplosy/fluxboard#78 |
 | Canvas redesign (board, list, task detail, shell) | — | oplosy/fluxboard#79 |
 | Epics (R-01) | FR-PROJ-008 | oplosy/fluxboard#82 |
+| Story points (R-02) | FR-TASK-015 | oplosy/fluxboard#83 |
