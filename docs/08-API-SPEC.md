@@ -102,6 +102,9 @@ DELETE /orgs/{orgId}/projects/{key}/columns/{id}     ?migrate_to=<columnId> requ
 
 GET    /orgs/{orgId}/projects/{key}/board            columns + tasks (card projection), one query
 GET    /orgs/{orgId}/projects/{key}/analytics        rollup data (FR-AN-001)
+GET    /orgs/{orgId}/dashboard                       per-project open/done/overdue, per-assignee open, weekly completed; visible projects only (FR-AN-005)
+GET    /orgs/{orgId}/dashboard/layout                caller's widget list [{id,type,project_ids}]; default when unsaved
+PUT    /orgs/{orgId}/dashboard/layout                replace it; types project_status|overdue|throughput|workload, <=12 widgets, 400 otherwise
 ```
 
 ## 6. Tasks

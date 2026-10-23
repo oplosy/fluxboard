@@ -420,6 +420,7 @@ func newApp(ctx context.Context, cfg *config.Config, logger *slog.Logger) (_ *ap
 			Projects: projectRepo,
 			Members:  projectMemberRepo,
 			Usage:    analyticsRepo,
+			Dash:     postgres.NewDashboardRepo(tenantPool),
 			Subs:     postgres.NewSubscriptionRepo(tenantPool),
 			Plans:    postgres.NewPlanRepo(pool),
 		})

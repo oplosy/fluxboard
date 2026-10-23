@@ -166,6 +166,13 @@ type CustomField struct {
 	CreatedAt time.Time `json:"created_at"`
 }
 
+type DashboardLayout struct {
+	OrgID     uuid.UUID `json:"org_id"`
+	UserID    uuid.UUID `json:"user_id"`
+	Widgets   []byte    `json:"widgets"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 type EntitlementOverride struct {
 	OrgID     uuid.UUID   `json:"org_id"`
 	Key       string      `json:"key"`
