@@ -102,7 +102,7 @@ locked account, OAuth-only account). A tripped throttle returns 429
 `rate_limited` with `Retry-After` and `details.retry_after` (seconds; the
 header is not readable cross-origin).
 
-The client IP used by every per-IP throttle comes from `RemoteAddr`, or from
+The client IP for every per-IP throttle comes from `RemoteAddr`, or from
 `X-Forwarded-For` only for the `TRUSTED_PROXY_HOPS` entries our own proxies
 append (the N-th from the right). The leftmost XFF entry is client-controlled
 and never trusted, so it cannot be rotated to dodge the login throttle.
