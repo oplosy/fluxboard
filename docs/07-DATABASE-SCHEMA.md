@@ -3,7 +3,7 @@
 Conventions: UUIDv7 PKs (`pkg/uuidv7`, time-ordered → index-friendly),
 `timestamptz` everywhere, `created_at/updated_at` on all tables
 (updated_at via trigger), soft delete = `deleted_at timestamptz`.
-Migrations: golang-migrate, `NNNN_name.up.sql/.down.sql`, every migration
+Migrations: golang-migrate, `NNNN_name.up.sql/.down.sql`; every migration is
 reversible. RLS policy pattern from 05 §4 applied to every table marked **[T]**
 (tenant-owned).
 
