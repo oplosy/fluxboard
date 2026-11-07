@@ -1,6 +1,6 @@
 # Documentation index
 
-Start with the [project overview](00-PROJECT-OVERVIEW.md), then use the [working rules](CLAUDE.md) to follow the required reading order.
+Start with the [project overview](00-PROJECT-OVERVIEW.md), then follow the [working rules](CLAUDE.md) for the required reading order.
 
 ## Product and architecture
 
