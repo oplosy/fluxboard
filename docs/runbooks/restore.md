@@ -98,7 +98,7 @@ Not yet exercised: run this on a staging copy, time it, and record the result
 below before quoting these numbers.
 
 1. **Pick the moment** just before the incident, in UTC, and write it down. It
-   is the recovery manifest's anchor for the database and the objects.
+   anchors the recovery manifest for the database and the objects.
    `aws rds describe-db-instances --db-instance-identifier <db_instance_id>`
    shows `LatestRestorableTime`.
 2. **Restore into a new instance.** PITR never overwrites the source:

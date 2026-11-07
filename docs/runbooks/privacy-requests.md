@@ -72,7 +72,7 @@ Deleted data stays in backups for a limited time (`deploy/aws`, ADR-028):
 - earlier file versions: 30 days;
 - daily vault copies: 35 days.
 
-It is gone from every backup within **35 days**. The privacy policy states this.
+It is gone from all backups within **35 days**. The privacy policy states this.
 A restore from backup (`restore.md`) must not resurrect data a user deleted,
 except as part of recovering the whole service. After such a restore, re-apply
 deletions requested in the restored window.

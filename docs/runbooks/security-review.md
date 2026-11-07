@@ -19,6 +19,6 @@ scope, commands, findings, and unresolved risks in the pull request.
 ## Evidence
 
 Attach the exact command output or CI job links to the review. A passing unit
-test does not prove PostgreSQL RLS isolation; that claim requires an integration
-test using the `fluxboard_app` role. Track any accepted residual risk in the
+test does not prove PostgreSQL RLS isolation; that claim needs an integration
+test that uses the `fluxboard_app` role. Track any accepted residual risk in the
 pull request and link the related ADR or requirement ID.

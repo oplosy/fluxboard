@@ -62,7 +62,7 @@ CI uses service containers instead, and suites take their endpoints from env.
 entitlement-gated writes fail with `load free plan: not found`), then loads the
 fixture on the owner pool. It refuses `APP_ENV=prod`.
 
-Deterministic fixture (fixed UUIDv5 IDs; every row derived from a clock that
+Deterministic fixture (fixed UUIDv5 IDs; every row is derived from a clock that
 defaults to today, UTC midnight — pin it with `make seed SEED_ARGS="-clock
 2026-01-15"` for byte-identical data):
 - Users (all `email_verified`, password `Demo-Pass-2026!`): `owner@demo.dev`,

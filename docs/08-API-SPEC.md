@@ -201,7 +201,7 @@ same limiter keyed `rl:api:{orgId}:{userId}`.
 
 ### Task versions and claims (ADR-033, FR-AGT-004/005)
 
-Every task carries `version`, bumped by the database on each content change
+Every task carries a `version`, bumped by the database on each content change
 (not on a rank-only reorder, nor on claim/lease bookkeeping). A write that
 sends `version` is applied only if the task is still at it; otherwise 409:
 

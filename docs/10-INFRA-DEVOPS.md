@@ -136,7 +136,7 @@ failing (blackbox probe, 3 failed probes = 45 s), API 5xx > 5%, webhook
 error-rate, reconcile drift, job failure rate, refresh reuse. Dead-letter and
 queue depth still need an Asynq exporter.
 
-**Delivery:** Prometheus sends to Alertmanager, which emails every alert
+**Delivery:** Prometheus sends to Alertmanager, which emails each alert
 (firing and resolved; grouped by alertname+job, repeat every 4 h) to
 `ALERT_EMAIL_TO` over the same SMTP settings as the API. Locally the mail lands
 in Mailpit; verified end to end on 2026-10-12 by stopping the api container:

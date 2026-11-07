@@ -28,8 +28,8 @@ their order, not a provider's commands.
   - `ghcr.io/<owner>/fluxboard-web`: Next.js production server;
 - opens a GitHub Release whose notes list every image by digest.
 
-Deploy by digest from the release notes, not by tag: a tag can be moved, a
-digest cannot.
+Deploy by digest from the release notes, not by tag: a tag can move, a digest
+cannot.
 
 ## Deploy order
 

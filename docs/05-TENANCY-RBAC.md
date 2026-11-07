@@ -1,6 +1,6 @@
 # 05 — Multi-Tenancy & Authorization
 
-Implements FR-TEN-*, plus the authorization layer used by every module.
+Implements FR-TEN-*, plus the authorization layer used by all modules.
 
 ## 1. Tenancy Model
 

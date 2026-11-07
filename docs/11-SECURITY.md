@@ -60,7 +60,7 @@ Permissions-Policy: camera=(), microphone=(), geolocation=()
 
 ## 5. Secure Development Practices (enforced, not aspirational)
 
-- Every new endpoint PR must state: authn path, authz check (Casbin object/
+- Every endpoint PR must state: authn path, authz check (Casbin object/
   action + usecase fine gate), tenant scoping, rate-limit class — PR template
   checklist.
 - `errmap.go` guarantees no internal error text reaches clients (500 body is

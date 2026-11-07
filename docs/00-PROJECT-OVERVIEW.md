@@ -7,7 +7,7 @@ usage-based billing. Organizations (tenants) sign up, invite members, manage
 projects on kanban boards, and are billed monthly through Stripe based on
 their plan tier plus metered usage (active members, storage, API calls).
 
-The product is a **portfolio project**: every module is chosen to demonstrate
+The product is a **portfolio project**: each module is chosen to demonstrate
 a specific production engineering competency, not to maximize feature count.
 
 | Module | Competency Demonstrated |
@@ -101,4 +101,4 @@ fluxboard/
 â””â”€â”€ .github/workflows/       # ci.yml, described in 10-INFRA-DEVOPS.md
 ```
 
-<!-- docs: cross-ref — plan enforcement details in 06-BILLING.md §7, RLS isolation in 05-TENANCY-RBAC.md §4 -->
+<!-- docs: cross-ref ï¿½ plan enforcement details in 06-BILLING.md ï¿½7, RLS isolation in 05-TENANCY-RBAC.md ï¿½4 -->

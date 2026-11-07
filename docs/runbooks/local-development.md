@@ -31,4 +31,4 @@ runtime dependencies and is the meaningful local readiness check.
 
 `make down` stops the stack and removes Compose volumes, including local
 PostgreSQL, Redis, and MinIO data. Use `docker compose ... stop` when the data
-must be retained and the stack will be resumed later.
+must be kept and the stack will be resumed later.
