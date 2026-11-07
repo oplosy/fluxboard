@@ -19,7 +19,7 @@ api:8080/api/v1/webhooks/stripe`); §10 has the setup.
 
 Card data: **never** touches our servers — Stripe Checkout (hosted) for
 acquisition, Stripe Billing Portal for payment-method management. PCI scope:
-SAQ A. There is no card form anywhere in our codebase.
+SAQ A. No card form exists anywhere in our codebase.
 
 ## 2. Subscription State Machine (local `subscriptions.status`)
 
