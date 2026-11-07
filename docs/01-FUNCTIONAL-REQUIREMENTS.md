@@ -1,6 +1,6 @@
 # 01 — Functional Requirements (Exhaustive)
 
-Requirement ID format: `FR-<MODULE>-<NNN>`. Every requirement is testable.
+Requirement ID format: `FR-<MODULE>-<NNN>`. Every requirement must be testable.
 Priority: **M** = must (v1 blocker), **S** = should, **C** = could.
 Acceptance criteria for each phase = all **M** requirements of that module pass.
 
