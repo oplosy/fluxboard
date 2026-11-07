@@ -105,7 +105,7 @@ can begin area-by-area once the backing API for that area (its phase) is done.
   entries to `jobs.Schedule()`.
 - Money = integer minor units, never float. Timestamps = `timestamptz` UTC.
 
-## Local dev / verify cheatsheet (Windows, no `make`)
+## Local dev / verify cheat sheet (Windows, no `make`)
 
 - **Compose up:** `docker compose -f deploy/docker-compose.yml -f
   deploy/docker-compose.override.yml up -d --build api worker` (postgres/redis/
