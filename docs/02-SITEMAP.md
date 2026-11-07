@@ -1,7 +1,7 @@
 # 02 — Sitemap (Complete Page Inventory)
 
 Next.js 16 App Router (ADR-026). Route groups: `(public)`, `(auth)`, `(app)`, `(admin)`.
-Guard legend: **P** public · **A** authenticated · **V** authenticated+verified ·
+Guard legend: **P** public · **A** authenticated · **V** authenticated and verified ·
 **O(role)** org member with minimum role · **PA** platform admin.
 
 ## 1. Public / Marketing — `(public)`
