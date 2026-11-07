@@ -29,7 +29,7 @@
    ▼
 [AI provider — mock default] ◄── api/aiuc (clients never call it directly)
    │  deterministic, keyless; live Claude/Azure failover plugs the same port
-   │  every run ledgered in ai_runs + audited (severity=ai)
+   │  each run ledgered in ai_runs + audited (severity=ai)
    ▼
 [MCP clients] ──POST /api/v1/orgs/{id}/mcp──► [Go API] (same gates: HybridAuth,
    tenant, RBAC, scope, surface flag, monthly meter)
