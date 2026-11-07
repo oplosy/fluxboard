@@ -61,7 +61,7 @@ purges. Worker: `cmd/worker`, concurrency 10, Prometheus metrics exported.
 | `billing:reconcile` | nightly 04:00 | 06 §8; pure read+heal, naturally idempotent |
 | `webhook:retry` | admin button | re-invokes consumer → dedup via processed_stripe_events (safe no-op if handled) |
 
-**Handler contract:** every handler idempotent (stated mechanism above),
+**Handler contract:** every handler is idempotent (mechanism stated above),
 context-aware (respects cancellation), max 3 retries then dead-letter
 (`asynq:dead`) — surfaced in `/admin/jobs`. Failure of one org's job never
 aborts the batch (per-org error isolation, errors aggregated to log).
